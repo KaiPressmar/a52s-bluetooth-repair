@@ -114,6 +114,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=("$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes --verify-tag=false)
+          args=("$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes)
           if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
           gh release create "${args[@]}"
