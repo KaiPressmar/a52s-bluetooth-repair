@@ -1,8 +1,8 @@
-name: Test and Build
+name: CI
 
 on:
   push:
-    branches: [ main, tdd-test-infrastructure ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  test-lint-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,22 +35,24 @@ jobs:
           gradle-version: '8.9'
       - name: Unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
-      - name: Lint
+      - name: Android lint
         run: gradle :app:lintDebug --stacktrace
-      - name: Build debug APK
+      - name: Build installable debug APK
         run: gradle :app:assembleDebug --stacktrace
-      - name: Upload test reports
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: ci-reports
           path: |
             app/build/reports/tests/
             app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
-      - name: Upload tested APK
+          retention-days: 14
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: a52s-bluetooth-repair-debug
+          name: a52s-bluetooth-repair-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14

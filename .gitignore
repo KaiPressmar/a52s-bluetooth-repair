@@ -1,0 +1,24 @@
+# Gradle / Android
+.gradle/
+build/
+**/build/
+local.properties
+.idea/
+*.iml
+
+# Signing material — never commit
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+keystore.properties
+
+# Diagnostics / private captures
+*.log
+*.bugreport
+bugreport-*.zip
+
+# OS
+.DS_Store
+Thumbs.db
