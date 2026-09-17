@@ -106,7 +106,7 @@ jobs:
           name: ${{ env.RELEASE_TAG }}-signed-apk
           path: |
             ${{ env.APK_PATH }}
-            $ {{ env.APK_PATH }}.sha256
+            ${{ env.APK_PATH }}.sha256
           if-no-files-found: error
           retention-days: 30
       - name: Create GitHub release
