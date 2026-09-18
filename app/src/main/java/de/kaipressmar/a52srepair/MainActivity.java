@@ -18,19 +18,19 @@ public class MainActivity extends Activity {
     LinearLayout box; TextView status;
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
-        ScrollView scroll = new ScrollView(this); box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(32,32,32,32); scroll.addView(box); setContentView(scroll);
-        TextView title = new TextView(this); title.setText("A52s Bluetooth Repair 0.3\nExperimentelle Diagnose für HFP/SCO-Audio"); title.setTextSize(22); box.addView(title);
-        status = new TextView(this); box.addView(status);
-        button("Snapshot protokollieren", v -> snapshot("MANUAL SNAPSHOT"));
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(getColor(R.color.surface)); box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(48,48,48,64); scroll.addView(box); setContentView(scroll);
+        TextView title = new TextView(this); title.setText("A52s Bluetooth Repair\nTelefonie-Audio im Blick"); title.setTextSize(26); title.setTextColor(getColor(R.color.text_primary)); title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD); box.addView(title); TextView intro=new TextView(this); intro.setText("Diagnose und gezielte Reparatur für Bluetooth-HFP/SCO – ohne unnötige Eingriffe."); intro.setTextSize(15); intro.setTextColor(getColor(R.color.text_secondary)); intro.setPadding(0,12,0,24); box.addView(intro);
+        status = new TextView(this); status.setTextSize(14); status.setTextColor(getColor(R.color.text_primary)); status.setBackgroundResource(R.drawable.bg_card); status.setPadding(28,28,28,28); box.addView(status);
+        button("Zustand aktualisieren", v -> snapshot("MANUAL SNAPSHOT"));
         button("Monitoring starten", v -> startMonitor());
         button("Monitoring stoppen", v -> stopService(new Intent(this, MonitorService.class)));
-        button("Test 1: Audio-Routing zurücksetzen", v -> resetRouting());
-        button("Test 2: SCO neu aufbauen", v -> restartSco());
+        button("Audio-Routing reparieren", v -> resetRouting());
+        button("SCO-Verbindung neu aufbauen", v -> restartSco());
         button("Bluetooth-Einstellungen öffnen", v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
-        button("Log teilen", v -> shareLog());
+        button("Diagnoseprotokoll teilen", v -> shareLog());
         requestNeededPermissions(); snapshot("APP START");
     }
-    void button(String text, View.OnClickListener l) { Button b=new Button(this); b.setText(text); b.setOnClickListener(l); box.addView(b); }
+    void button(String text, View.OnClickListener l) { Button b=new Button(this); b.setText(text); b.setAllCaps(false); b.setTextSize(15); b.setMinHeight(56); b.setTextColor(getColor(R.color.text_primary)); b.setBackgroundResource(R.drawable.bg_secondary); b.setOnClickListener(l); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.topMargin=14; box.addView(b,p); }
     void requestNeededPermissions() {
         List<String> p=new ArrayList<>();
         if (Build.VERSION.SDK_INT>=31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED) p.add(Manifest.permission.BLUETOOTH_CONNECT);

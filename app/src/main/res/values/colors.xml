@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+ <color name="surface">#F7F9F8</color>
+ <color name="text_primary">#13211B</color>
+ <color name="text_secondary">#66736D</color>
+ <color name="brand">#187A57</color>
+ <color name="success">#14734E</color>
+ <color name="warning">#9A6200</color>
+</resources>
