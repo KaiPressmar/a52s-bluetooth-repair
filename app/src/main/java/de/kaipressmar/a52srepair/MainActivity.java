@@ -33,7 +33,7 @@ public class MainActivity extends Activity {
  private void buildDashboard(){
   LinearLayout head=new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL);
   TextView mark=label("B",22,Typeface.BOLD,GREEN_DARK); mark.setTextColor(Color.WHITE); mark.setGravity(Gravity.CENTER); mark.setBackground(round(GREEN_DARK,18)); head.addView(mark,new LinearLayout.LayoutParams(dp(54),dp(54)));
-  TextView brand=label("A52s\nBluetooth Repair",20,Typeface.BOLD,INK); LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-2,1);bp.leftMargin=dp(14);head.addView(brand,bp);
+  LinearLayout brandBox=new LinearLayout(this);brandBox.setOrientation(LinearLayout.VERTICAL);brandBox.addView(label("A52s Bluetooth Repair",19,Typeface.BOLD,INK));brandBox.addView(label("Version "+BuildConfig.VERSION_NAME,11,Typeface.NORMAL,MUTED));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-2,1);bp.leftMargin=dp(14);head.addView(brandBox,bp);
   TextView gear=label("⚙",25,Typeface.NORMAL,INK);gear.setGravity(Gravity.CENTER);gear.setBackground(round(Color.WHITE,18));gear.setElevation(dp(1));gear.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));head.addView(gear,new LinearLayout.LayoutParams(dp(48),dp(48)));content.addView(head);
 
   statusPill=label("●  Status wird geprüft",13,Typeface.BOLD,GREEN_DARK);statusPill.setPadding(dp(12),dp(7),dp(12),dp(7));statusPill.setBackground(round(Color.rgb(229,246,237),99));add(statusPill,18,-2);
