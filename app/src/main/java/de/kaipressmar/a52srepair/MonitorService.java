@@ -88,6 +88,15 @@ public class MonitorService extends Service {
 
         BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
         BluetoothHealth health = probe.health;
+
+        // setCommunicationDevice() remains active while our process lives. Release only routes
+        // selected by this app as soon as the communication session is over.
+        if (!health.inCommunication && RepairStateStore.routeOwned(this)) {
+            BluetoothRepair.releaseCommunicationRoute(this);
+            probe = BluetoothRepair.probe(this);
+            health = probe.health;
+        }
+
         RepairStateStore.saveHealth(this, health);
         Diag.log(
                 this,
@@ -95,6 +104,12 @@ public class MonitorService extends Service {
                         + reason
                         + " state="
                         + health.state
+                        + " hfpProfile="
+                        + health.hfpProfileConnected
+                        + " scoAvailable="
+                        + health.scoAvailable
+                        + " scoSelected="
+                        + health.scoSelected
                         + "\n"
                         + Diag.snapshot(this));
 
