@@ -98,13 +98,13 @@ public class MonitorService extends Service {
                         + "\n"
                         + Diag.snapshot(this));
 
+        boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
         int suspectCount =
-                RepairStateStore.updateConsecutiveSuspect(this, health.needsRepair());
+                RepairStateStore.updateConsecutiveSuspect(this, actionableSuspect);
 
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
-                        && health.needsRepair()
-                        && !health.speakerphoneOn
+                        && actionableSuspect
                         && suspectCount >= 2
                         && System.currentTimeMillis() - RepairStateStore.lastRepairAt(this)
                                 >= REPAIR_COOLDOWN_MS;
