@@ -40,6 +40,13 @@ public class RepairPolicyTest {
         assertTrue(RepairPolicy.canAutoRepair(suspect(false), 2, now, previousRepair));
     }
 
+    @Test public void hfpConnectedWithoutScoDoesNotAttemptImpossiblePublicRepair() {
+        BluetoothHealth noSco = BluetoothHealth.assess(
+                true, true, AudioManager.MODE_IN_CALL, true, false, false, false);
+        assertEquals(BluetoothHealth.State.HFP_CONNECTED_NO_SCO, noSco.state);
+        assertFalse(RepairPolicy.canAutoRepair(noSco, 99, 100_000L, 0L));
+    }
+
     @Test public void healthyStateNeverRepairs() {
         BluetoothHealth healthy = BluetoothHealth.assess(
                 true, true, AudioManager.MODE_IN_CALL, true, true, true, false);
