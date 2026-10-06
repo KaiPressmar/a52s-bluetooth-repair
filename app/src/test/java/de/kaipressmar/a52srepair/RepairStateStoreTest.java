@@ -37,9 +37,17 @@ public class RepairStateStoreTest {
         assertEquals(1, RepairStateStore.updateConsecutiveSuspect(context, true));
     }
 
+    @Test public void routeOwnershipIsPersisted() {
+        assertFalse(RepairStateStore.routeOwned(context));
+        RepairStateStore.setRouteOwned(context, true);
+        assertTrue(RepairStateStore.routeOwned(context));
+        RepairStateStore.setRouteOwned(context, false);
+        assertFalse(RepairStateStore.routeOwned(context));
+    }
+
     @Test public void healthAndRepairHistoryAreStored() {
         BluetoothHealth health = BluetoothHealth.assess(
-                true, true, android.media.AudioManager.MODE_IN_CALL, true, false, false);
+                true, true, android.media.AudioManager.MODE_IN_CALL, true, true, false, false);
         RepairStateStore.saveHealth(context, health);
         RepairStateStore.markRepair(context);
 

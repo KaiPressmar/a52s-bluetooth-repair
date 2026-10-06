@@ -231,6 +231,9 @@ public class MainActivity extends Activity {
 
         if (!probe.health.needsRepair()) {
             refresh(false);
+            if (probe.health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO) {
+                showDetails(probe.health.summary + "\n\n" + probe.health.detail);
+            }
             Toast.makeText(this, probe.health.summary, Toast.LENGTH_LONG).show();
             return;
         }
@@ -293,6 +296,13 @@ public class MainActivity extends Activity {
     private void refresh(boolean log) {
         BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
         BluetoothHealth health = probe.health;
+        if (!health.inCommunication
+                && !RepairStateStore.monitoringEnabled(this)
+                && RepairStateStore.routeOwned(this)) {
+            BluetoothRepair.releaseCommunicationRoute(this);
+            probe = BluetoothRepair.probe(this);
+            health = probe.health;
+        }
         if (log) Diag.log(this, "UI SNAPSHOT\n" + Diag.snapshot(this));
 
         if (details != null) details.setText(Diag.snapshot(this));
@@ -314,6 +324,7 @@ public class MainActivity extends Activity {
                         Color.rgb(255, 234, 226),
                         Color.rgb(155, 55, 25));
                 break;
+            case HFP_CONNECTED_NO_SCO:
             case CALL_WITHOUT_SCO:
             case BLUETOOTH_OFF:
             case PERMISSION_REQUIRED:

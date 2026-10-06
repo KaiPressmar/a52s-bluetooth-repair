@@ -86,6 +86,14 @@ final class Diag {
         BluetoothRepair.Probe probe = BluetoothRepair.probe(c);
         s.append("health=")
                 .append(probe.health.state)
+                .append(" hfpProfile=")
+                .append(probe.health.hfpProfileConnected)
+                .append(" scoAvailable=")
+                .append(probe.health.scoAvailable)
+                .append(" scoSelected=")
+                .append(probe.health.scoSelected)
+                .append(" routeOwned=")
+                .append(RepairStateStore.routeOwned(c))
                 .append(" summary=")
                 .append(probe.health.summary)
                 .append('\n');

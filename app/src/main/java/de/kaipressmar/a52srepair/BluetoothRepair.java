@@ -3,6 +3,7 @@ package de.kaipressmar.a52srepair;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioDeviceInfo;
@@ -45,14 +46,22 @@ final class BluetoothRepair {
                                 == PackageManager.PERMISSION_GRANTED;
 
         boolean bluetoothEnabled = false;
+        boolean hfpProfileConnected = false;
         if (permission) {
             try {
                 BluetoothManager bm =
                         (BluetoothManager) c.getSystemService(Context.BLUETOOTH_SERVICE);
                 BluetoothAdapter adapter = bm == null ? null : bm.getAdapter();
                 bluetoothEnabled = adapter != null && adapter.isEnabled();
+                if (bluetoothEnabled) {
+                    hfpProfileConnected =
+                            adapter.getProfileConnectionState(BluetoothProfile.HEADSET)
+                                    == BluetoothAdapter.STATE_CONNECTED;
+                }
             } catch (SecurityException ignored) {
                 permission = false;
+            } catch (RuntimeException ignored) {
+                // Vendor Bluetooth stacks can transiently fail while profiles reconnect.
             }
         }
 
@@ -61,6 +70,7 @@ final class BluetoothRepair {
                     new BluetoothHealth(
                             BluetoothHealth.State.ERROR,
                             false,
+                            hfpProfileConnected,
                             false,
                             false,
                             false,
@@ -96,6 +106,7 @@ final class BluetoothRepair {
                         permission,
                         bluetoothEnabled,
                         am.getMode(),
+                        hfpProfileConnected,
                         available,
                         selected,
                         speakerphoneOn);
@@ -115,11 +126,18 @@ final class BluetoothRepair {
 
         AudioDeviceInfo target = before.bluetoothCommunicationDevice;
         if (target == null) {
+            if (before.health.hfpProfileConnected) {
+                return new RepairResult(
+                        false,
+                        false,
+                        "HFP ist verbunden, aber Android stellt kein SCO/HFP-Kommunikationsgerät bereit. Ohne privilegierten Zugriff kann die App den Samsung-Bluetoothdienst nicht neu starten.");
+            }
             return new RepairResult(false, false, "Kein Bluetooth-SCO/HFP-Kommunikationsgerät verfügbar.");
         }
 
         try {
             am.clearCommunicationDevice();
+            RepairStateStore.setRouteOwned(c, false);
             boolean selected = am.setCommunicationDevice(target);
             Diag.log(
                     c,
@@ -130,27 +148,32 @@ final class BluetoothRepair {
                             + "\n"
                             + Diag.snapshot(c));
             if (selected) {
+                RepairStateStore.setRouteOwned(c, true);
                 RepairStateStore.markRepair(c);
                 RepairStateStore.clearConsecutiveSuspect(c);
                 return new RepairResult(true, true, "Bluetooth-Telefoniepfad wurde neu ausgewählt.");
             }
             return new RepairResult(true, false, "Android hat die Auswahl des Bluetooth-Telefoniepfads abgelehnt.");
         } catch (RuntimeException e) {
+            RepairStateStore.setRouteOwned(c, false);
             Diag.log(c, "ROUTE REPAIR ERROR " + e);
             return new RepairResult(true, false, "Routing-Reparatur fehlgeschlagen: " + e.getClass().getSimpleName());
         }
     }
 
     static void releaseCommunicationRoute(Context c) {
+        if (!RepairStateStore.routeOwned(c)) return;
+
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         if (am != null) {
             try {
                 am.clearCommunicationDevice();
-                Diag.log(c, "COMMUNICATION ROUTE CLEARED\n" + Diag.snapshot(c));
+                Diag.log(c, "OWNED COMMUNICATION ROUTE CLEARED\n" + Diag.snapshot(c));
             } catch (RuntimeException e) {
                 Diag.log(c, "COMMUNICATION ROUTE CLEAR ERROR " + e);
             }
         }
+        RepairStateStore.setRouteOwned(c, false);
     }
 
     static boolean isBluetoothCommunicationDevice(AudioDeviceInfo device) {

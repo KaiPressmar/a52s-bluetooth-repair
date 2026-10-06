@@ -1,7 +1,7 @@
 plugins { id("com.android.application") }
 
-val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.4.0")
-val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("4")
+val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.4.1")
+val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("5")
 val signingStoreFile = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE")
 val signingStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD")
 val signingKeyAlias = providers.environmentVariable("ANDROID_SIGNING_KEY_ALIAS")
