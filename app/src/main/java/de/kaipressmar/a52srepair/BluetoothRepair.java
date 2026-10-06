@@ -56,7 +56,7 @@ final class BluetoothRepair {
                 if (bluetoothEnabled) {
                     hfpProfileConnected =
                             adapter.getProfileConnectionState(BluetoothProfile.HEADSET)
-                                    == BluetoothProfile.STATE_CONNECTED;
+                                    == BluetoothAdapter.STATE_CONNECTED;
                 }
             } catch (SecurityException ignored) {
                 permission = false;
