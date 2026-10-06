@@ -27,8 +27,8 @@ Back up the keystore and credentials offline. Losing the signing key prevents fu
 1. Work through a pull request into `main`; CI must pass.
 2. Confirm experimental repair changes have tests and a documented real-device test result where applicable.
 3. Decide the next semantic version.
-4. Open **Actions → Release APK → Run workflow** on `main`.
-5. Enter the version without the `v` prefix. Keep `prerelease=true` for experimental builds; use `false` only for a build considered stable enough for normal use.
+4. Preferred automated path: update the repository-level `RELEASE_VERSION` file in the release PR. When that change lands on `main`, the signed release workflow runs automatically and publishes the version as a prerelease.
+5. Manual path: open **Actions → Release APK → Run workflow** on `main`, enter the version without the `v` prefix, and select whether it should be a prerelease.
 6. The workflow validates the version, runs unit tests and release lint, restores the signing key from secrets, builds the release APK, verifies its signature, generates SHA-256, creates a provenance attestation, and publishes a GitHub Release with generated notes.
 7. Install the published APK on the target A52s and perform the smoke/real-device checks in `TESTING.md`.
 
