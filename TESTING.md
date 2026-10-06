@@ -1,6 +1,6 @@
 # Testing strategy
 
-The goal is to develop the A52s Bluetooth repair experimentally without turning an unverified hypothesis into an automatic, disruptive fix.
+The goal is to develop the A52s Bluetooth repair experimentally without turning an unverified hypothesis into a broad or destructive Bluetooth reset.
 
 ## TDD rule
 
@@ -8,29 +8,43 @@ Every bug fix starts with a failing test or a captured reproducible device scena
 
 ## Test pyramid
 
-1. **Pure JVM tests**: repair policy, state transitions, escalation thresholds, cooldowns and safety invariants.
-2. **Robolectric tests**: diagnostic persistence and Android-facing behavior that can be simulated reliably.
+1. **Pure JVM tests**: health classification, repair eligibility, state transitions, cooldowns and safety invariants.
+2. **Robolectric tests**: persistence and Android-facing UI behavior that can be simulated reliably.
 3. **Instrumentation tests**: read-only diagnostics and carefully scoped integration checks on a real Android device.
 4. **Manual A52s fault reproduction**: the only layer that can prove the real HFP/SCO failure has been fixed.
 
 ## Non-negotiable safety invariants
 
-Automated repair logic must not modify routing while a call/communication session is active. It must not act when Bluetooth is disabled or no Bluetooth SCO endpoint is present. Repeated suspicious observations are required before escalation. Diagnostics must remain read-only. A repair attempt must be logged before and after execution. New repair strategies remain manual/opt-in until real-device evidence demonstrates they are safe and useful.
+Automatic repair is opt-in through Auto-Schutz. It may only act when all of the following are true: Bluetooth permission is present, Bluetooth is enabled, an active call/communication mode is detected, a Bluetooth SCO/HFP communication device is available, that Bluetooth device is not currently selected, the same suspect condition has been observed twice consecutively, speakerphone is not explicitly active, and the repair cooldown has elapsed.
+
+The automatic path may only clear/reselect the public Android communication route. It must not toggle Bluetooth, clear Bluetooth app data, restart vendor/system services, change `AudioManager` mode, or attempt hidden/private API resets. Every repair attempt and verification snapshot must be logged.
 
 ## Required regression scenarios
 
+- Bluetooth permission missing.
 - Bluetooth disabled.
-- Bluetooth enabled but no car/headset SCO endpoint.
-- Healthy Bluetooth SCO route.
-- Suspect route for one sample (transient state).
-- Suspect route for repeated samples.
-- Active call/communication session always blocks automatic mutation.
+- Bluetooth enabled but no active call.
+- Active call with no SCO/HFP endpoint.
+- Healthy active Bluetooth SCO/HFP route.
+- Suspect active route for one sample: no automatic repair yet.
+- Suspect active route for repeated samples: eligible for automatic repair.
+- Active speakerphone route: automatic repair blocked.
+- Cooldown prevents repair thrashing.
 - Diagnostic logging appends rather than destroys earlier evidence.
-- Snapshot contains stable keys used for later comparison.
-- Diagnostic snapshot does not alter AudioManager mode.
+- Snapshot contains communication device, available communication devices and output devices.
+- Diagnostic snapshot does not alter `AudioManager` mode.
+- Auto-Schutz preference and last state survive Activity recreation/app restart.
 
 ## Real A52s protocol
 
-Capture a known-good snapshot and test call after reboot. Leave monitoring active until the failure occurs. Before applying any repair, capture another snapshot and note the exact time. Apply exactly one repair strategy, then immediately repeat the same call test. Record success/failure and capture the post-action snapshot. Do not combine repair strategies in one experiment; otherwise the effective action cannot be identified.
+Capture a known-good snapshot and test call after reboot. Enable Auto-Schutz and leave it active until the failure occurs. When possible, record the exact time of the failed call. Before rebooting, open the app and export the log.
+
+For the first real-device validation of v0.4.0, verify separately:
+
+1. A healthy call through the car remains untouched.
+2. Selecting phone speaker intentionally is not immediately overridden by the watchdog.
+3. When the failure occurs and Android still exposes a SCO/HFP endpoint, the log shows `SUSPECT_ROUTING`, two consecutive observations, a route-repair attempt and a verification result.
+4. If Android exposes no SCO/HFP endpoint, the app reports `CALL_WITHOUT_SCO` and does not claim success.
+5. Stopping Auto-Schutz removes the persistent service behavior and clears any route requested by the app.
 
 A passing CI build proves only that code-level invariants hold. It does **not** prove the Samsung/Qualcomm HFP/SCO defect is fixed. That requires reproduction on the affected Galaxy A52s 5G.
