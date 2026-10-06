@@ -104,10 +104,11 @@ public class MonitorService extends Service {
 
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
-                        && actionableSuspect
-                        && suspectCount >= 2
-                        && System.currentTimeMillis() - RepairStateStore.lastRepairAt(this)
-                                >= REPAIR_COOLDOWN_MS;
+                        && RepairPolicy.canAutoRepair(
+                                health,
+                                suspectCount,
+                                System.currentTimeMillis(),
+                                RepairStateStore.lastRepairAt(this));
 
         if (repairAllowed) {
             BluetoothRepair.RepairResult result =
