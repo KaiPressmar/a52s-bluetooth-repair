@@ -9,12 +9,14 @@ final class BluetoothHealth {
         IDLE,
         HEALTHY,
         SUSPECT_ROUTING,
+        HFP_CONNECTED_NO_SCO,
         CALL_WITHOUT_SCO,
         ERROR
     }
 
     final State state;
     final boolean inCommunication;
+    final boolean hfpProfileConnected;
     final boolean scoAvailable;
     final boolean scoSelected;
     final boolean speakerphoneOn;
@@ -24,6 +26,7 @@ final class BluetoothHealth {
     BluetoothHealth(
             State state,
             boolean inCommunication,
+            boolean hfpProfileConnected,
             boolean scoAvailable,
             boolean scoSelected,
             boolean speakerphoneOn,
@@ -31,6 +34,7 @@ final class BluetoothHealth {
             String detail) {
         this.state = state;
         this.inCommunication = inCommunication;
+        this.hfpProfileConnected = hfpProfileConnected;
         this.scoAvailable = scoAvailable;
         this.scoSelected = scoSelected;
         this.speakerphoneOn = speakerphoneOn;
@@ -46,6 +50,7 @@ final class BluetoothHealth {
             boolean permission,
             boolean bluetoothEnabled,
             int audioMode,
+            boolean hfpProfileConnected,
             boolean scoAvailable,
             boolean scoSelected,
             boolean speakerphoneOn) {
@@ -57,6 +62,7 @@ final class BluetoothHealth {
             return new BluetoothHealth(
                     State.PERMISSION_REQUIRED,
                     inCommunication,
+                    false,
                     scoAvailable,
                     scoSelected,
                     speakerphoneOn,
@@ -68,6 +74,7 @@ final class BluetoothHealth {
             return new BluetoothHealth(
                     State.BLUETOOTH_OFF,
                     inCommunication,
+                    false,
                     scoAvailable,
                     scoSelected,
                     speakerphoneOn,
@@ -79,19 +86,23 @@ final class BluetoothHealth {
             return new BluetoothHealth(
                     scoSelected ? State.HEALTHY : State.IDLE,
                     false,
+                    hfpProfileConnected,
                     scoAvailable,
                     scoSelected,
                     speakerphoneOn,
                     scoSelected ? "Telefonie-Audio verbunden" : "Bereit – kein aktiver Anruf",
-                    scoAvailable
-                            ? "Ein Bluetooth-Telefoniegerät ist verfügbar. Die automatische Prüfung wird bei einem aktiven Anruf schärfer."
-                            : "Aktuell ist kein Bluetooth-SCO-Gerät für Telefonie verfügbar.");
+                    hfpProfileConnected
+                            ? "Ein HFP-Gerät ist verbunden. Der Telefoniepfad wird bei einem aktiven Anruf gezielt geprüft."
+                            : (scoAvailable
+                                    ? "Ein Bluetooth-Telefoniegerät ist verfügbar. Die automatische Prüfung wird bei einem aktiven Anruf schärfer."
+                                    : "Aktuell ist kein Bluetooth-HFP/SCO-Gerät für Telefonie verbunden."));
         }
 
         if (scoAvailable && scoSelected) {
             return new BluetoothHealth(
                     State.HEALTHY,
                     true,
+                    hfpProfileConnected,
                     true,
                     true,
                     speakerphoneOn,
@@ -99,10 +110,11 @@ final class BluetoothHealth {
                     "Ein Bluetooth-SCO/HFP-Gerät ist während der Kommunikation aktiv.");
         }
 
-        if (scoAvailable && !scoSelected) {
+        if (scoAvailable) {
             return new BluetoothHealth(
                     State.SUSPECT_ROUTING,
                     true,
+                    hfpProfileConnected,
                     true,
                     false,
                     speakerphoneOn,
@@ -110,9 +122,22 @@ final class BluetoothHealth {
                     "Ein Bluetooth-Telefoniegerät ist verfügbar, aber nicht als Kommunikationsgerät ausgewählt.");
         }
 
+        if (hfpProfileConnected) {
+            return new BluetoothHealth(
+                    State.HFP_CONNECTED_NO_SCO,
+                    true,
+                    true,
+                    false,
+                    false,
+                    speakerphoneOn,
+                    "HFP verbunden, aber SCO fehlt",
+                    "Das Headset-/Freisprechprofil ist verbunden, Android bietet aber kein routbares SCO/HFP-Kommunikationsgerät an. Das entspricht dem bekannten A52s-Fehlerbild; eine normale App kann den System-Bluetoothdienst nicht privilegiert neu starten.");
+        }
+
         return new BluetoothHealth(
                 State.CALL_WITHOUT_SCO,
                 true,
+                false,
                 false,
                 false,
                 speakerphoneOn,
