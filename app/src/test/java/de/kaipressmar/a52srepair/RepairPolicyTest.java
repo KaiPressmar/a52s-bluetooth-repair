@@ -11,6 +11,7 @@ public class RepairPolicyTest {
                 true,
                 AudioManager.MODE_IN_CALL,
                 true,
+                true,
                 false,
                 speakerphone);
     }
@@ -41,7 +42,7 @@ public class RepairPolicyTest {
 
     @Test public void healthyStateNeverRepairs() {
         BluetoothHealth healthy = BluetoothHealth.assess(
-                true, true, AudioManager.MODE_IN_CALL, true, true, false);
+                true, true, AudioManager.MODE_IN_CALL, true, true, true, false);
         assertFalse(RepairPolicy.canAutoRepair(healthy, 99, 100_000L, 0L));
     }
 }
