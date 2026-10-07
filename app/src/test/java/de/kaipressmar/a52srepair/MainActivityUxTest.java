@@ -85,6 +85,7 @@ public class MainActivityUxTest {
         assertContains(text, "Live-Diagnose");
         assertContains(text, "Bluetooth");
         assertContains(text, "HFP-Profil");
+        assertContains(text, "Anruf-Erkennung");
         assertContains(text, "SCO/Telefonie");
         assertContains(text, "Fehlersignatur");
         assertContains(text, "Diagnose aktualisieren");
