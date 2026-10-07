@@ -598,6 +598,8 @@ public class MainActivity extends Activity {
 
     private void renderUpdateState() {
         if (updateTitle == null || updateSub == null || updateAction == null) return;
+        updateSub.setTextColor(MUTED);
+        updateAction.setEnabled(true);
 
         UpdateRelease cached = UpdateStateStore.cachedRelease(this);
         if (cached != null
