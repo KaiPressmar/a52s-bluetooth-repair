@@ -16,6 +16,7 @@ final class UpdateStateStore {
     private static final String ERROR = "error";
 
     static final long AUTO_CHECK_INTERVAL_MS = 12L * 60L * 60L * 1000L;
+    static final long FAILED_RETRY_INTERVAL_MS = 60L * 60L * 1000L;
 
     private UpdateStateStore() {}
 
@@ -24,8 +25,14 @@ final class UpdateStateStore {
     }
 
     static boolean shouldCheck(Context c, long now) {
-        long last = prefs(c).getLong(LAST_CHECK, 0L);
-        return last == 0L || now - last >= AUTO_CHECK_INTERVAL_MS;
+        SharedPreferences p = prefs(c);
+        long last = p.getLong(LAST_CHECK, 0L);
+        String error = p.getString(ERROR, "");
+        long interval =
+                error == null || error.isEmpty()
+                        ? AUTO_CHECK_INTERVAL_MS
+                        : FAILED_RETRY_INTERVAL_MS;
+        return last == 0L || now - last >= interval;
     }
 
     static void saveCheck(Context c, UpdateRelease release, String error, long now) {
