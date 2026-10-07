@@ -67,6 +67,7 @@ public class MonitorService extends Service {
                     if (profile == BluetoothProfile.HEADSET) {
                         headsetProxy = null;
                         consecutiveTransportMismatch = 0;
+                        transportMismatchSinceMillis = 0L;
                     }
                 }
             };
@@ -166,6 +167,8 @@ public class MonitorService extends Service {
                                     HFP_CONNECTED_SETTLE_MS);
                         } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                             repairAttemptsInIncident = 0;
+                            consecutiveTransportMismatch = 0;
+                            transportMismatchSinceMillis = 0L;
                             scheduleSoon("hfp-disconnected");
                         } else {
                             scheduleSoon("hfp-state-" + state);
@@ -393,8 +396,7 @@ public class MonitorService extends Service {
             transportMismatchSinceMillis = 0L;
         }
 
-        if (!health.inCommunication
-                || (health.scoSelected && !transportMismatch)) {
+        if (!health.inCommunication) {
             repairAttemptsInIncident = 0;
         }
 
