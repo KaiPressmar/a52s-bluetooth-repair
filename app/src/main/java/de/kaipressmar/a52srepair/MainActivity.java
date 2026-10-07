@@ -688,7 +688,7 @@ public class MainActivity extends Activity {
         card.addView(infoDivider());
         card.addView(infoRow("Referenz-Firmware", getString(R.string.device_reference_firmware)));
         card.addView(infoDivider());
-        card.addView(infoRow("App-Ziel-SDK", "API 36"));
+        card.addView(infoRow("App-Ziel-SDK", "API " + getApplicationInfo().targetSdkVersion));
         card.addView(infoDivider());
         card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
@@ -1254,7 +1254,7 @@ public class MainActivity extends Activity {
                             : (health.state == BluetoothHealth.State.BLUETOOTH_OFF
                                     ? "Bluetooth aus · Prüfung und Reparatur pausieren automatisch"
                                     : (autoRepair
-                                            ? "Aktiv · Bluetooth/HFP-Ereignisse triggern Prüfung und Reparatur"
+                                            ? "Aktiv · Bluetooth/HFP/SCO- und Anruf-Ereignisse triggern Prüfung und Reparatur"
                                             : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")));
         }
 
