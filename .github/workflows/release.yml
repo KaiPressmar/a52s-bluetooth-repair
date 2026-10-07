@@ -66,14 +66,14 @@ jobs:
         with:
           packages: ''
 
-      - name: Install Android 15 and Android 16 SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+      - name: Install Android 14 through Android 16 SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Test Android 16 release candidates
+      - name: Test device-specific release candidates
         run: |
           gradle :app:testA52sDebugUnitTest :app:testS22DebugUnitTest --stacktrace
           gradle :app:lintA52sRelease :app:lintS22Release --stacktrace
