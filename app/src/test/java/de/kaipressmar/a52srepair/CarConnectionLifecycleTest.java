@@ -118,6 +118,7 @@ public class CarConnectionLifecycleTest {
                         Boolean.FALSE,
                         2,
                         2_200_000L,
+                        2_206_000L,
                         0L);
 
         assertEquals(
