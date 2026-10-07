@@ -11,12 +11,11 @@ import android.os.*;
 public class MonitorService extends Service {
     static final String CHANNEL_ID = "monitor";
     static final int NOTIFICATION_ID = 1;
-    private static final long IDLE_INTERVAL_MS = 30_000L;
-    private static final long CALL_INTERVAL_MS = 5_000L;
-    private static final long REPAIR_COOLDOWN_MS = 60_000L;
+    private static final long EVENT_DEBOUNCE_MS = 1_200L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
+    private AudioManager.OnModeChangedListener modeChangedListener;
 
     private final Runnable tick =
             new Runnable() {
@@ -57,9 +56,13 @@ public class MonitorService extends Service {
 
         if (audioManager != null) {
             audioManager.registerAudioDeviceCallback(deviceCallback, handler);
+            modeChangedListener =
+                    mode -> scheduleSoon(
+                            "audio-mode-" + mode);
+            audioManager.addOnModeChangedListener(getMainExecutor(), modeChangedListener);
         }
 
-        Diag.log(this, "WATCHDOG START");
+        Diag.log(this, "WATCHDOG START energyMode=event-driven");
         handler.post(tick);
     }
 
@@ -75,7 +78,7 @@ public class MonitorService extends Service {
     private void scheduleSoon(String reason) {
         Diag.log(this, "WATCHDOG EVENT " + reason);
         handler.removeCallbacks(tick);
-        handler.postDelayed(tick, 750L);
+        handler.postDelayed(tick, EVENT_DEBOUNCE_MS);
     }
 
     private void runCheck(String reason) {
@@ -157,9 +160,17 @@ public class MonitorService extends Service {
             updateNotification(health.summary);
         }
 
-        handler.postDelayed(
-                tick,
-                health.inCommunication ? CALL_INTERVAL_MS : IDLE_INTERVAL_MS);
+        long nextDelay =
+                WatchdogSchedule.nextDelayMillis(health, suspectCount);
+        handler.postDelayed(tick, nextDelay);
+        Diag.log(
+                this,
+                "WATCHDOG NEXT inMs="
+                        + nextDelay
+                        + " state="
+                        + health.state
+                        + " suspectCount="
+                        + suspectCount);
     }
 
     private void updateNotification(String text) {
@@ -177,7 +188,7 @@ public class MonitorService extends Service {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("A52s Bluetooth Repair · Auto-Schutz")
+                .setContentTitle(getString(R.string.app_name) + " · Auto-Schutz")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(pi)
@@ -193,6 +204,12 @@ public class MonitorService extends Service {
             try {
                 audioManager.unregisterAudioDeviceCallback(deviceCallback);
             } catch (RuntimeException ignored) {
+            }
+            if (modeChangedListener != null) {
+                try {
+                    audioManager.removeOnModeChangedListener(modeChangedListener);
+                } catch (RuntimeException ignored) {
+                }
             }
         }
         BluetoothRepair.releaseCommunicationRoute(this);
