@@ -1156,13 +1156,19 @@ public class MainActivity extends Activity {
             details.setText(Diag.snapshot(this));
         }
 
+        Boolean lastHfpAudioTransport = RepairStateStore.lastHfpAudioTransport(this);
+
         if (routeTitle != null) {
             AudioDeviceInfo current = probe.current;
             routeTitle.setText(
                     current == null
                             ? "Kein Telefonie-Audiogerät aktiv"
                             : String.valueOf(current.getProductName()));
-            routeSub.setText(health.summary);
+            routeSub.setText(
+                    health.inCommunication
+                                    && Boolean.FALSE.equals(lastHfpAudioTransport)
+                            ? "Bluetooth-Route ist gewählt, aber der HFP-Audiotransport ist getrennt"
+                            : health.summary);
             signatureSub.setText(
                     probe.signature.label
                             + (probe.signature.confidence == FailureSignature.Confidence.NONE
@@ -1179,7 +1185,13 @@ public class MainActivity extends Activity {
         }
 
         if (statusPill != null) {
-            switch (health.state) {
+            if (health.inCommunication
+                    && Boolean.FALSE.equals(lastHfpAudioTransport)) {
+                setHeroStatus(
+                        "●  HFP-Audiotransport getrennt",
+                        AppPalette.WARNING,
+                        Color.WHITE);
+            } else switch (health.state) {
                 case HEALTHY:
                     setHeroStatus("●  " + health.summary, AppPalette.SUCCESS, Color.WHITE);
                     break;
@@ -1219,16 +1231,23 @@ public class MainActivity extends Activity {
             metricHfpValue.setTextColor(health.hfpProfileConnected ? AppPalette.TEAL : MUTED);
         }
         if (metricScoValue != null) {
+            boolean transportDown =
+                    health.inCommunication
+                            && Boolean.FALSE.equals(lastHfpAudioTransport);
             metricScoValue.setText(
-                    health.scoSelected
-                            ? "Aktiv"
-                            : (health.scoAvailable ? "Verfügbar" : "Fehlt"));
+                    transportDown
+                            ? "Audio getrennt"
+                            : (health.scoSelected
+                                    ? "Aktiv"
+                                    : (health.scoAvailable ? "Verfügbar" : "Fehlt")));
             metricScoValue.setTextColor(
-                    health.scoSelected
-                            ? AppPalette.CYAN
-                            : (health.inCommunication && !health.scoAvailable
-                                    ? AppPalette.WARNING
-                                    : MUTED));
+                    transportDown
+                            ? AppPalette.WARNING
+                            : (health.scoSelected
+                                    ? AppPalette.CYAN
+                                    : (health.inCommunication && !health.scoAvailable
+                                            ? AppPalette.WARNING
+                                            : MUTED)));
         }
 
         if (autoRepairSwitch != null) {
@@ -1305,16 +1324,23 @@ public class MainActivity extends Activity {
                             ? AppPalette.WARNING
                             : (health.inCommunication ? AppPalette.SUCCESS : MUTED));
 
+            boolean transportDown =
+                    health.inCommunication
+                            && Boolean.FALSE.equals(lastHfpAudioTransport);
             diagScoValue.setText(
-                    health.scoSelected
-                            ? "Aktiv"
-                            : (health.scoAvailable ? "Verfügbar" : "Nicht verfügbar"));
+                    transportDown
+                            ? "Route da, HFP-Audio getrennt"
+                            : (health.scoSelected
+                                    ? "Aktiv"
+                                    : (health.scoAvailable ? "Verfügbar" : "Nicht verfügbar")));
             diagScoValue.setTextColor(
-                    health.scoSelected
-                            ? AppPalette.SUCCESS
-                            : (health.inCommunication && !health.scoAvailable
-                                    ? AppPalette.WARNING
-                                    : MUTED));
+                    transportDown
+                            ? AppPalette.WARNING
+                            : (health.scoSelected
+                                    ? AppPalette.SUCCESS
+                                    : (health.inCommunication && !health.scoAvailable
+                                            ? AppPalette.WARNING
+                                            : MUTED)));
 
             diagSignatureValue.setText(
                     probe.signature.label
