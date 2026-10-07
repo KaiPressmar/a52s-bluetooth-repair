@@ -94,11 +94,14 @@ final class BluetoothRepair {
 
         boolean selected = current != null && isBluetoothCommunicationDevice(current);
         boolean available = candidate != null;
-        boolean speakerphoneOn;
-        try {
-            speakerphoneOn = am.isSpeakerphoneOn();
-        } catch (RuntimeException e) {
-            speakerphoneOn = false;
+        boolean speakerphoneOn =
+                current != null && current.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+        if (!speakerphoneOn) {
+            try {
+                speakerphoneOn = am.isSpeakerphoneOn();
+            } catch (RuntimeException ignored) {
+                // getCommunicationDevice() is the primary source on modern Android.
+            }
         }
 
         BluetoothHealth health =
@@ -151,7 +154,10 @@ final class BluetoothRepair {
                 RepairStateStore.setRouteOwned(c, true);
                 RepairStateStore.markRepair(c);
                 RepairStateStore.clearConsecutiveSuspect(c);
-                return new RepairResult(true, true, "Bluetooth-Telefoniepfad wurde neu ausgewählt.");
+                return new RepairResult(
+                        true,
+                        true,
+                        "Bluetooth-Telefoniepfad wurde neu angefordert. Android bestätigt die Route asynchron.");
             }
             return new RepairResult(true, false, "Android hat die Auswahl des Bluetooth-Telefoniepfads abgelehnt.");
         } catch (RuntimeException e) {
