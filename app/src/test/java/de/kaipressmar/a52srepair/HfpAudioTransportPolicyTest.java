@@ -65,8 +65,8 @@ public class HfpAudioTransportPolicyTest {
                         Boolean.FALSE));
     }
 
-    @Test public void unknownTransportFallsBackToCommunicationRouteSignal() {
-        assertTrue(
+    @Test public void unknownTransportNeverClaimsVerifiedRepairSuccess() {
+        assertFalse(
                 HfpAudioTransportPolicy.verificationSucceeded(
                         health(true, false),
                         null));
