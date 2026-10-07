@@ -438,7 +438,6 @@ public class MonitorService extends Service {
         RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         boolean transportMismatch =
                 HfpAudioTransportPolicy.isMismatch(health, hfpAudioConnected);
-        long now = System.currentTimeMillis();
         if (transportMismatch) {
             if (transportMismatchSinceMillis == 0L) {
                 transportMismatchSinceMillis = now;
