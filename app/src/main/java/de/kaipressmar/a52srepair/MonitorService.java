@@ -71,6 +71,7 @@ public class MonitorService extends Service {
         }
 
         Diag.log(this, "WATCHDOG START energyMode=event-driven");
+        UpdateManager.checkForUpdates(this, false, null);
         handler.post(tick);
     }
 
@@ -192,6 +193,7 @@ public class MonitorService extends Service {
         long nextDelay =
                 WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
         handler.postDelayed(tick, nextDelay);
+        UpdateManager.checkForUpdates(this, false, null);
         Diag.log(
                 this,
                 "WATCHDOG NEXT inMs="
