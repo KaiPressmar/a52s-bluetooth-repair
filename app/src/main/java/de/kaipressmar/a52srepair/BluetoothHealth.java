@@ -54,8 +54,29 @@ final class BluetoothHealth {
             boolean scoAvailable,
             boolean scoSelected,
             boolean speakerphoneOn) {
+        return assess(
+                permission,
+                bluetoothEnabled,
+                audioMode,
+                hfpProfileConnected,
+                scoAvailable,
+                scoSelected,
+                speakerphoneOn,
+                false);
+    }
+
+    static BluetoothHealth assess(
+            boolean permission,
+            boolean bluetoothEnabled,
+            int audioMode,
+            boolean hfpProfileConnected,
+            boolean scoAvailable,
+            boolean scoSelected,
+            boolean speakerphoneOn,
+            boolean cellularCallActive) {
         boolean inCommunication =
-                audioMode == AudioManager.MODE_IN_CALL
+                cellularCallActive
+                        || audioMode == AudioManager.MODE_IN_CALL
                         || audioMode == AudioManager.MODE_IN_COMMUNICATION;
 
         if (!permission) {

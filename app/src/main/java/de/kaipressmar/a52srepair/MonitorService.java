@@ -4,6 +4,8 @@ import android.app.*;
 import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothHeadset;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -13,6 +15,9 @@ import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.os.*;
+import android.telephony.TelephonyCallback;
+import android.telephony.TelephonyManager;
+import android.content.pm.PackageManager;
 
 public class MonitorService extends Service {
     static final String CHANNEL_ID = "monitor";
@@ -24,11 +29,18 @@ public class MonitorService extends Service {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
+    private BluetoothAdapter bluetoothAdapter;
+    private BluetoothHeadset headsetProxy;
     private AudioManager.OnModeChangedListener modeChangedListener;
     private AudioManager.OnCommunicationDeviceChangedListener communicationDeviceChangedListener;
     private boolean bluetoothReceiverRegistered;
+    private TelephonyManager telephonyManager;
+    private CallStateCallback callStateCallback;
+    private boolean cellularCallActive;
     private String pendingReason = "scheduled";
     private int repairAttemptsInIncident;
+    private int consecutiveTransportMismatch;
+    private long transportMismatchSinceMillis;
 
     private final Runnable tick =
             new Runnable() {
@@ -37,6 +49,26 @@ public class MonitorService extends Service {
                     String reason = pendingReason;
                     pendingReason = "scheduled";
                     runCheck(reason);
+                }
+            };
+
+    private final BluetoothProfile.ServiceListener headsetServiceListener =
+            new BluetoothProfile.ServiceListener() {
+                @Override
+                public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    if (profile == BluetoothProfile.HEADSET && proxy instanceof BluetoothHeadset) {
+                        headsetProxy = (BluetoothHeadset) proxy;
+                        scheduleSoon("hfp-proxy-connected");
+                    }
+                }
+
+                @Override
+                public void onServiceDisconnected(int profile) {
+                    if (profile == BluetoothProfile.HEADSET) {
+                        headsetProxy = null;
+                        consecutiveTransportMismatch = 0;
+                        transportMismatchSinceMillis = 0L;
+                    }
                 }
             };
 
@@ -53,6 +85,29 @@ public class MonitorService extends Service {
                 }
             };
 
+    private final class CallStateCallback extends TelephonyCallback
+            implements TelephonyCallback.CallStateListener {
+        @Override
+        public void onCallStateChanged(int state) {
+            if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                cellularCallActive = true;
+                repairAttemptsInIncident = 0;
+                scheduleAfter("telephony-offhook", 350L);
+                handler.postDelayed(
+                        () -> scheduleSoon("telephony-offhook-settled"),
+                        2_000L);
+            } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                cellularCallActive = false;
+                repairAttemptsInIncident = 0;
+                consecutiveTransportMismatch = 0;
+                transportMismatchSinceMillis = 0L;
+                scheduleSoon("telephony-idle");
+            } else if (state == TelephonyManager.CALL_STATE_RINGING) {
+                scheduleSoon("telephony-ringing");
+            }
+        }
+    }
+
     private final BroadcastReceiver bluetoothEvents =
             new BroadcastReceiver() {
                 @Override
@@ -68,6 +123,8 @@ public class MonitorService extends Service {
                         if (state == BluetoothAdapter.STATE_OFF
                                 || state == BluetoothAdapter.STATE_TURNING_OFF) {
                             repairAttemptsInIncident = 0;
+                            consecutiveTransportMismatch = 0;
+                            transportMismatchSinceMillis = 0L;
                             handler.removeCallbacks(tick);
                             if (RepairStateStore.routeOwned(MonitorService.this)) {
                                 BluetoothRepair.releaseCommunicationRoute(MonitorService.this);
@@ -110,6 +167,8 @@ public class MonitorService extends Service {
                                     HFP_CONNECTED_SETTLE_MS);
                         } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                             repairAttemptsInIncident = 0;
+                            consecutiveTransportMismatch = 0;
+                            transportMismatchSinceMillis = 0L;
                             scheduleSoon("hfp-disconnected");
                         } else {
                             scheduleSoon("hfp-state-" + state);
@@ -142,6 +201,9 @@ public class MonitorService extends Service {
     public void onCreate() {
         super.onCreate();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        BluetoothManager bluetoothManager =
+                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        bluetoothAdapter = bluetoothManager == null ? null : bluetoothManager.getAdapter();
 
         NotificationManager nm = getSystemService(NotificationManager.class);
         nm.createNotificationChannel(
@@ -165,8 +227,10 @@ public class MonitorService extends Service {
         }
 
         registerBluetoothEvents();
+        registerHeadsetProxy();
+        ensureTelephonyCallStateListener();
 
-        Diag.log(this, "WATCHDOG START triggerMode=bluetooth+hfp+audio periodicOnlyWhenBtOn");
+        Diag.log(this, "WATCHDOG START triggerMode=bluetooth+hfp+sco+telephony periodicOnlyWhenBtOn");
         checkAppUpdates();
         handler.post(tick);
     }
@@ -192,6 +256,70 @@ public class MonitorService extends Service {
             bluetoothReceiverRegistered = true;
         } catch (RuntimeException e) {
             Diag.log(this, "WATCHDOG bluetooth receiver unavailable " + e.getClass().getSimpleName());
+        }
+    }
+
+    private void registerHeadsetProxy() {
+        if (bluetoothAdapter == null || headsetProxy != null) return;
+        try {
+            bluetoothAdapter.getProfileProxy(
+                    this,
+                    headsetServiceListener,
+                    BluetoothProfile.HEADSET);
+        } catch (RuntimeException e) {
+            Diag.log(
+                    this,
+                    "WATCHDOG HFP proxy-unavailable "
+                            + e.getClass().getSimpleName());
+        }
+    }
+
+    private Boolean hfpAudioTransportConnected() {
+        BluetoothHeadset proxy = headsetProxy;
+        if (proxy == null) return null;
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                        != PackageManager.PERMISSION_GRANTED) {
+            return null;
+        }
+
+        try {
+            for (BluetoothDevice device : proxy.getConnectedDevices()) {
+                if (proxy.isAudioConnected(device)) return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private void ensureTelephonyCallStateListener() {
+        if (callStateCallback != null
+                || Build.VERSION.SDK_INT < 31
+                || checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        try {
+            telephonyManager =
+                    (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+            if (telephonyManager == null) return;
+            cellularCallActive = BluetoothRepair.currentCellularCallActive(this);
+            callStateCallback = new CallStateCallback();
+            telephonyManager.registerTelephonyCallback(
+                    getMainExecutor(),
+                    callStateCallback);
+            Diag.log(
+                    this,
+                    "WATCHDOG TELEPHONY listener=registered active="
+                            + cellularCallActive);
+        } catch (RuntimeException e) {
+            callStateCallback = null;
+            Diag.log(
+                    this,
+                    "WATCHDOG TELEPHONY listener-unavailable "
+                            + e.getClass().getSimpleName());
         }
     }
 
@@ -222,7 +350,11 @@ public class MonitorService extends Service {
             return;
         }
 
-        BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
+        ensureTelephonyCallStateListener();
+        BluetoothRepair.Probe probe =
+                BluetoothRepair.probe(
+                        this,
+                        cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
         BluetoothHealth health = probe.health;
 
         if (health.state == BluetoothHealth.State.BLUETOOTH_OFF) {
@@ -232,6 +364,7 @@ public class MonitorService extends Service {
             repairAttemptsInIncident = 0;
             RepairStateStore.updateConsecutiveSuspect(this, false);
             RepairStateStore.updateConsecutiveDegraded(this, false);
+            RepairStateStore.saveHfpAudioTransport(this, null);
             RepairStateStore.saveHealth(this, health);
             HealthHistoryStore.record(this, health, reason);
             updateNotification("Bluetooth aus · Auto-Schutz pausiert");
@@ -255,9 +388,25 @@ public class MonitorService extends Service {
             health = probe.health;
         }
 
-        if (!health.inCommunication || health.scoSelected) {
+        Boolean hfpAudioConnected = hfpAudioTransportConnected();
+        RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
+        boolean transportMismatch =
+                HfpAudioTransportPolicy.isMismatch(health, hfpAudioConnected);
+        long now = System.currentTimeMillis();
+        if (transportMismatch) {
+            if (transportMismatchSinceMillis == 0L) {
+                transportMismatchSinceMillis = now;
+            }
+        } else {
+            transportMismatchSinceMillis = 0L;
+        }
+
+        if (!health.inCommunication) {
             repairAttemptsInIncident = 0;
         }
+
+        consecutiveTransportMismatch =
+                transportMismatch ? consecutiveTransportMismatch + 1 : 0;
 
         RepairStateStore.saveHealth(this, health);
         HealthHistoryStore.record(this, health, reason);
@@ -275,6 +424,10 @@ public class MonitorService extends Service {
                         + health.scoAvailable
                         + " scoSelected="
                         + health.scoSelected
+                        + " hfpAudioTransport="
+                        + (hfpAudioConnected == null ? "unknown" : hfpAudioConnected)
+                        + " transportMismatch="
+                        + transportMismatch
                         + " attempts="
                         + repairAttemptsInIncident
                         + "\n"
@@ -302,8 +455,26 @@ public class MonitorService extends Service {
                         health,
                         suspectCount,
                         degradedCount,
-                        System.currentTimeMillis(),
+                        now,
                         RepairStateStore.lastRepairAt(this));
+
+        RepairDecision transportDecision =
+                HfpAudioTransportPolicy.decide(
+                        health,
+                        hfpAudioConnected,
+                        consecutiveTransportMismatch,
+                        transportMismatchSinceMillis,
+                        now,
+                        RepairStateStore.lastRepairAt(this));
+
+        if (transportDecision.action
+                == RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE) {
+            decision = transportDecision;
+        } else if (decision.action == RepairDecision.Action.NONE
+                && transportDecision.action
+                        == RepairDecision.Action.WAIT_FOR_CONFIRMATION) {
+            decision = transportDecision;
+        }
 
         Diag.log(
                 this,
@@ -324,7 +495,10 @@ public class MonitorService extends Service {
 
         if (repairAllowed) {
             BluetoothRepair.RepairResult result =
-                    BluetoothRepair.repairCommunicationRoute(this, false);
+                    BluetoothRepair.repairCommunicationRoute(
+                            this,
+                            transportMismatch,
+                            cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
             if (result.attempted) repairAttemptsInIncident++;
 
             Diag.log(
@@ -368,6 +542,16 @@ public class MonitorService extends Service {
 
         long nextDelay =
                 WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
+        if (transportDecision.action
+                == RepairDecision.Action.WAIT_FOR_CONFIRMATION) {
+            long transportConfirmDelay =
+                    HfpAudioTransportPolicy.confirmationDelayMillis(
+                            transportMismatchSinceMillis,
+                            now);
+            if (nextDelay < 0L || transportConfirmDelay < nextDelay) {
+                nextDelay = transportConfirmDelay;
+            }
+        }
         if (nextDelay >= 0L) {
             handler.postDelayed(tick, nextDelay);
         }
@@ -388,11 +572,19 @@ public class MonitorService extends Service {
     private void verifyRepair(String reason) {
         if (!RepairStateStore.monitoringEnabled(this)) return;
 
-        BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
+        BluetoothRepair.Probe verified =
+                BluetoothRepair.probe(
+                        this,
+                        cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
         BluetoothHealth health = verified.health;
+        Boolean hfpAudioConnected = hfpAudioTransportConnected();
+        RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         RepairStateStore.saveHealth(this, health);
 
-        boolean success = health.scoSelected;
+        boolean success =
+                HfpAudioTransportPolicy.verificationSucceeded(
+                        health,
+                        hfpAudioConnected);
         HealthHistoryStore.record(this, health, success ? "repair" : "verify");
 
         Diag.log(
@@ -415,11 +607,18 @@ public class MonitorService extends Service {
         }
 
         boolean finalVerification = "auto-repair-final".equals(reason);
-        if (RepairVerificationPolicy.needsFinalVerification(
-                health.scoSelected,
-                health.inCommunication,
-                RepairStateStore.routeOwned(this),
-                finalVerification)) {
+        boolean selectedButTransportDown =
+                health.scoSelected && Boolean.FALSE.equals(hfpAudioConnected);
+        boolean selectedButTransportUnknown =
+                health.scoSelected && hfpAudioConnected == null;
+
+        if (((selectedButTransportDown || selectedButTransportUnknown)
+                        && !finalVerification)
+                || RepairVerificationPolicy.needsFinalVerification(
+                        health.scoSelected,
+                        health.inCommunication,
+                        RepairStateStore.routeOwned(this),
+                        finalVerification)) {
             updateNotification("Bluetooth-Route wird noch bestätigt …");
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-final"),
@@ -428,10 +627,15 @@ public class MonitorService extends Service {
         }
 
         if (finalVerification
-                && RepairRetryPolicy.shouldRetryAfterVerification(
-                        health,
-                        RepairStateStore.routeOwned(this),
-                        repairAttemptsInIncident)) {
+                && (RepairRetryPolicy.shouldRetryAfterVerification(
+                                health,
+                                RepairStateStore.routeOwned(this),
+                                repairAttemptsInIncident)
+                        || (HfpAudioTransportPolicy.isMismatch(
+                                        health,
+                                        hfpAudioConnected)
+                                && repairAttemptsInIncident
+                                        < RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT))) {
             updateNotification("Erster Versuch ohne Erfolg · zweiter Reparaturversuch folgt");
             handler.postDelayed(
                     () -> scheduleSoon("repair-verification-retry"),
@@ -439,7 +643,10 @@ public class MonitorService extends Service {
             return;
         }
 
-        if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO) {
+        if (selectedButTransportUnknown) {
+            updateNotification(
+                    "Bluetooth-Route gewählt · HFP-Audiotransport konnte nicht verifiziert werden");
+        } else if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO) {
             updateNotification("HFP verbunden · SCO-Systempfad blockiert");
         } else if (RepairRetryPolicy.exhausted(repairAttemptsInIncident)) {
             updateNotification("Telefonie-Route nicht repariert · automatische Versuche beendet");
@@ -486,6 +693,25 @@ public class MonitorService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+
+        if (telephonyManager != null && callStateCallback != null) {
+            try {
+                telephonyManager.unregisterTelephonyCallback(callStateCallback);
+            } catch (RuntimeException ignored) {
+            }
+            callStateCallback = null;
+            telephonyManager = null;
+        }
+
+        if (bluetoothAdapter != null && headsetProxy != null) {
+            try {
+                bluetoothAdapter.closeProfileProxy(
+                        BluetoothProfile.HEADSET,
+                        headsetProxy);
+            } catch (RuntimeException ignored) {
+            }
+            headsetProxy = null;
+        }
 
         if (bluetoothReceiverRegistered) {
             try {

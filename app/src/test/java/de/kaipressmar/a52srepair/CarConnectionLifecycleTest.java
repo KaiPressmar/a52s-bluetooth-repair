@@ -67,6 +67,65 @@ public class CarConnectionLifecycleTest {
         assertTrue(RepairRetryPolicy.canAttempt(true, confirmed, 0));
     }
 
+    @Test public void telephonyOffhookStillTriggersRepairWhenSamsungAudioModeStaysNormal() {
+        BluetoothHealth routeDrift =
+                BluetoothHealth.assess(
+                        true,
+                        true,
+                        AudioManager.MODE_NORMAL,
+                        true,
+                        true,
+                        false,
+                        false,
+                        true);
+        FailureSignature signature = FailureSignature.classify(routeDrift, true);
+        RepairDecision confirmed =
+                RepairDecision.decide(
+                        signature,
+                        routeDrift,
+                        2,
+                        0,
+                        2_100_000L,
+                        0L);
+
+        assertTrue(routeDrift.inCommunication);
+        assertEquals(BluetoothHealth.State.SUSPECT_ROUTING, routeDrift.state);
+        assertEquals(
+                RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE,
+                confirmed.action);
+    }
+
+    @Test public void selectedRouteButDisconnectedScoTransportIsStillRepairable() {
+        BluetoothHealth routeLooksSelected =
+                BluetoothHealth.assess(
+                        true,
+                        true,
+                        AudioManager.MODE_IN_CALL,
+                        true,
+                        true,
+                        true,
+                        false);
+
+        assertEquals(BluetoothHealth.State.HEALTHY, routeLooksSelected.state);
+        assertTrue(
+                HfpAudioTransportPolicy.isMismatch(
+                        routeLooksSelected,
+                        Boolean.FALSE));
+
+        RepairDecision confirmed =
+                HfpAudioTransportPolicy.decide(
+                        routeLooksSelected,
+                        Boolean.FALSE,
+                        2,
+                        2_200_000L,
+                        2_206_000L,
+                        0L);
+
+        assertEquals(
+                RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE,
+                confirmed.action);
+    }
+
     @Test public void successfulBluetoothCallRouteEndsIncidentWithoutMoreRepair() {
         BluetoothHealth healthy =
                 BluetoothHealth.assess(

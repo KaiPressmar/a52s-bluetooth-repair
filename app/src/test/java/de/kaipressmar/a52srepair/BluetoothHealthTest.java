@@ -34,6 +34,39 @@ public class BluetoothHealthTest {
         assertFalse(h.needsRepair());
     }
 
+    @Test public void cellularCallHintDetectsCallEvenWhenAudioModeIsStillNormal() {
+        BluetoothHealth h =
+                BluetoothHealth.assess(
+                        true,
+                        true,
+                        AudioManager.MODE_NORMAL,
+                        true,
+                        true,
+                        false,
+                        false,
+                        true);
+
+        assertTrue(h.inCommunication);
+        assertEquals(BluetoothHealth.State.SUSPECT_ROUTING, h.state);
+        assertTrue(h.needsRepair());
+    }
+
+    @Test public void cellularCallHintWithMissingScoIdentifiesVendorFailure() {
+        BluetoothHealth h =
+                BluetoothHealth.assess(
+                        true,
+                        true,
+                        AudioManager.MODE_NORMAL,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true);
+
+        assertTrue(h.inCommunication);
+        assertEquals(BluetoothHealth.State.HFP_CONNECTED_NO_SCO, h.state);
+    }
+
     @Test public void activeCallWithScoSelectedIsHealthy() {
         BluetoothHealth h = BluetoothHealth.assess(
                 true, true, AudioManager.MODE_IN_CALL, true, true, true, false);

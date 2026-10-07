@@ -16,6 +16,7 @@ final class RepairStateStore {
     private static final String KEY_CONSECUTIVE_SUSPECT = "consecutive_suspect";
     private static final String KEY_CONSECUTIVE_DEGRADED = "consecutive_degraded";
     private static final String KEY_ROUTE_OWNED = "route_owned";
+    private static final String KEY_HFP_AUDIO_TRANSPORT = "hfp_audio_transport";
 
     private RepairStateStore() {}
 
@@ -97,6 +98,21 @@ final class RepairStateStore {
         int next = degraded ? p.getInt(KEY_CONSECUTIVE_DEGRADED, 0) + 1 : 0;
         p.edit().putInt(KEY_CONSECUTIVE_DEGRADED, next).apply();
         return next;
+    }
+
+    static void saveHfpAudioTransport(Context c, Boolean connected) {
+        String value =
+                connected == null
+                        ? "unknown"
+                        : (connected ? "connected" : "disconnected");
+        prefs(c).edit().putString(KEY_HFP_AUDIO_TRANSPORT, value).apply();
+    }
+
+    static Boolean lastHfpAudioTransport(Context c) {
+        String value = prefs(c).getString(KEY_HFP_AUDIO_TRANSPORT, "unknown");
+        if ("connected".equals(value)) return Boolean.TRUE;
+        if ("disconnected".equals(value)) return Boolean.FALSE;
+        return null;
     }
 
     static boolean routeOwned(Context c) {

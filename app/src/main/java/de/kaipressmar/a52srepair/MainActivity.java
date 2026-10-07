@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private TextView metricScoValue;
     private TextView diagBluetoothValue;
     private TextView diagHfpValue;
+    private TextView diagCallValue;
     private TextView diagScoValue;
     private TextView diagSignatureValue;
     private Switch monitorSwitch;
@@ -192,6 +193,7 @@ public class MainActivity extends Activity {
         metricScoValue = null;
         diagBluetoothValue = null;
         diagHfpValue = null;
+        diagCallValue = null;
         diagScoValue = null;
         diagSignatureValue = null;
         monitorSwitch = null;
@@ -467,6 +469,8 @@ public class MainActivity extends Activity {
         diagnostic.addView(infoDivider());
         diagHfpValue = diagnosticRow(diagnostic, "HFP-Profil", "wird geprüft");
         diagnostic.addView(infoDivider());
+        diagCallValue = diagnosticRow(diagnostic, "Anruf-Erkennung", "wird geprüft");
+        diagnostic.addView(infoDivider());
         diagScoValue = diagnosticRow(diagnostic, "SCO/Telefonie", "wird geprüft");
         diagnostic.addView(infoDivider());
         diagSignatureValue = diagnosticRow(diagnostic, "Fehlersignatur", "wird bewertet");
@@ -688,7 +692,7 @@ public class MainActivity extends Activity {
         card.addView(infoDivider());
         card.addView(infoRow("Referenz-Firmware", getString(R.string.device_reference_firmware)));
         card.addView(infoDivider());
-        card.addView(infoRow("App-Ziel-SDK", "API 36"));
+        card.addView(infoRow("App-Ziel-SDK", "API " + getApplicationInfo().targetSdkVersion));
         card.addView(infoDivider());
         card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
@@ -1081,17 +1085,13 @@ public class MainActivity extends Activity {
     private void verifyRepair(String logPrefix) {
         BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, verified.health);
-        boolean success = verified.health.scoSelected;
-        HealthHistoryStore.record(this, verified.health, success ? "repair" : "verify");
-        if (success) {
-            RepairStateStore.markRepair(this);
-            RepairStateStore.clearConsecutiveSuspect(this);
-        }
+        boolean routeSelected = verified.health.scoSelected;
+        HealthHistoryStore.record(this, verified.health, "verify");
         Diag.log(
                 this,
                 logPrefix
-                        + " success="
-                        + success
+                        + " routeSelected="
+                        + routeSelected
                         + "\n"
                         + Diag.snapshot(this, verified));
         refresh(false);
@@ -1156,13 +1156,19 @@ public class MainActivity extends Activity {
             details.setText(Diag.snapshot(this));
         }
 
+        Boolean lastHfpAudioTransport = RepairStateStore.lastHfpAudioTransport(this);
+
         if (routeTitle != null) {
             AudioDeviceInfo current = probe.current;
             routeTitle.setText(
                     current == null
                             ? "Kein Telefonie-Audiogerät aktiv"
                             : String.valueOf(current.getProductName()));
-            routeSub.setText(health.summary);
+            routeSub.setText(
+                    health.inCommunication
+                                    && Boolean.FALSE.equals(lastHfpAudioTransport)
+                            ? "Bluetooth-Route ist gewählt, aber der HFP-Audiotransport ist getrennt"
+                            : health.summary);
             signatureSub.setText(
                     probe.signature.label
                             + (probe.signature.confidence == FailureSignature.Confidence.NONE
@@ -1179,7 +1185,13 @@ public class MainActivity extends Activity {
         }
 
         if (statusPill != null) {
-            switch (health.state) {
+            if (health.inCommunication
+                    && Boolean.FALSE.equals(lastHfpAudioTransport)) {
+                setHeroStatus(
+                        "●  HFP-Audiotransport getrennt",
+                        AppPalette.WARNING,
+                        Color.WHITE);
+            } else switch (health.state) {
                 case HEALTHY:
                     setHeroStatus("●  " + health.summary, AppPalette.SUCCESS, Color.WHITE);
                     break;
@@ -1219,16 +1231,23 @@ public class MainActivity extends Activity {
             metricHfpValue.setTextColor(health.hfpProfileConnected ? AppPalette.TEAL : MUTED);
         }
         if (metricScoValue != null) {
+            boolean transportDown =
+                    health.inCommunication
+                            && Boolean.FALSE.equals(lastHfpAudioTransport);
             metricScoValue.setText(
-                    health.scoSelected
-                            ? "Aktiv"
-                            : (health.scoAvailable ? "Verfügbar" : "Fehlt"));
+                    transportDown
+                            ? "Audio getrennt"
+                            : (health.scoSelected
+                                    ? "Aktiv"
+                                    : (health.scoAvailable ? "Verfügbar" : "Fehlt")));
             metricScoValue.setTextColor(
-                    health.scoSelected
-                            ? AppPalette.CYAN
-                            : (health.inCommunication && !health.scoAvailable
-                                    ? AppPalette.WARNING
-                                    : MUTED));
+                    transportDown
+                            ? AppPalette.WARNING
+                            : (health.scoSelected
+                                    ? AppPalette.CYAN
+                                    : (health.inCommunication && !health.scoAvailable
+                                            ? AppPalette.WARNING
+                                            : MUTED)));
         }
 
         if (autoRepairSwitch != null) {
@@ -1248,14 +1267,20 @@ public class MainActivity extends Activity {
             updatingMonitorSwitch = false;
 
             boolean autoRepair = RepairStateStore.autoRepairEnabled(this);
+            boolean phoneStatePermission =
+                    Build.VERSION.SDK_INT < 31
+                            || checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                                    == PackageManager.PERMISSION_GRANTED;
             monitorSubtitle.setText(
                     !monitoring
                             ? "Aus · einschalten für automatische Erkennung im Hintergrund"
                             : (health.state == BluetoothHealth.State.BLUETOOTH_OFF
                                     ? "Bluetooth aus · Prüfung und Reparatur pausieren automatisch"
-                                    : (autoRepair
-                                            ? "Aktiv · Bluetooth/HFP-Ereignisse triggern Prüfung und Reparatur"
-                                            : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")));
+                                    : (!phoneStatePermission
+                                            ? "Aktiv · Anruf-Erkennung eingeschränkt, Telefonstatus-Berechtigung fehlt"
+                                            : (autoRepair
+                                                    ? "Aktiv · Bluetooth/HFP/SCO- und Anruf-Ereignisse triggern Prüfung und Reparatur"
+                                                    : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus"))));
         }
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
@@ -1287,16 +1312,41 @@ public class MainActivity extends Activity {
             diagHfpValue.setTextColor(
                     health.hfpProfileConnected ? AppPalette.SUCCESS : MUTED);
 
+            boolean phonePermission =
+                    Build.VERSION.SDK_INT < 31
+                            || checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                                    == PackageManager.PERMISSION_GRANTED;
+            boolean cellularCall = BluetoothRepair.currentCellularCallActive(this);
+            diagCallValue.setText(
+                    !phonePermission
+                            ? "Berechtigung fehlt"
+                            : (cellularCall
+                                    ? "Mobilfunkanruf aktiv"
+                                    : (health.inCommunication
+                                            ? "Audio-Kommunikation aktiv"
+                                            : "Kein aktiver Anruf")));
+            diagCallValue.setTextColor(
+                    !phonePermission
+                            ? AppPalette.WARNING
+                            : (health.inCommunication ? AppPalette.SUCCESS : MUTED));
+
+            boolean transportDown =
+                    health.inCommunication
+                            && Boolean.FALSE.equals(lastHfpAudioTransport);
             diagScoValue.setText(
-                    health.scoSelected
-                            ? "Aktiv"
-                            : (health.scoAvailable ? "Verfügbar" : "Nicht verfügbar"));
+                    transportDown
+                            ? "Route da, HFP-Audio getrennt"
+                            : (health.scoSelected
+                                    ? "Aktiv"
+                                    : (health.scoAvailable ? "Verfügbar" : "Nicht verfügbar")));
             diagScoValue.setTextColor(
-                    health.scoSelected
-                            ? AppPalette.SUCCESS
-                            : (health.inCommunication && !health.scoAvailable
-                                    ? AppPalette.WARNING
-                                    : MUTED));
+                    transportDown
+                            ? AppPalette.WARNING
+                            : (health.scoSelected
+                                    ? AppPalette.SUCCESS
+                                    : (health.inCommunication && !health.scoAvailable
+                                            ? AppPalette.WARNING
+                                            : MUTED)));
 
             diagSignatureValue.setText(
                     probe.signature.label
@@ -1727,6 +1777,11 @@ public class MainActivity extends Activity {
         List<String> permissions = new ArrayList<>();
         if (Build.VERSION.SDK_INT >= 31 && !btPermission()) {
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+        }
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.READ_PHONE_STATE);
         }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
