@@ -38,6 +38,10 @@ public class MainActivity extends Activity {
     private TextView metricAutoValue;
     private TextView metricHfpValue;
     private TextView metricScoValue;
+    private TextView diagBluetoothValue;
+    private TextView diagHfpValue;
+    private TextView diagScoValue;
+    private TextView diagSignatureValue;
     private Switch monitorSwitch;
     private TextView monitorSubtitle;
     private TextView homeLastCheck;
@@ -45,6 +49,9 @@ public class MainActivity extends Activity {
     private LinearLayout homeUpdateBanner;
     private TextView homeUpdateBannerText;
     private boolean updatingMonitorSwitch;
+    private Switch autoRepairSwitch;
+    private TextView autoRepairSubtitle;
+    private boolean updatingAutoRepairSwitch;
 
     private HealthHistoryChart historyChart;
     private TextView historySummary;
@@ -183,12 +190,18 @@ public class MainActivity extends Activity {
         metricAutoValue = null;
         metricHfpValue = null;
         metricScoValue = null;
+        diagBluetoothValue = null;
+        diagHfpValue = null;
+        diagScoValue = null;
+        diagSignatureValue = null;
         monitorSwitch = null;
         monitorSubtitle = null;
         homeLastCheck = null;
         recoveryCard = null;
         homeUpdateBanner = null;
         homeUpdateBannerText = null;
+        autoRepairSwitch = null;
+        autoRepairSubtitle = null;
 
         historyChart = null;
         historySummary = null;
@@ -271,19 +284,15 @@ public class MainActivity extends Activity {
         add(homeUpdateBanner, 9, -1);
 
         LinearLayout metrics = new LinearLayout(this);
-        LinearLayout autoMetric = metricCard("AUTO", "Aus", AppPalette.PRIMARY_SOFT);
-        LinearLayout hfpMetric = metricCard("HFP", "–", AppPalette.TEAL_SOFT);
-        LinearLayout scoMetric = metricCard("SCO", "–", AppPalette.CYAN_SOFT);
-        metricAutoValue = (TextView) autoMetric.getChildAt(1);
+        LinearLayout hfpMetric = metricCard("HFP-PROFIL", "–", AppPalette.TEAL_SOFT);
+        LinearLayout scoMetric = metricCard("TELEFONIE-ROUTE", "–", AppPalette.CYAN_SOFT);
         metricHfpValue = (TextView) hfpMetric.getChildAt(1);
         metricScoValue = (TextView) scoMetric.getChildAt(1);
 
-        metrics.addView(autoMetric, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams centerMetric = new LinearLayout.LayoutParams(0, -2, 1);
-        centerMetric.leftMargin = dp(8);
-        centerMetric.rightMargin = dp(8);
-        metrics.addView(hfpMetric, centerMetric);
-        metrics.addView(scoMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        metrics.addView(hfpMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams secondMetric = new LinearLayout.LayoutParams(0, -2, 1);
+        secondMetric.leftMargin = dp(8);
+        metrics.addView(scoMetric, secondMetric);
         add(metrics, 10, -1);
 
         add(sectionHeader("Verbindung", "Was Android gerade für Telefonie verwendet"), 21, -1);
@@ -373,7 +382,7 @@ public class MainActivity extends Activity {
         LinearLayout stats = new LinearLayout(this);
         LinearLayout healthy = metricCard("STABIL", "0", AppPalette.SUCCESS_SOFT);
         LinearLayout problems = metricCard("AUFFÄLLIG", "0", AppPalette.WARNING_SOFT);
-        LinearLayout repairs = metricCard("REPARATUREN", "0", AppPalette.PRIMARY_SOFT);
+        LinearLayout repairs = metricCard("REPARIERT", "0", AppPalette.PRIMARY_SOFT);
         historyHealthyValue = (TextView) healthy.getChildAt(1);
         historyProblemValue = (TextView) problems.getChildAt(1);
         historyRepairValue = (TextView) repairs.getChildAt(1);
@@ -427,25 +436,54 @@ public class MainActivity extends Activity {
     }
 
     private void buildToolsPage() {
-        buildTopBar("Werkzeuge", "Manuelle Diagnose und Recovery für Sonderfälle");
+        buildTopBar("Diagnose", "Live-Zustand, Reparatur und Recovery an einem Ort");
 
-        add(sectionHeader("Diagnose", "Nur nutzen, wenn du genauer nachsehen möchtest"), 12, -1);
-        add(
-                actionCard(
-                        R.drawable.ic_search,
-                        "Nur Diagnose",
-                        "Zustand und Fehlersignatur prüfen, ohne das Audio-Routing zu verändern",
-                        false,
-                        v -> manualDiagnosis()),
-                9,
-                -1);
+        add(sectionHeader("Schnelltest", "Die vier Signale, die für das Fehlerbild entscheidend sind"), 12, -1);
 
-        add(sectionHeader("Reparatur", "Bewusste Eingriffe außerhalb der Automatik"), 21, -1);
+        LinearLayout diagnostic = card();
+        diagnostic.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout diagHeader = new LinearLayout(this);
+        diagHeader.setGravity(Gravity.CENTER_VERTICAL);
+        diagHeader.addView(
+                iconBubble(R.drawable.ic_search, PRIMARY, AppPalette.PRIMARY_SOFT),
+                new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout diagCopy = new LinearLayout(this);
+        diagCopy.setOrientation(LinearLayout.VERTICAL);
+        diagCopy.addView(label("Live-Diagnose", 15, Typeface.BOLD, INK));
+        diagCopy.addView(
+                label(
+                        "Wird beim Öffnen und beim Zurückkehren in die App aktualisiert",
+                        11,
+                        Typeface.NORMAL,
+                        MUTED));
+        LinearLayout.LayoutParams diagCopyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        diagCopyParams.leftMargin = dp(11);
+        diagHeader.addView(diagCopy, diagCopyParams);
+        diagnostic.addView(diagHeader);
+
+        diagnostic.addView(infoDivider());
+        diagBluetoothValue = diagnosticRow(diagnostic, "Bluetooth", "wird geprüft");
+        diagnostic.addView(infoDivider());
+        diagHfpValue = diagnosticRow(diagnostic, "HFP-Profil", "wird geprüft");
+        diagnostic.addView(infoDivider());
+        diagScoValue = diagnosticRow(diagnostic, "SCO/Telefonie", "wird geprüft");
+        diagnostic.addView(infoDivider());
+        diagSignatureValue = diagnosticRow(diagnostic, "Fehlersignatur", "wird bewertet");
+
+        TextView refreshDiagnosis =
+                smallButton("Diagnose aktualisieren", v -> manualDiagnosis(), false);
+        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(-1, -2);
+        refreshParams.topMargin = dp(12);
+        diagnostic.addView(refreshDiagnosis, refreshParams);
+        add(diagnostic, 9, -1);
+
+        add(sectionHeader("Reparatur", "Nur gezielt eingreifen, wenn die Diagnose es nahelegt"), 21, -1);
         add(
                 actionCard(
                         R.drawable.ic_repair,
                         "SCO/HFP neu auswählen",
-                        "Bluetooth-Kommunikationsgerät gezielt neu anfordern",
+                        "Bluetooth-Kommunikationsgerät bewusst neu anfordern und anschließend verifizieren",
                         false,
                         v -> forceRepair()),
                 9,
@@ -456,7 +494,7 @@ public class MainActivity extends Activity {
                 actionCard(
                         R.drawable.ic_settings,
                         "Samsung Bluetooth Agent",
-                        "App-Info der Samsung-Bluetooth-Komponente öffnen; dort kann der Cache geprüft werden",
+                        "App-Info der Samsung-Bluetooth-Komponente öffnen und dort zuerst den Cache prüfen",
                         false,
                         v -> openBluetoothAgentSettings()),
                 9,
@@ -474,38 +512,22 @@ public class MainActivity extends Activity {
                 actionCard(
                         R.drawable.ic_developer,
                         "Entwickleroptionen",
-                        "Nur für bekannte Workarounds wie A2DP-Offload/SAP manuell öffnen",
+                        "Nur für bekannte manuelle Workarounds wie A2DP-Offload/SAP öffnen",
                         false,
                         v -> openDeveloperOptions()),
                 8,
                 -1);
 
-        LinearLayout note = noteCard(
-                "Automatische Grenze",
-                "Wenn Android kein SCO/HFP-Kommunikationsgerät mehr anbietet, startet die App keine aggressiven Systemdienste neu. Dieser Zustand wird erkannt und hier gezielt eskaliert.",
-                AppPalette.WARNING_SOFT,
-                AppPalette.WARNING);
-        add(note, 11, -1);
-    }
-
-    private void buildSettingsPage() {
-        buildTopBar("Einstellungen", "Updates, Benachrichtigungen und technische Informationen");
-
-        add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 12, -1);
-        buildFullUpdateCard();
-
-        add(sectionHeader("Hintergrund", "Systemzugriff und Benachrichtigungen verwalten"), 21, -1);
         add(
-                actionCard(
-                        R.drawable.ic_notifications,
-                        "Benachrichtigungen",
-                        "Status- und Update-Benachrichtigungen in Android konfigurieren",
-                        false,
-                        v -> openNotificationSettings()),
-                9,
+                noteCard(
+                        "Automatische Grenze",
+                        "Wenn Android kein SCO/HFP-Kommunikationsgerät mehr anbietet, startet die App keine aggressiven Systemdienste neu. Sie erkennt diesen Zustand und führt dich stattdessen zu den sicheren Recovery-Schritten.",
+                        AppPalette.WARNING_SOFT,
+                        AppPalette.WARNING),
+                11,
                 -1);
 
-        add(sectionHeader("Diagnose & Support", "Technische Daten nur bei Bedarf einblenden"), 21, -1);
+        add(sectionHeader("Support-Daten", "Technische Informationen nur hier, nicht in den normalen Einstellungen"), 21, -1);
 
         details = label("", 11, Typeface.NORMAL, MUTED);
         details.setTypeface(Typeface.MONOSPACE);
@@ -530,6 +552,80 @@ public class MainActivity extends Activity {
                         false,
                         v -> shareLog()),
                 10,
+                -1);
+    }
+
+    private void buildSettingsPage() {
+        buildTopBar("Einstellungen", "Schutzverhalten, Updates und App-Informationen");
+
+        add(sectionHeader("Schutzverhalten", "Festlegen, wie der Auto-Schutz reagieren darf"), 12, -1);
+
+        LinearLayout repairSetting = card();
+        repairSetting.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout repairTop = new LinearLayout(this);
+        repairTop.setGravity(Gravity.CENTER_VERTICAL);
+        repairTop.addView(
+                iconBubble(R.drawable.ic_shield, PRIMARY, AppPalette.PRIMARY_SOFT),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
+
+        LinearLayout repairCopy = new LinearLayout(this);
+        repairCopy.setOrientation(LinearLayout.VERTICAL);
+        repairCopy.addView(label("Automatisch reparieren", 15, Typeface.BOLD, INK));
+        autoRepairSubtitle =
+                label(
+                        "Bestätigte, öffentlich reparierbare Routingfehler automatisch beheben",
+                        11,
+                        Typeface.NORMAL,
+                        MUTED);
+        repairCopy.addView(autoRepairSubtitle);
+        LinearLayout.LayoutParams repairCopyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        repairCopyParams.leftMargin = dp(12);
+        repairTop.addView(repairCopy, repairCopyParams);
+
+        autoRepairSwitch = new Switch(this);
+        autoRepairSwitch.setShowText(false);
+        tintSwitch(autoRepairSwitch);
+        autoRepairSwitch.setOnCheckedChangeListener(
+                (buttonView, checked) -> {
+                    if (updatingAutoRepairSwitch) return;
+                    RepairStateStore.setAutoRepairEnabled(this, checked);
+                    refresh(false);
+                    Toast.makeText(
+                                    this,
+                                    checked
+                                            ? "Automatische Reparatur aktiviert."
+                                            : "Auto-Schutz erkennt weiterhin Fehler, repariert aber nicht automatisch.",
+                                    Toast.LENGTH_SHORT)
+                            .show();
+                });
+        repairTop.addView(autoRepairSwitch);
+        repairSetting.addView(repairTop);
+
+        TextView repairHint =
+                label(
+                        "Diese Einstellung verändert nicht die Überwachung selbst. Auto-Schutz kann aktiv bleiben und bei ausgeschalteter Auto-Reparatur nur erkennen, protokollieren und warnen.",
+                        11,
+                        Typeface.NORMAL,
+                        MUTED);
+        repairHint.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+        hintParams.topMargin = dp(10);
+        repairSetting.addView(repairHint, hintParams);
+        add(repairSetting, 9, -1);
+
+        add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 21, -1);
+        buildFullUpdateCard();
+
+        add(sectionHeader("System", "Benachrichtigungen und Android-Zugriff"), 21, -1);
+        add(
+                actionCard(
+                        R.drawable.ic_notifications,
+                        "Benachrichtigungen",
+                        "Status- und Update-Benachrichtigungen in Android konfigurieren",
+                        false,
+                        v -> openNotificationSettings()),
+                9,
                 -1);
 
         add(sectionHeader("App-Info", "Installierter Build und Geräteprofil"), 21, -1);
@@ -587,6 +683,21 @@ public class MainActivity extends Activity {
         card.addView(infoDivider());
         card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
+    }
+
+    private TextView diagnosticRow(
+            LinearLayout parent,
+            String labelText,
+            String initialValue) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView left = label(labelText, 12, Typeface.NORMAL, MUTED);
+        TextView right = label(initialValue, 12, Typeface.BOLD, INK);
+        right.setGravity(Gravity.RIGHT);
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(right, new LinearLayout.LayoutParams(0, -2, 1));
+        parent.addView(row);
+        return right;
     }
 
     private View infoDivider() {
@@ -825,7 +936,7 @@ public class MainActivity extends Activity {
                 navDestination(Page.HISTORY, R.drawable.ic_history, "Verlauf", "nav-history"),
                 new LinearLayout.LayoutParams(0, dp(62), 1));
         nav.addView(
-                navDestination(Page.TOOLS, R.drawable.ic_tools, "Werkzeuge", "nav-tools"),
+                navDestination(Page.TOOLS, R.drawable.ic_tools, "Diagnose", "nav-tools"),
                 new LinearLayout.LayoutParams(0, dp(62), 1));
         nav.addView(
                 navDestination(Page.SETTINGS, R.drawable.ic_settings, "Einstellungen", "nav-settings"),
@@ -840,11 +951,13 @@ public class MainActivity extends Activity {
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(5), dp(6), dp(5), dp(6));
         item.setClickable(true);
+        item.setContentDescription(title);
         item.setOnClickListener(v -> showPage(page));
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
         icon.setColorFilter(MUTED);
+        icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
 
         TextView label = label(title, 9, Typeface.NORMAL, MUTED);
@@ -984,7 +1097,6 @@ public class MainActivity extends Activity {
             }
 
             RepairStateStore.setMonitoringEnabled(this, true);
-            RepairStateStore.setAutoRepairEnabled(this, true);
             try {
                 startForegroundService(new Intent(this, MonitorService.class));
                 Toast.makeText(this, "Auto-Schutz ist aktiv.", Toast.LENGTH_SHORT).show();
@@ -1099,15 +1211,29 @@ public class MainActivity extends Activity {
                                     : MUTED));
         }
 
+        if (autoRepairSwitch != null) {
+            boolean autoRepair = RepairStateStore.autoRepairEnabled(this);
+            updatingAutoRepairSwitch = true;
+            autoRepairSwitch.setChecked(autoRepair);
+            updatingAutoRepairSwitch = false;
+            autoRepairSubtitle.setText(
+                    autoRepair
+                            ? "Bestätigte, öffentlich reparierbare Routingfehler automatisch beheben"
+                            : "Nur erkennen, protokollieren und warnen");
+        }
+
         if (monitorSwitch != null) {
             updatingMonitorSwitch = true;
             monitorSwitch.setChecked(monitoring);
             updatingMonitorSwitch = false;
 
+            boolean autoRepair = RepairStateStore.autoRepairEnabled(this);
             monitorSubtitle.setText(
                     monitoring
-                            ? "Aktiv · ereignisbasiert · Leerlauf-Check etwa stündlich"
-                            : "Aus · einschalten für automatische Erkennung und Reparatur");
+                            ? (autoRepair
+                                    ? "Aktiv · erkennt und repariert bestätigte Routingfehler"
+                                    : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")
+                            : "Aus · einschalten für automatische Erkennung im Hintergrund");
         }
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
@@ -1120,6 +1246,47 @@ public class MainActivity extends Activity {
                                     + formatTime(lastCheck)
                                     + " · "
                                     + lastSummary);
+        }
+
+        if (diagBluetoothValue != null) {
+            diagBluetoothValue.setText(
+                    health.state == BluetoothHealth.State.BLUETOOTH_OFF
+                            ? "Ausgeschaltet"
+                            : (health.state == BluetoothHealth.State.PERMISSION_REQUIRED
+                                    ? "Berechtigung fehlt"
+                                    : "Aktiv"));
+            diagBluetoothValue.setTextColor(
+                    health.state == BluetoothHealth.State.BLUETOOTH_OFF
+                                    || health.state == BluetoothHealth.State.PERMISSION_REQUIRED
+                            ? AppPalette.WARNING
+                            : AppPalette.SUCCESS);
+
+            diagHfpValue.setText(health.hfpProfileConnected ? "Verbunden" : "Nicht verbunden");
+            diagHfpValue.setTextColor(
+                    health.hfpProfileConnected ? AppPalette.SUCCESS : MUTED);
+
+            diagScoValue.setText(
+                    health.scoSelected
+                            ? "Aktiv"
+                            : (health.scoAvailable ? "Verfügbar" : "Nicht verfügbar"));
+            diagScoValue.setTextColor(
+                    health.scoSelected
+                            ? AppPalette.SUCCESS
+                            : (health.inCommunication && !health.scoAvailable
+                                    ? AppPalette.WARNING
+                                    : MUTED));
+
+            diagSignatureValue.setText(
+                    probe.signature.label
+                            + (probe.signature.confidence == FailureSignature.Confidence.NONE
+                                    ? ""
+                                    : " · " + confidenceLabel(probe.signature.confidence)));
+            diagSignatureValue.setTextColor(
+                    probe.signature.matchesKnownSamsungFailure()
+                            ? AppPalette.WARNING
+                            : (probe.signature.kind == FailureSignature.Kind.HEALTHY_CALL
+                                    ? AppPalette.SUCCESS
+                                    : MUTED));
         }
 
         List<HealthHistoryStore.Entry> entries = HealthHistoryStore.read(this);
@@ -1145,7 +1312,8 @@ public class MainActivity extends Activity {
             historyProblemValue.setText(String.valueOf(problems));
         }
         if (historyRepairValue != null) {
-            historyRepairValue.setText(String.valueOf(RepairStateStore.repairCount(this)));
+            historyRepairValue.setText(
+                    String.valueOf(HealthHistoryStore.repairCount(entries, since)));
         }
         if (recentEventsContainer != null) {
             renderRecentEvents(entries);

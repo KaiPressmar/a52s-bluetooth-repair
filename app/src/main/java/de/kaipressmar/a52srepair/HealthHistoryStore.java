@@ -138,6 +138,16 @@ final class HealthHistoryStore {
         return count;
     }
 
+    static int repairCount(List<Entry> entries, long since) {
+        int count = 0;
+        if (entries != null) {
+            for (Entry entry : entries) {
+                if (entry.timestamp >= since && "repair".equals(entry.source)) count++;
+            }
+        }
+        return count;
+    }
+
     private static String encode(List<Entry> entries) {
         StringBuilder out = new StringBuilder();
         for (Entry entry : entries) {

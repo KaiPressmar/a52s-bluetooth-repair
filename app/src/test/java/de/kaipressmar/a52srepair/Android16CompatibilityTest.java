@@ -26,7 +26,7 @@ public class Android16CompatibilityTest {
         assertTrue(text.contains("Übersicht"));
         assertTrue(text.contains("HFP"));
         assertTrue(text.contains("SCO"));
-        assertTrue(text.contains("Werkzeuge"));
+        assertTrue(text.contains("Diagnose"));
         assertTrue(text.contains("Einstellungen"));
 
         BluetoothHealth health =

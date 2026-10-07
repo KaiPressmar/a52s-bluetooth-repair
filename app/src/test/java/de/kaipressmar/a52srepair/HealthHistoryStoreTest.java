@@ -59,6 +59,25 @@ public class HealthHistoryStoreTest {
                 HealthHistoryStore.problemCount(entries, 0L));
     }
 
+    @Test public void repairCounterCanBeScopedToHistoryWindow() {
+        HealthHistoryStore.record(
+                context,
+                health(AudioManager.MODE_IN_COMMUNICATION, true, true, true),
+                "repair");
+        HealthHistoryStore.record(
+                context,
+                health(AudioManager.MODE_IN_COMMUNICATION, true, true, false),
+                "manual");
+
+        List<HealthHistoryStore.Entry> entries = HealthHistoryStore.read(context);
+        assertEquals(1, HealthHistoryStore.repairCount(entries, 0L));
+        assertEquals(
+                0,
+                HealthHistoryStore.repairCount(
+                        entries,
+                        System.currentTimeMillis() + 60_000L));
+    }
+
     @Test public void identicalBackgroundSamplesAreCoalesced() {
         BluetoothHealth idle =
                 health(AudioManager.MODE_NORMAL, true, true, false);

@@ -2,6 +2,7 @@ package de.kaipressmar.a52srepair;
 
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Switch;
 import android.widget.TextView;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -27,13 +28,13 @@ public class MainActivityUxTest {
         String text = allText(nav);
         assertContains(text, "Übersicht");
         assertContains(text, "Verlauf");
-        assertContains(text, "Werkzeuge");
+        assertContains(text, "Diagnose");
         assertContains(text, "Einstellungen");
-        assertFalse(text.contains("Diagnose"));
-        assertFalse(text.contains("Reparatur"));
+        assertFalse(text.contains("SCO/HFP neu auswählen"));
+        assertFalse(text.contains("Jetzt prüfen"));
     }
 
-    @Test public void overviewContainsOnlyEverydayStatusAndControls() {
+    @Test public void overviewAvoidsDuplicateAutoStatusAndKeepsEverydayControls() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
@@ -43,9 +44,9 @@ public class MainActivityUxTest {
         assertContains(text, "Automatisch geschützt.");
         assertContains(text, "Jetzt prüfen");
         assertContains(text, "Automatische Überwachung");
-        assertContains(text, "HFP");
-        assertContains(text, "SCO");
-        assertFalse(text.contains("Nur Diagnose"));
+        assertContains(text, "HFP-PROFIL");
+        assertContains(text, "TELEFONIE-ROUTE");
+        assertFalse(text.contains("AUTO\n"));
         assertFalse(text.contains("SCO/HFP neu auswählen"));
         assertFalse(text.contains("Diagnoseprotokoll teilen"));
     }
@@ -63,33 +64,38 @@ public class MainActivityUxTest {
         String text = allText(activity.findViewById(android.R.id.content));
         assertContains(text, "Letzte 24 Stunden");
         assertContains(text, "Letzte Ereignisse");
+        assertContains(text, "REPARIERT");
         assertContains(text, "Daten");
         assertContains(text, "Verlauf zurücksetzen");
         assertFalse(text.contains("Diagnoseprotokoll teilen"));
         assertFalse(text.contains("Jetzt prüfen"));
     }
 
-    @Test public void toolsAreReservedForManualDiagnosisAndRecovery() {
+    @Test public void diagnosisDestinationOwnsGuidedStatusRecoveryAndSupportData() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
-        View tools =
+        View diagnosis =
                 activity.findViewById(android.R.id.content)
                         .findViewWithTag("nav-tools");
-        assertNotNull(tools);
-        tools.performClick();
+        assertNotNull(diagnosis);
+        diagnosis.performClick();
 
         String text = allText(activity.findViewById(android.R.id.content));
-        assertContains(text, "Nur Diagnose");
+        assertContains(text, "Live-Diagnose");
+        assertContains(text, "Bluetooth");
+        assertContains(text, "HFP-Profil");
+        assertContains(text, "SCO/Telefonie");
+        assertContains(text, "Fehlersignatur");
+        assertContains(text, "Diagnose aktualisieren");
         assertContains(text, "SCO/HFP neu auswählen");
         assertContains(text, "Samsung Bluetooth Agent");
-        assertContains(text, "Bluetooth-Einstellungen");
-        assertContains(text, "Entwickleroptionen");
+        assertContains(text, "Technische Details anzeigen");
+        assertContains(text, "Diagnoseprotokoll teilen");
         assertFalse(text.contains("App & Updates"));
-        assertFalse(text.contains("Technische Details anzeigen"));
     }
 
-    @Test public void settingsOwnUpdatesNotificationsSupportAndAppInfo() {
+    @Test public void settingsOwnPreferencesUpdatesNotificationsAndAppInfoOnly() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
@@ -100,14 +106,50 @@ public class MainActivityUxTest {
         settings.performClick();
 
         String text = allText(activity.findViewById(android.R.id.content));
+        assertContains(text, "Schutzverhalten");
+        assertContains(text, "Automatisch reparieren");
         assertContains(text, "App & Updates");
         assertContains(text, "Benachrichtigungen");
-        assertContains(text, "Diagnose & Support");
-        assertContains(text, "Technische Details anzeigen");
-        assertContains(text, "Diagnoseprotokoll teilen");
         assertContains(text, "App-Info");
         assertContains(text, "Android 16 · API 36");
+        assertFalse(text.contains("Diagnoseprotokoll teilen"));
+        assertFalse(text.contains("Technische Details anzeigen"));
         assertFalse(text.contains("SCO/HFP neu auswählen"));
+    }
+
+    @Test public void autoRepairPreferenceCanBeDisabledWithoutStoppingMonitoringSetting() {
+        MainActivity activity =
+                Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
+        RepairStateStore.setAutoRepairEnabled(activity, true);
+
+        View settings =
+                activity.findViewById(android.R.id.content)
+                        .findViewWithTag("nav-settings");
+        settings.performClick();
+
+        Switch toggle = findFirstSwitch(activity.findViewById(android.R.id.content));
+        assertNotNull(toggle);
+        assertTrue(toggle.isChecked());
+
+        toggle.setChecked(false);
+
+        assertFalse(RepairStateStore.autoRepairEnabled(activity));
+    }
+
+    private Switch findFirstSwitch(View root) {
+        java.util.ArrayDeque<View> queue = new java.util.ArrayDeque<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            View view = queue.remove();
+            if (view instanceof Switch) return (Switch) view;
+            if (view instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) view;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    queue.add(group.getChildAt(i));
+                }
+            }
+        }
+        return null;
     }
 
     private void assertContains(String actual, String expected) {
