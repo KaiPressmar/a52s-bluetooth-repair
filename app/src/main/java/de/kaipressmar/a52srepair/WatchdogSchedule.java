@@ -7,8 +7,8 @@ package de.kaipressmar.a52srepair;
  * primarily event-driven. These timers are only safety nets for missed vendor callbacks.
  */
 final class WatchdogSchedule {
-    static final long IDLE_HEARTBEAT_MS = 30L * 60L * 1000L;
-    static final long ACTIVE_HEALTHY_RECHECK_MS = 2L * 60L * 1000L;
+    static final long IDLE_HEARTBEAT_MS = 60L * 60L * 1000L;
+    static final long ACTIVE_HEALTHY_RECHECK_MS = 5L * 60L * 1000L;
     static final long SUSPECT_CONFIRM_MS = 4_000L;
     static final long DEGRADED_RECHECK_MS = 5L * 60L * 1000L;
 
