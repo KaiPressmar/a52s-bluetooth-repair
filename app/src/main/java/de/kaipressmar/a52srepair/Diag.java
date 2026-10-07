@@ -27,6 +27,10 @@ final class Diag {
     }
 
     static String snapshot(Context c) {
+        return snapshot(c, BluetoothRepair.probe(c));
+    }
+
+    static String snapshot(Context c, BluetoothRepair.Probe probe) {
         StringBuilder s = new StringBuilder();
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         BluetoothManager bm =
@@ -96,7 +100,9 @@ final class Diag {
             s.append(" - ").append(device(d)).append('\n');
         }
 
-        BluetoothRepair.Probe probe = BluetoothRepair.probe(c);
+        if (probe == null) {
+            probe = BluetoothRepair.probe(c);
+        }
         s.append("health=")
                 .append(probe.health.state)
                 .append(" hfpProfile=")
