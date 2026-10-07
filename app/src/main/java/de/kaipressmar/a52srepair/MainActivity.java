@@ -40,11 +40,22 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle state) {
         super.onCreate(state);
 
-        getWindow().setStatusBarColor(BG);
-        getWindow().setNavigationBarColor(Color.WHITE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        getWindow().setDecorFitsSystemWindows(false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarDividerColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarContrastEnforced(false);
+        WindowInsetsController bars = getWindow().getInsetsController();
+        if (bars != null) {
+            bars.setSystemBarsAppearance(
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        }
 
         LinearLayout root = new LinearLayout(this);
+        root.setTag("app-root");
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
 
@@ -54,12 +65,28 @@ public class MainActivity extends Activity {
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(18), dp(20), dp(30));
+        content.setPadding(dp(20), dp(16), dp(20), dp(26));
         scroll.addView(content);
 
+        View navigation = bottomNav();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        root.addView(bottomNav());
+        root.addView(navigation);
+        root.setOnApplyWindowInsetsListener(
+                (view, insets) -> {
+                    android.graphics.Insets systemBars =
+                            insets.getInsets(
+                                    WindowInsets.Type.systemBars()
+                                            | WindowInsets.Type.displayCutout());
+                    view.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
+                    navigation.setPadding(
+                            dp(8),
+                            dp(6),
+                            dp(8),
+                            dp(8) + Math.max(0, systemBars.bottom));
+                    return insets;
+                });
         setContentView(root);
+        root.requestApplyInsets();
 
         buildDashboard();
         requestNeededPermissions();
@@ -154,12 +181,12 @@ public class MainActivity extends Activity {
                 false,
                 v -> forceRepair());
 
-        add(sectionHeader("Auto-Schutz", "Hintergrunddienst mit periodischer Zustandsprüfung"), 24, -1);
+        add(sectionHeader("Auto-Schutz", "Ereignisbasiert prüfen, mit sparsamer Sicherheitskontrolle"), 24, -1);
         LinearLayout monitor =
                 action(
                         "●",
                         "Automatische Überwachung starten",
-                        "Im Hintergrund prüfen und einen bestätigten Routingfehler automatisch reparieren",
+                        "Bei Anruf- und Audioänderungen sofort prüfen; im Leerlauf nur selten kontrollieren",
                         false,
                         v -> toggleMonitor());
         monitorTitle = (TextView) ((LinearLayout) monitor.getChildAt(1)).getChildAt(0);
@@ -189,7 +216,7 @@ public class MainActivity extends Activity {
         tip.addView(bulb, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView tt =
                 label(
-                        "Auto-Schutz\nWährend eines Anrufs wird nur repariert, wenn Bluetooth-SCO/HFP verfügbar ist, aber bei zwei Prüfungen hintereinander nicht als Kommunikationspfad ausgewählt wurde. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
+                        "Auto-Schutz\nDie Überwachung reagiert hauptsächlich auf Anruf- und Audioereignisse. Im Leerlauf erfolgt nur etwa alle 30 Minuten eine Sicherheitsprüfung. Ein verdächtiger HFP/SCO-Zustand wird nach kurzer Wartezeit bestätigt, bevor repariert wird. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
                         13,
                         Typeface.NORMAL,
                         INK);
@@ -358,8 +385,8 @@ public class MainActivity extends Activity {
                 monitoring ? "Automatische Überwachung stoppen" : "Automatische Überwachung starten");
         monitorSub.setText(
                 monitoring
-                        ? "Auto-Schutz aktiv · Prüfung alle 30 s, während Anrufen alle 5 s"
-                        : "Im Hintergrund prüfen und bestätigte HFP/SCO-Routingfehler reparieren");
+                        ? "Auto-Schutz aktiv · ereignisbasiert, Leerlauf-Check ca. alle 30 Min."
+                        : "Energiesparend im Hintergrund prüfen und bestätigte HFP/SCO-Routingfehler reparieren");
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
         String lastSummary = RepairStateStore.lastSummary(this);
@@ -522,23 +549,24 @@ public class MainActivity extends Activity {
 
     private View bottomNav() {
         LinearLayout nav = new LinearLayout(this);
+        nav.setTag("bottom-navigation");
         nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(8), dp(8), dp(8), dp(10));
+        nav.setPadding(dp(8), dp(6), dp(8), dp(8));
         nav.setBackgroundColor(Color.WHITE);
-        nav.setElevation(dp(8));
+        nav.setElevation(dp(10));
 
         nav.addView(
                 navItem("⌂", "Start", true, v -> refresh(false)),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("⌕", "Diagnose", false, v -> manualDiagnosis()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("↻", "Reparatur", false, v -> forceRepair()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("≡", "Verlauf", false, v -> showHistory()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         return nav;
     }
 
