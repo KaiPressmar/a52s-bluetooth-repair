@@ -141,13 +141,29 @@ public class MonitorService extends Service {
             BluetoothRepair.releaseCommunicationRoute(this);
         }
 
+        RepairDecision decision =
+                RepairDecision.decide(
+                        probe.signature,
+                        health,
+                        suspectCount,
+                        degradedCount,
+                        System.currentTimeMillis(),
+                        RepairStateStore.lastRepairAt(this));
+        Diag.log(
+                this,
+                "WATCHDOG DECISION signature="
+                        + probe.signature.kind
+                        + " confidence="
+                        + probe.signature.confidence
+                        + " action="
+                        + decision.action
+                        + " reason="
+                        + decision.reason);
+
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
-                        && RepairPolicy.canAutoRepair(
-                                health,
-                                suspectCount,
-                                System.currentTimeMillis(),
-                                RepairStateStore.lastRepairAt(this));
+                        && decision.action
+                                == RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE;
 
         if (repairAllowed) {
             BluetoothRepair.RepairResult result =
@@ -167,6 +183,8 @@ public class MonitorService extends Service {
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-verify"),
                     8_000L);
+        } else if (decision.action == RepairDecision.Action.ESCALATE_VENDOR_STACK) {
+            updateNotification("HFP verbunden · SCO-Systempfad blockiert");
         } else {
             updateNotification(health.summary);
         }
