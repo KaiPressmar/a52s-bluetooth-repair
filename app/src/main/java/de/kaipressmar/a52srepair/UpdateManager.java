@@ -1,6 +1,10 @@
 package de.kaipressmar.a52srepair;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -36,7 +40,13 @@ final class UpdateManager {
 
     private static final String RELEASES_URL =
             "https://api.github.com/repos/KaiPressmar/a52s-bluetooth-repair/releases?per_page=20";
-    private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final ExecutorService EXECUTOR =
+            Executors.newSingleThreadExecutor(
+                    runnable -> {
+                        Thread thread = new Thread(runnable, "bluetooth-repair-updater");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
     private static final AtomicBoolean CHECKING = new AtomicBoolean(false);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
@@ -47,12 +57,16 @@ final class UpdateManager {
         long now = System.currentTimeMillis();
 
         if (!force && !UpdateStateStore.shouldCheck(app, now)) {
-            postCheck(callback, UpdateStateStore.cachedRelease(app), false, UpdateStateStore.lastError(app));
+            postCheck(
+                    callback,
+                    cachedNewerRelease(app),
+                    false,
+                    UpdateStateStore.lastError(app));
             return;
         }
 
         if (!CHECKING.compareAndSet(false, true)) {
-            postCheck(callback, UpdateStateStore.cachedRelease(app), false, "");
+            postCheck(callback, cachedNewerRelease(app), false, "");
             return;
         }
 
@@ -78,8 +92,48 @@ final class UpdateManager {
                     } finally {
                         CHECKING.set(false);
                     }
-                    postCheck(callback, release != null ? release : UpdateStateStore.cachedRelease(app), true, error);
+                    postCheck(
+                            callback,
+                            release != null ? release : cachedNewerRelease(app),
+                            true,
+                            error);
                 });
+    }
+
+    static void notifyUpdateAvailable(Context context, UpdateRelease release) {
+        if (release == null
+                || UpdateRelease.compareVersions(release.version, appVersion(context)) <= 0) {
+            return;
+        }
+
+        NotificationManager nm = context.getSystemService(NotificationManager.class);
+        if (nm == null) return;
+
+        String channelId = "app-updates";
+        nm.createNotificationChannel(
+                new NotificationChannel(
+                        channelId,
+                        "App-Updates",
+                        NotificationManager.IMPORTANCE_LOW));
+
+        Intent launch = new Intent(context, MainActivity.class);
+        PendingIntent pi =
+                PendingIntent.getActivity(
+                        context,
+                        20,
+                        launch,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        Notification notification =
+                new Notification.Builder(context, channelId)
+                        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                        .setContentTitle(context.getString(R.string.app_name) + " · Update verfügbar")
+                        .setContentText("Version " + release.version + " kann installiert werden.")
+                        .setContentIntent(pi)
+                        .setAutoCancel(true)
+                        .setOnlyAlertOnce(true)
+                        .build();
+        nm.notify(2, notification);
     }
 
     static void installUpdate(
@@ -286,6 +340,14 @@ final class UpdateManager {
         } catch (Exception e) {
             return "0.0.0";
         }
+    }
+
+    private static UpdateRelease cachedNewerRelease(Context context) {
+        UpdateRelease cached = UpdateStateStore.cachedRelease(context);
+        if (cached == null) return null;
+        return UpdateRelease.compareVersions(cached.version, appVersion(context)) > 0
+                ? cached
+                : null;
     }
 
     private static void postCheck(
