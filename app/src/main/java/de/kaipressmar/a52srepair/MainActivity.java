@@ -221,7 +221,7 @@ public class MainActivity extends Activity {
         tip.addView(bulb, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView tt =
                 label(
-                        "Auto-Schutz\nDie Überwachung reagiert hauptsächlich auf Anruf- und Audioereignisse. Im Leerlauf erfolgt nur etwa alle 30 Minuten eine Sicherheitsprüfung. Ein verdächtiger HFP/SCO-Zustand wird nach kurzer Wartezeit bestätigt, bevor repariert wird. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
+                        "Auto-Schutz\nDie Überwachung reagiert hauptsächlich auf Anruf- und Audioereignisse. Im Leerlauf erfolgt nur etwa stündlich eine Sicherheitsprüfung. Ein verdächtiger HFP/SCO-Zustand wird nach kurzer Wartezeit bestätigt, bevor repariert wird. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
                         13,
                         Typeface.NORMAL,
                         INK);
@@ -442,7 +442,7 @@ public class MainActivity extends Activity {
                 monitoring ? "Automatische Überwachung stoppen" : "Automatische Überwachung starten");
         monitorSub.setText(
                 monitoring
-                        ? "Auto-Schutz aktiv · ereignisbasiert, Leerlauf-Check ca. alle 30 Min."
+                        ? "Auto-Schutz aktiv · ereignisbasiert, Leerlauf-Check ca. stündlich"
                         : "Energiesparend im Hintergrund prüfen und bestätigte HFP/SCO-Routingfehler reparieren");
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
