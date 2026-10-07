@@ -351,6 +351,7 @@ public class MonitorService extends Service {
             repairAttemptsInIncident = 0;
             RepairStateStore.updateConsecutiveSuspect(this, false);
             RepairStateStore.updateConsecutiveDegraded(this, false);
+            RepairStateStore.saveHfpAudioTransport(this, null);
             RepairStateStore.saveHealth(this, health);
             HealthHistoryStore.record(this, health, reason);
             updateNotification("Bluetooth aus · Auto-Schutz pausiert");
@@ -375,6 +376,7 @@ public class MonitorService extends Service {
         }
 
         Boolean hfpAudioConnected = hfpAudioTransportConnected();
+        RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         boolean transportMismatch =
                 HfpAudioTransportPolicy.isMismatch(health, hfpAudioConnected);
 
@@ -546,6 +548,7 @@ public class MonitorService extends Service {
                         cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
         BluetoothHealth health = verified.health;
         Boolean hfpAudioConnected = hfpAudioTransportConnected();
+        RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         RepairStateStore.saveHealth(this, health);
 
         boolean success =
@@ -576,8 +579,11 @@ public class MonitorService extends Service {
         boolean finalVerification = "auto-repair-final".equals(reason);
         boolean selectedButTransportDown =
                 health.scoSelected && Boolean.FALSE.equals(hfpAudioConnected);
+        boolean selectedButTransportUnknown =
+                health.scoSelected && hfpAudioConnected == null;
 
-        if ((selectedButTransportDown && !finalVerification)
+        if (((selectedButTransportDown || selectedButTransportUnknown)
+                        && !finalVerification)
                 || RepairVerificationPolicy.needsFinalVerification(
                         health.scoSelected,
                         health.inCommunication,
@@ -607,7 +613,10 @@ public class MonitorService extends Service {
             return;
         }
 
-        if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO) {
+        if (selectedButTransportUnknown) {
+            updateNotification(
+                    "Bluetooth-Route gewählt · HFP-Audiotransport konnte nicht verifiziert werden");
+        } else if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO) {
             updateNotification("HFP verbunden · SCO-Systempfad blockiert");
         } else if (RepairRetryPolicy.exhausted(repairAttemptsInIncident)) {
             updateNotification("Telefonie-Route nicht repariert · automatische Versuche beendet");
