@@ -84,8 +84,19 @@ public class MainActivity extends Activity {
 
         LinearLayout brandBox = new LinearLayout(this);
         brandBox.setOrientation(LinearLayout.VERTICAL);
-        brandBox.addView(label("A52s Bluetooth Repair", 19, Typeface.BOLD, INK));
+        brandBox.addView(label(getString(R.string.app_name), 19, Typeface.BOLD, INK));
         brandBox.addView(label("Version " + appVersion(), 11, Typeface.NORMAL, MUTED));
+        boolean profileMatch =
+                DeviceProfile.matchesTarget(
+                        getString(R.string.device_profile_key), Build.MODEL, Build.DEVICE);
+        brandBox.addView(
+                label(
+                        (profileMatch ? "Optimiert für " : "Build-Profil: ")
+                                + getString(R.string.device_profile_name)
+                                + " · Android 16 / API 36",
+                        10,
+                        Typeface.NORMAL,
+                        profileMatch ? GREEN_DARK : MUTED));
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(0, -2, 1);
         bp.leftMargin = dp(14);
         head.addView(brandBox, bp);
@@ -460,7 +471,9 @@ public class MainActivity extends Activity {
 
         TextView sub =
                 label(
-                        "HFP/SCO überwachen, Routingfehler erkennen und den Telefoniepfad gezielt neu auswählen.",
+                        "Optimiert für "
+                                + getString(R.string.device_profile_name)
+                                + ": HFP/SCO überwachen, Routingfehler erkennen und den Telefoniepfad gezielt neu auswählen.",
                         14,
                         Typeface.NORMAL,
                         Color.rgb(224, 245, 235));

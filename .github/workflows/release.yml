@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Semantic version without v prefix, e.g. 0.4.0'
+        description: 'Semantic version without v prefix, e.g. 0.5.0'
         required: true
         type: string
       prerelease:
@@ -30,7 +30,7 @@ jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       RELEASE_VERSION_CODE: ${{ github.run_number }}
@@ -59,24 +59,24 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: ''
 
-      - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android 15 and Android 16 SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.13'
 
-      - name: Test and lint release candidate
+      - name: Test Android 16 release candidates
         run: |
-          gradle :app:testDebugUnitTest --stacktrace
-          gradle :app:lintRelease --stacktrace
+          gradle :app:testA52sDebugUnitTest :app:testS22DebugUnitTest --stacktrace
+          gradle :app:lintA52sRelease :app:lintS22Release --stacktrace
 
       - name: Require signing secrets
         env:
@@ -97,44 +97,59 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
           chmod 600 "$RUNNER_TEMP/release.keystore"
 
-      - name: Build signed release APK
+      - name: Build signed A52s and S22 release APKs
         env:
           ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/release.keystore
           ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
           ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
           ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:assembleA52sRelease :app:assembleS22Release --stacktrace
 
-      - name: Verify and package APK
+      - name: Verify and package device-specific APKs
         shell: bash
         run: |
           set -euo pipefail
-          SRC="app/build/outputs/apk/release/app-release.apk"
-          OUT="a52s-bluetooth-repair-${RELEASE_TAG}.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          test -f "$SRC"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs "$SRC"
-          cp "$SRC" "$OUT"
-          sha256sum "$OUT" > "$OUT.sha256"
-          echo "APK_PATH=$OUT" >> "$GITHUB_ENV"
+
+          SRC_A52S="app/build/outputs/apk/a52s/release/app-a52s-release.apk"
+          SRC_S22="app/build/outputs/apk/s22/release/app-s22-release.apk"
+          OUT_A52S="bluetooth-repair-a52s-5g-${RELEASE_TAG}.apk"
+          OUT_S22="bluetooth-repair-galaxy-s22-${RELEASE_TAG}.apk"
+
+          for src in "$SRC_A52S" "$SRC_S22"; do
+            test -f "$src"
+            "$APKSIGNER" verify --verbose --print-certs "$src"
+          done
+
+          cp "$SRC_A52S" "$OUT_A52S"
+          cp "$SRC_S22" "$OUT_S22"
+          sha256sum "$OUT_A52S" > "$OUT_A52S.sha256"
+          sha256sum "$OUT_S22" > "$OUT_S22.sha256"
+
+          echo "APK_A52S=$OUT_A52S" >> "$GITHUB_ENV"
+          echo "APK_S22=$OUT_S22" >> "$GITHUB_ENV"
 
       - name: Attest APK provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: ${{ env.APK_PATH }}
+          subject-path: |
+            ${{ env.APK_A52S }}
+            ${{ env.APK_S22 }}
 
-      - name: Upload release build artifact
+      - name: Upload signed device builds
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.RELEASE_TAG }}-signed-apk
+          name: ${{ env.RELEASE_TAG }}-signed-device-apks
           path: |
-            ${{ env.APK_PATH }}
-            ${{ env.APK_PATH }}.sha256
+            ${{ env.APK_A52S }}
+            ${{ env.APK_A52S }}.sha256
+            ${{ env.APK_S22 }}
+            ${{ env.APK_S22 }}.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub release
+      - name: Create GitHub release with both device builds
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
@@ -142,7 +157,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=("$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes)
+          args=(
+            "$RELEASE_TAG"
+            "$APK_A52S" "$APK_A52S.sha256"
+            "$APK_S22" "$APK_S22.sha256"
+            --target "$GITHUB_SHA"
+            --title "$RELEASE_TAG"
+            --generate-notes
+          )
           if [ "$EVENT_NAME" = "push" ] || [ "$PRERELEASE_INPUT" = "true" ]; then
             args+=(--prerelease)
           fi

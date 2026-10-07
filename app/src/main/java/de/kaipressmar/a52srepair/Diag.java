@@ -37,10 +37,23 @@ final class Diag {
                 .append(Build.MANUFACTURER)
                 .append(" ")
                 .append(Build.MODEL)
+                .append(" device=")
+                .append(Build.DEVICE)
                 .append(" sdk=")
                 .append(Build.VERSION.SDK_INT)
                 .append(" build=")
                 .append(Build.DISPLAY)
+                .append('\n');
+
+        String targetKey = c.getString(R.string.device_profile_key);
+        s.append("buildProfile=")
+                .append(c.getString(R.string.device_profile_name))
+                .append(" targetKey=")
+                .append(targetKey)
+                .append(" actualFamily=")
+                .append(DeviceProfile.detect(Build.MODEL, Build.DEVICE))
+                .append(" profileMatch=")
+                .append(DeviceProfile.matchesTarget(targetKey, Build.MODEL, Build.DEVICE))
                 .append('\n');
 
         try {
