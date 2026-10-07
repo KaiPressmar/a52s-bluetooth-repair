@@ -14,7 +14,10 @@ final class WatchdogSchedule {
 
     private WatchdogSchedule() {}
 
-    static long nextDelayMillis(BluetoothHealth health, int consecutiveSuspect) {
+    static long nextDelayMillis(
+            BluetoothHealth health,
+            int consecutiveSuspect,
+            int consecutiveDegraded) {
         if (health == null || !health.inCommunication) {
             return IDLE_HEARTBEAT_MS;
         }
@@ -24,8 +27,11 @@ final class WatchdogSchedule {
         }
 
         if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
-                || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO
-                || health.state == BluetoothHealth.State.ERROR) {
+                || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO) {
+            return consecutiveDegraded < 2 ? 8_000L : DEGRADED_RECHECK_MS;
+        }
+
+        if (health.state == BluetoothHealth.State.ERROR) {
             return DEGRADED_RECHECK_MS;
         }
 
