@@ -34,6 +34,7 @@ public class HfpAudioTransportPolicyTest {
                         Boolean.FALSE,
                         1,
                         1_000_000L,
+                        1_002_000L,
                         0L);
         RepairDecision confirmed =
                 HfpAudioTransportPolicy.decide(
@@ -41,6 +42,7 @@ public class HfpAudioTransportPolicyTest {
                         Boolean.FALSE,
                         2,
                         1_000_000L,
+                        1_006_000L,
                         0L);
 
         assertEquals(
@@ -49,6 +51,28 @@ public class HfpAudioTransportPolicyTest {
         assertEquals(
                 RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE,
                 confirmed.action);
+    }
+
+    @Test public void elapsedTimeIsRequiredEvenWithTwoFastSamples() {
+        BluetoothHealth selected = health(true, false);
+
+        RepairDecision tooFast =
+                HfpAudioTransportPolicy.decide(
+                        selected,
+                        Boolean.FALSE,
+                        2,
+                        1_000_000L,
+                        1_003_000L,
+                        0L);
+
+        assertEquals(
+                RepairDecision.Action.WAIT_FOR_CONFIRMATION,
+                tooFast.action);
+        assertEquals(
+                2_000L,
+                HfpAudioTransportPolicy.confirmationDelayMillis(
+                        1_000_000L,
+                        1_003_000L));
     }
 
     @Test public void connectedScoTransportVerifiesSuccessfulRepair() {
