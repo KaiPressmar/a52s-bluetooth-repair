@@ -23,9 +23,10 @@ public class Android16CompatibilityTest {
 
         assertEquals(36, Build.VERSION.SDK_INT);
         String text = allText(activity.findViewById(android.R.id.content));
-        assertTrue(text.contains("Android 16 / API 36"));
+        assertTrue(text.contains("Übersicht"));
         assertTrue(text.contains("HFP"));
         assertTrue(text.contains("SCO"));
+        assertTrue(text.contains("Werkzeuge"));
 
         BluetoothHealth health =
                 BluetoothHealth.assess(
