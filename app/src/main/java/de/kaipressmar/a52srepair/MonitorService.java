@@ -812,6 +812,7 @@ public class MonitorService extends Service {
 
         if (success) {
             preflightConnectedSeen = false;
+            preflightAttemptsThisConnection = ScoPreflightPolicy.MAX_ATTEMPTS_PER_CONNECTION;
             RepairStateStore.markHfpReady(this, System.currentTimeMillis());
             updateNotification("Fahrzeug verbunden · Telefoniekanal bereit");
             Diag.log(this, "SCO PREFLIGHT success reason=" + reason);
