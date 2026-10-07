@@ -40,6 +40,7 @@ public class MonitorService extends Service {
     private String pendingReason = "scheduled";
     private int repairAttemptsInIncident;
     private int consecutiveTransportMismatch;
+    private long transportMismatchSinceMillis;
 
     private final Runnable tick =
             new Runnable() {
@@ -97,6 +98,8 @@ public class MonitorService extends Service {
             } else if (state == TelephonyManager.CALL_STATE_IDLE) {
                 cellularCallActive = false;
                 repairAttemptsInIncident = 0;
+                consecutiveTransportMismatch = 0;
+                transportMismatchSinceMillis = 0L;
                 scheduleSoon("telephony-idle");
             } else if (state == TelephonyManager.CALL_STATE_RINGING) {
                 scheduleSoon("telephony-ringing");
@@ -119,6 +122,8 @@ public class MonitorService extends Service {
                         if (state == BluetoothAdapter.STATE_OFF
                                 || state == BluetoothAdapter.STATE_TURNING_OFF) {
                             repairAttemptsInIncident = 0;
+                            consecutiveTransportMismatch = 0;
+                            transportMismatchSinceMillis = 0L;
                             handler.removeCallbacks(tick);
                             if (RepairStateStore.routeOwned(MonitorService.this)) {
                                 BluetoothRepair.releaseCommunicationRoute(MonitorService.this);
@@ -379,6 +384,14 @@ public class MonitorService extends Service {
         RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         boolean transportMismatch =
                 HfpAudioTransportPolicy.isMismatch(health, hfpAudioConnected);
+        long now = System.currentTimeMillis();
+        if (transportMismatch) {
+            if (transportMismatchSinceMillis == 0L) {
+                transportMismatchSinceMillis = now;
+            }
+        } else {
+            transportMismatchSinceMillis = 0L;
+        }
 
         if (!health.inCommunication
                 || (health.scoSelected && !transportMismatch)) {
@@ -429,7 +442,6 @@ public class MonitorService extends Service {
             BluetoothRepair.releaseCommunicationRoute(this);
         }
 
-        long now = System.currentTimeMillis();
         RepairDecision decision =
                 RepairDecision.decide(
                         probe.signature,
@@ -444,6 +456,7 @@ public class MonitorService extends Service {
                         health,
                         hfpAudioConnected,
                         consecutiveTransportMismatch,
+                        transportMismatchSinceMillis,
                         now,
                         RepairStateStore.lastRepairAt(this));
 
@@ -522,6 +535,16 @@ public class MonitorService extends Service {
 
         long nextDelay =
                 WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
+        if (transportDecision.action
+                == RepairDecision.Action.WAIT_FOR_CONFIRMATION) {
+            long transportConfirmDelay =
+                    HfpAudioTransportPolicy.confirmationDelayMillis(
+                            transportMismatchSinceMillis,
+                            now);
+            if (nextDelay < 0L || transportConfirmDelay < nextDelay) {
+                nextDelay = transportConfirmDelay;
+            }
+        }
         if (nextDelay >= 0L) {
             handler.postDelayed(tick, nextDelay);
         }
