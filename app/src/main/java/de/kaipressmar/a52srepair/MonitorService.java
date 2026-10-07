@@ -16,12 +16,15 @@ public class MonitorService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
     private AudioManager.OnModeChangedListener modeChangedListener;
+    private String pendingReason = "scheduled";
 
     private final Runnable tick =
             new Runnable() {
                 @Override
                 public void run() {
-                    runCheck("scheduled");
+                    String reason = pendingReason;
+                    pendingReason = "scheduled";
+                    runCheck(reason);
                 }
             };
 
@@ -76,7 +79,7 @@ public class MonitorService extends Service {
     }
 
     private void scheduleSoon(String reason) {
-        Diag.log(this, "WATCHDOG EVENT " + reason);
+        pendingReason = reason;
         handler.removeCallbacks(tick);
         handler.postDelayed(tick, EVENT_DEBOUNCE_MS);
     }
