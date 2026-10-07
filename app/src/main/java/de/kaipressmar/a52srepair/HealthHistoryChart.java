@@ -18,7 +18,7 @@ final class HealthHistoryChart extends View {
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private List<HealthHistoryStore.Entry> entries = Collections.emptyList();
 
-    private final int green = AppPalette.PRIMARY;
+    private final int green = AppPalette.SUCCESS;
     private final int amber = AppPalette.WARNING;
     private final int red = AppPalette.ERROR;
     private final int grey = AppPalette.NEUTRAL;
