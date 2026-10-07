@@ -107,7 +107,8 @@ public class MainActivity extends Activity {
         requestNeededPermissions();
         refresh(false);
         renderUpdateState();
-        checkForUpdates(false);
+        new Handler(Looper.getMainLooper())
+                .postDelayed(() -> checkForUpdates(false), 1_200L);
     }
 
     @Override
