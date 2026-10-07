@@ -25,7 +25,7 @@ public class WatchdogScheduleTest {
                 health(AudioManager.MODE_NORMAL, true, true, false);
         assertEquals(
                 30L * 60L * 1000L,
-                WatchdogSchedule.nextDelayMillis(idle, 0));
+                WatchdogSchedule.nextDelayMillis(idle, 0, 0));
     }
 
     @Test public void firstSuspectIsConfirmedQuicklyInsteadOfPollingContinuously() {
@@ -33,7 +33,7 @@ public class WatchdogScheduleTest {
                 health(AudioManager.MODE_IN_COMMUNICATION, true, true, false);
         assertEquals(
                 4_000L,
-                WatchdogSchedule.nextDelayMillis(suspect, 1));
+                WatchdogSchedule.nextDelayMillis(suspect, 1, 0));
     }
 
     @Test public void confirmedSuspectBacksOffAfterRepairOpportunity() {
@@ -41,7 +41,7 @@ public class WatchdogScheduleTest {
                 health(AudioManager.MODE_IN_COMMUNICATION, true, true, false);
         assertEquals(
                 5L * 60L * 1000L,
-                WatchdogSchedule.nextDelayMillis(suspect, 2));
+                WatchdogSchedule.nextDelayMillis(suspect, 2, 0));
     }
 
     @Test public void healthyCallUsesSparseSafetyRecheck() {
@@ -49,15 +49,23 @@ public class WatchdogScheduleTest {
                 health(AudioManager.MODE_IN_COMMUNICATION, true, true, true);
         assertEquals(
                 2L * 60L * 1000L,
-                WatchdogSchedule.nextDelayMillis(healthy, 0));
+                WatchdogSchedule.nextDelayMillis(healthy, 0, 0));
     }
 
-    @Test public void connectedHfpWithoutScoBacksOffBecausePublicRepairIsUnavailable() {
+    @Test public void firstMissingScoSampleIsConfirmedBeforeBackingOff() {
         BluetoothHealth noSco =
                 health(AudioManager.MODE_IN_CALL, true, false, false);
         assertEquals(BluetoothHealth.State.HFP_CONNECTED_NO_SCO, noSco.state);
         assertEquals(
+                8_000L,
+                WatchdogSchedule.nextDelayMillis(noSco, 0, 1));
+    }
+
+    @Test public void confirmedMissingScoStateBacksOff() {
+        BluetoothHealth noSco =
+                health(AudioManager.MODE_IN_CALL, true, false, false);
+        assertEquals(
                 5L * 60L * 1000L,
-                WatchdogSchedule.nextDelayMillis(noSco, 0));
+                WatchdogSchedule.nextDelayMillis(noSco, 0, 2));
     }
 }
