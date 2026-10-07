@@ -1267,14 +1267,20 @@ public class MainActivity extends Activity {
             updatingMonitorSwitch = false;
 
             boolean autoRepair = RepairStateStore.autoRepairEnabled(this);
+            boolean phoneStatePermission =
+                    Build.VERSION.SDK_INT < 31
+                            || checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                                    == PackageManager.PERMISSION_GRANTED;
             monitorSubtitle.setText(
                     !monitoring
                             ? "Aus · einschalten für automatische Erkennung im Hintergrund"
                             : (health.state == BluetoothHealth.State.BLUETOOTH_OFF
                                     ? "Bluetooth aus · Prüfung und Reparatur pausieren automatisch"
-                                    : (autoRepair
-                                            ? "Aktiv · Bluetooth/HFP/SCO- und Anruf-Ereignisse triggern Prüfung und Reparatur"
-                                            : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")));
+                                    : (!phoneStatePermission
+                                            ? "Aktiv · Anruf-Erkennung eingeschränkt, Telefonstatus-Berechtigung fehlt"
+                                            : (autoRepair
+                                                    ? "Aktiv · Bluetooth/HFP/SCO- und Anruf-Ereignisse triggern Prüfung und Reparatur"
+                                                    : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus"))));
         }
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
