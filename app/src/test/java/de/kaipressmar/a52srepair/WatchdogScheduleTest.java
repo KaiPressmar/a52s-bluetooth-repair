@@ -24,7 +24,7 @@ public class WatchdogScheduleTest {
         BluetoothHealth idle =
                 health(AudioManager.MODE_NORMAL, true, true, false);
         assertEquals(
-                30L * 60L * 1000L,
+                60L * 60L * 1000L,
                 WatchdogSchedule.nextDelayMillis(idle, 0, 0));
     }
 
@@ -48,7 +48,7 @@ public class WatchdogScheduleTest {
         BluetoothHealth healthy =
                 health(AudioManager.MODE_IN_COMMUNICATION, true, true, true);
         assertEquals(
-                2L * 60L * 1000L,
+                5L * 60L * 1000L,
                 WatchdogSchedule.nextDelayMillis(healthy, 0, 0));
     }
 
