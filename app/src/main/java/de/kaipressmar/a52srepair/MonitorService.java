@@ -71,6 +71,7 @@ public class MonitorService extends Service {
         }
 
         Diag.log(this, "WATCHDOG START energyMode=event-driven");
+        checkAppUpdates();
         handler.post(tick);
     }
 
@@ -192,6 +193,7 @@ public class MonitorService extends Service {
         long nextDelay =
                 WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
         handler.postDelayed(tick, nextDelay);
+        UpdateManager.checkForUpdates(this, false, null);
         Diag.log(
                 this,
                 "WATCHDOG NEXT inMs="
@@ -230,6 +232,17 @@ public class MonitorService extends Service {
                     () -> verifyRepair("auto-repair-final"),
                     RepairVerificationPolicy.FINAL_GRACE_MS);
         }
+    }
+
+    private void checkAppUpdates() {
+        UpdateManager.checkForUpdates(
+                this,
+                false,
+                (release, networkChecked, error) -> {
+                    if (networkChecked && release != null) {
+                        UpdateManager.notifyUpdateAvailable(this, release);
+                    }
+                });
     }
 
     private void updateNotification(String text) {

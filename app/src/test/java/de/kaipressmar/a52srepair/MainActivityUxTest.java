@@ -33,6 +33,9 @@ public class MainActivityUxTest {
         assertContains(text, "Verlauf");
         assertContains(text, "Systempfad blockiert");
         assertContains(text, "Bluetooth Agent öffnen");
+        assertContains(text, "App & Updates");
+        assertContains(text, "Neue signierte Releases automatisch erkennen");
+        assertContains(text, "Prüfen");
         assertContains(text, "Technische Details anzeigen");
         assertContains(text, "Version ");
     }

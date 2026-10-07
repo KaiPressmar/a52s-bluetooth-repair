@@ -1,7 +1,7 @@
 plugins { id("com.android.application") }
 
-val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.7.0")
-val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("8")
+val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.8.0")
+val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("9")
 val signingStoreFile = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE")
 val signingStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD")
 val signingKeyAlias = providers.environmentVariable("ANDROID_SIGNING_KEY_ALIAS")
@@ -55,6 +55,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.core:core:1.15.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core:1.6.1")

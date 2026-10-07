@@ -36,6 +36,12 @@ public class MainActivity extends Activity {
     private HealthHistoryChart historyChart;
     private TextView historySummary;
     private LinearLayout recoveryCard;
+    private LinearLayout updateCard;
+    private TextView updateTitle;
+    private TextView updateSub;
+    private TextView updateAction;
+    private UpdateRelease availableUpdate;
+    private boolean pendingUpdateInstall;
 
     private final int GREEN = AppPalette.PRIMARY;
     private final int GREEN_DARK = AppPalette.PRIMARY_DARK;
@@ -100,12 +106,24 @@ public class MainActivity extends Activity {
         buildDashboard();
         requestNeededPermissions();
         refresh(false);
+        renderUpdateState();
+        new Handler(Looper.getMainLooper())
+                .postDelayed(() -> checkForUpdates(false), 1_200L);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (details != null) refresh(false);
+        if (details != null) {
+            refresh(false);
+            renderUpdateState();
+        }
+        if (pendingUpdateInstall
+                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                        || getPackageManager().canRequestPackageInstalls())) {
+            pendingUpdateInstall = false;
+            onUpdateAction();
+        }
     }
 
     private void buildDashboard() {
@@ -318,6 +336,34 @@ public class MainActivity extends Activity {
         recoveryCard.addView(developer, devParams);
         recoveryCard.setVisibility(View.GONE);
         add(recoveryCard, 12, -1);
+
+        add(sectionHeader("App & Updates", "Neue signierte Releases automatisch erkennen und sicher installieren"), 24, -1);
+        updateCard = card();
+        TextView updateIcon = label("↥", 22, Typeface.BOLD, GREEN_DARK);
+        updateIcon.setGravity(Gravity.CENTER);
+        updateIcon.setBackground(round(AppPalette.PRIMARY_SOFT, 99));
+        updateCard.addView(updateIcon, new LinearLayout.LayoutParams(dp(46), dp(46)));
+
+        LinearLayout updateCopy = new LinearLayout(this);
+        updateCopy.setOrientation(LinearLayout.VERTICAL);
+        updateTitle = label("Update-Prüfung wird vorbereitet", 15, Typeface.BOLD, INK);
+        updateSub =
+                label(
+                        "GitHub-Releases werden automatisch geprüft; Downloads werden per SHA-256 verifiziert.",
+                        12,
+                        Typeface.NORMAL,
+                        MUTED);
+        updateCopy.addView(updateTitle);
+        updateCopy.addView(updateSub);
+        LinearLayout.LayoutParams updateCopyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        updateCopyParams.leftMargin = dp(13);
+        updateCard.addView(updateCopy, updateCopyParams);
+
+        updateAction = compactButton("Prüfen", v -> onUpdateAction());
+        LinearLayout.LayoutParams updateActionParams = new LinearLayout.LayoutParams(-2, -2);
+        updateActionParams.leftMargin = dp(8);
+        updateCard.addView(updateAction, updateActionParams);
+        add(updateCard, 10, -1);
 
         add(sectionHeader("Werkzeuge & Diagnose", "Details, Export und Android-Einstellungen"), 24, -1);
         action(
@@ -549,6 +595,101 @@ public class MainActivity extends Activity {
                             || probe.signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO;
             recoveryCard.setVisibility(blocked ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private void renderUpdateState() {
+        if (updateTitle == null || updateSub == null || updateAction == null) return;
+        updateSub.setTextColor(MUTED);
+        updateAction.setEnabled(true);
+
+        UpdateRelease cached = UpdateStateStore.cachedRelease(this);
+        if (cached != null
+                && UpdateRelease.compareVersions(cached.version, appVersion()) > 0) {
+            availableUpdate = cached;
+            updateTitle.setText("Update v" + cached.version + " verfügbar");
+            updateTitle.setTextColor(AppPalette.PRIMARY_DARK);
+            updateSub.setText(
+                    getString(R.string.device_profile_name)
+                            + " · signierte Release-APK · SHA-256-Prüfung vor Installation");
+            updateAction.setText("Installieren");
+            updateAction.setTextColor(AppPalette.PRIMARY_DARK);
+            return;
+        }
+
+        availableUpdate = null;
+        long checked = UpdateStateStore.lastCheckAt(this);
+        String error = UpdateStateStore.lastError(this);
+        if (checked == 0L) {
+            updateTitle.setText("Automatische Update-Prüfung aktiv");
+            updateSub.setText("Beim Start und im Auto-Schutz wird höchstens alle 12 Stunden nachgesehen.");
+        } else if (error != null && !error.isEmpty()) {
+            updateTitle.setText("Update-Prüfung zuletzt nicht möglich");
+            updateSub.setText("Installierte Version v" + appVersion() + " · manuelle Prüfung möglich");
+        } else {
+            updateTitle.setText("App ist aktuell · v" + appVersion());
+            updateSub.setText("Letzte Prüfung " + formatTime(checked) + " · passend für " + getString(R.string.device_profile_name));
+        }
+        updateAction.setText("Prüfen");
+        updateAction.setTextColor(GREEN_DARK);
+    }
+
+    private void checkForUpdates(boolean force) {
+        if (updateTitle != null) {
+            updateTitle.setText(force ? "Suche nach Updates …" : "Update-Status wird geprüft …");
+        }
+        UpdateManager.checkForUpdates(
+                this,
+                force,
+                (release, networkChecked, error) -> {
+                    renderUpdateState();
+                    if (force) {
+                        if (release != null
+                                && UpdateRelease.compareVersions(release.version, appVersion()) > 0) {
+                            Toast.makeText(
+                                            this,
+                                            "Update v" + release.version + " ist verfügbar.",
+                                            Toast.LENGTH_LONG)
+                                    .show();
+                        } else if (error != null && !error.isEmpty()) {
+                            Toast.makeText(
+                                            this,
+                                            "Update-Prüfung fehlgeschlagen.",
+                                            Toast.LENGTH_LONG)
+                                    .show();
+                        } else {
+                            Toast.makeText(
+                                            this,
+                                            "Du verwendest bereits die aktuelle Version.",
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        }
+                    }
+                });
+    }
+
+    private void onUpdateAction() {
+        if (availableUpdate == null) {
+            checkForUpdates(true);
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !getPackageManager().canRequestPackageInstalls()) {
+            pendingUpdateInstall = true;
+        }
+
+        updateAction.setEnabled(false);
+        UpdateManager.installUpdate(
+                this,
+                availableUpdate,
+                (message, error) -> {
+                    updateAction.setEnabled(true);
+                    updateSub.setText(message);
+                    updateSub.setTextColor(error ? AppPalette.ERROR : MUTED);
+                    if (error) {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
     }
 
     private void toggleTechnicalDetails() {
