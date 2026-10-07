@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">S22 Bluetooth Repair</string>
+    <string name="device_profile_name">Galaxy S22</string>
+    <string name="device_profile_key">s22</string>
+    <string name="device_profile_models">SM-S901* / r0s / r0q</string>
+</resources>
