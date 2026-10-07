@@ -196,6 +196,14 @@ public class MonitorService extends Service {
                 verified.health.scoSelected
                         ? "Telefonie-Audio erfolgreich über Bluetooth geroutet"
                         : verified.health.summary);
+        if (!verified.health.scoSelected
+                && verified.health.inCommunication
+                && RepairStateStore.routeOwned(this)
+                && !"auto-repair-final".equals(reason)) {
+            handler.postDelayed(
+                    () -> verifyRepair("auto-repair-final"),
+                    22_000L);
+        }
     }
 
     private void updateNotification(String text) {
