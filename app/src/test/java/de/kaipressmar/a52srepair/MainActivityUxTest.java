@@ -13,7 +13,7 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 35)
 public class MainActivityUxTest {
-    @Test public void bottomNavigationRepresentsDestinationsNotImmediateActions() {
+    @Test public void bottomNavigationContainsOnlyRealDestinations() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
@@ -22,34 +22,35 @@ public class MainActivityUxTest {
                         .findViewWithTag("bottom-navigation");
         assertNotNull(nav);
         assertTrue(nav instanceof ViewGroup);
-        assertEquals(3, ((ViewGroup) nav).getChildCount());
+        assertEquals(4, ((ViewGroup) nav).getChildCount());
 
         String text = allText(nav);
         assertContains(text, "Übersicht");
         assertContains(text, "Verlauf");
         assertContains(text, "Werkzeuge");
+        assertContains(text, "Einstellungen");
         assertFalse(text.contains("Diagnose"));
         assertFalse(text.contains("Reparatur"));
     }
 
-    @Test public void overviewFocusesOnStatusAndEverydayActions() {
+    @Test public void overviewContainsOnlyEverydayStatusAndControls() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
         String text = allText(activity.findViewById(android.R.id.content));
 
-        assertContains(text, "Übersicht");
-        assertContains(text, "Deine Verbindung.");
+        assertContains(text, "Telefonie-Audio.");
         assertContains(text, "Automatisch geschützt.");
         assertContains(text, "Jetzt prüfen");
-        assertContains(text, "Auto-Schutz aktivieren");
+        assertContains(text, "Automatische Überwachung");
         assertContains(text, "HFP");
         assertContains(text, "SCO");
         assertFalse(text.contains("Nur Diagnose"));
         assertFalse(text.contains("SCO/HFP neu auswählen"));
+        assertFalse(text.contains("Diagnoseprotokoll teilen"));
     }
 
-    @Test public void historyDestinationShowsHistorySpecificContent() {
+    @Test public void historyShowsSummaryChartEventsAndOnlyHistoryManagement() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
@@ -60,14 +61,15 @@ public class MainActivityUxTest {
         history.performClick();
 
         String text = allText(activity.findViewById(android.R.id.content));
-        assertContains(text, "Stabilität statt Log-Datei");
         assertContains(text, "Letzte 24 Stunden");
-        assertContains(text, "Historie verwalten");
+        assertContains(text, "Letzte Ereignisse");
+        assertContains(text, "Daten");
         assertContains(text, "Verlauf zurücksetzen");
+        assertFalse(text.contains("Diagnoseprotokoll teilen"));
         assertFalse(text.contains("Jetzt prüfen"));
     }
 
-    @Test public void toolsDestinationGroupsAdvancedActionsAndUpdates() {
+    @Test public void toolsAreReservedForManualDiagnosisAndRecovery() {
         MainActivity activity =
                 Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
 
@@ -78,14 +80,34 @@ public class MainActivityUxTest {
         tools.performClick();
 
         String text = allText(activity.findViewById(android.R.id.content));
-        assertContains(text, "Werkzeuge");
-        assertContains(text, "Alles Technische an einem Ort");
         assertContains(text, "Nur Diagnose");
         assertContains(text, "SCO/HFP neu auswählen");
-        assertContains(text, "Bluetooth Agent");
+        assertContains(text, "Samsung Bluetooth Agent");
+        assertContains(text, "Bluetooth-Einstellungen");
+        assertContains(text, "Entwickleroptionen");
+        assertFalse(text.contains("App & Updates"));
+        assertFalse(text.contains("Technische Details anzeigen"));
+    }
+
+    @Test public void settingsOwnUpdatesNotificationsSupportAndAppInfo() {
+        MainActivity activity =
+                Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
+
+        View settings =
+                activity.findViewById(android.R.id.content)
+                        .findViewWithTag("nav-settings");
+        assertNotNull(settings);
+        settings.performClick();
+
+        String text = allText(activity.findViewById(android.R.id.content));
         assertContains(text, "App & Updates");
-        assertContains(text, "Technische Details");
-        assertFalse(text.contains("Deine Verbindung."));
+        assertContains(text, "Benachrichtigungen");
+        assertContains(text, "Diagnose & Support");
+        assertContains(text, "Technische Details anzeigen");
+        assertContains(text, "Diagnoseprotokoll teilen");
+        assertContains(text, "App-Info");
+        assertContains(text, "Android 16 · API 36");
+        assertFalse(text.contains("SCO/HFP neu auswählen"));
     }
 
     private void assertContains(String actual, String expected) {
