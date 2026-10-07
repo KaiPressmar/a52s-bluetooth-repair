@@ -24,6 +24,9 @@ public class MainActivity extends Activity {
     private TextView routeTitle;
     private TextView routeSub;
     private TextView signatureSub;
+    private TextView metricAutoValue;
+    private TextView metricHfpValue;
+    private TextView metricScoValue;
     private TextView lastCheckTitle;
     private TextView lastCheckSub;
     private TextView monitorTitle;
@@ -149,6 +152,22 @@ public class MainActivity extends Activity {
         statusPill.setPadding(dp(12), dp(7), dp(12), dp(7));
         statusPill.setBackground(round(AppPalette.PRIMARY_SOFT, 99));
         add(statusPill, 16, -2);
+
+        LinearLayout metrics = new LinearLayout(this);
+        metrics.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout autoMetric = metricCard("Auto-Schutz", "Aus");
+        LinearLayout hfpMetric = metricCard("HFP", "–");
+        LinearLayout scoMetric = metricCard("SCO", "–");
+        metricAutoValue = (TextView) autoMetric.getChildAt(1);
+        metricHfpValue = (TextView) hfpMetric.getChildAt(1);
+        metricScoValue = (TextView) scoMetric.getChildAt(1);
+        metrics.addView(autoMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams midMetric = new LinearLayout.LayoutParams(0, -2, 1);
+        midMetric.leftMargin = dp(8);
+        midMetric.rightMargin = dp(8);
+        metrics.addView(hfpMetric, midMetric);
+        metrics.addView(scoMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        add(metrics, 12, -1);
 
         LinearLayout route = card();
         TextView icon = label("◉", 24, Typeface.BOLD, GREEN);
@@ -340,14 +359,14 @@ public class MainActivity extends Activity {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, false);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), 8_000L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), RepairVerificationPolicy.FIRST_VERIFY_MS);
     }
 
     private void forceRepair() {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, true);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), 8_000L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), RepairVerificationPolicy.FIRST_VERIFY_MS);
     }
 
     private void verifyRepair(String logPrefix) {
@@ -454,6 +473,28 @@ public class MainActivity extends Activity {
         }
 
         boolean monitoring = RepairStateStore.monitoringEnabled(this);
+        if (metricAutoValue != null) {
+            metricAutoValue.setText(monitoring ? "Aktiv" : "Aus");
+            metricAutoValue.setTextColor(monitoring ? AppPalette.PRIMARY_DARK : MUTED);
+        }
+        if (metricHfpValue != null) {
+            metricHfpValue.setText(health.hfpProfileConnected ? "Verbunden" : "Nicht aktiv");
+            metricHfpValue.setTextColor(
+                    health.hfpProfileConnected ? AppPalette.PRIMARY_DARK : MUTED);
+        }
+        if (metricScoValue != null) {
+            metricScoValue.setText(
+                    health.scoSelected
+                            ? "Aktiv"
+                            : (health.scoAvailable ? "Verfügbar" : "Fehlt"));
+            metricScoValue.setTextColor(
+                    health.scoSelected
+                            ? AppPalette.PRIMARY_DARK
+                            : (health.inCommunication && !health.scoAvailable
+                                    ? AppPalette.WARNING
+                                    : MUTED));
+        }
+
         monitorTitle.setText(
                 monitoring ? "Automatische Überwachung stoppen" : "Automatische Überwachung starten");
         monitorSub.setText(
@@ -638,6 +679,20 @@ public class MainActivity extends Activity {
         p.rightMargin = dp(8);
         v.setLayoutParams(p);
         return v;
+    }
+
+    private LinearLayout metricCard(String title, String value) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12), dp(11), dp(12), dp(11));
+        box.setBackground(round(AppPalette.SURFACE, 16));
+        TextView label = label(title, 10, Typeface.BOLD, MUTED);
+        TextView current = label(value, 13, Typeface.BOLD, INK);
+        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2);
+        vp.topMargin = dp(3);
+        box.addView(label);
+        box.addView(current, vp);
+        return box;
     }
 
     private LinearLayout sectionHeader(String title, String sub) {
