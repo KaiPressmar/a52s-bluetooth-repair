@@ -172,8 +172,6 @@ final class BluetoothRepair {
                             + Diag.snapshot(c));
             if (selected) {
                 RepairStateStore.setRouteOwned(c, true);
-                RepairStateStore.markRepair(c);
-                RepairStateStore.clearConsecutiveSuspect(c);
                 return new RepairResult(
                         true,
                         true,
