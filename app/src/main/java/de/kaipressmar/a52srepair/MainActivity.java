@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     private TextView updateSub;
     private TextView updateAction;
     private UpdateRelease availableUpdate;
+    private boolean pendingUpdateInstall;
 
     private final int GREEN = AppPalette.PRIMARY;
     private final int GREEN_DARK = AppPalette.PRIMARY_DARK;
@@ -115,6 +116,12 @@ public class MainActivity extends Activity {
         if (details != null) {
             refresh(false);
             renderUpdateState();
+        }
+        if (pendingUpdateInstall
+                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                        || getPackageManager().canRequestPackageInstalls())) {
+            pendingUpdateInstall = false;
+            onUpdateAction();
         }
     }
 
@@ -661,6 +668,11 @@ public class MainActivity extends Activity {
         if (availableUpdate == null) {
             checkForUpdates(true);
             return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !getPackageManager().canRequestPackageInstalls()) {
+            pendingUpdateInstall = true;
         }
 
         updateAction.setEnabled(false);
