@@ -277,6 +277,11 @@ public class MonitorService extends Service {
     private Boolean hfpAudioTransportConnected() {
         BluetoothHeadset proxy = headsetProxy;
         if (proxy == null) return null;
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                        != PackageManager.PERMISSION_GRANTED) {
+            return null;
+        }
 
         try {
             for (BluetoothDevice device : proxy.getConnectedDevices()) {
