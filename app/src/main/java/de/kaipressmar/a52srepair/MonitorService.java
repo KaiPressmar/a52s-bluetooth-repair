@@ -84,6 +84,19 @@ public class MonitorService extends Service {
                         return;
                     }
 
+                    if (BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                        int state =
+                                intent.getIntExtra(
+                                        BluetoothAdapter.EXTRA_CONNECTION_STATE,
+                                        BluetoothAdapter.STATE_DISCONNECTED);
+                        scheduleAfter(
+                                state == BluetoothAdapter.STATE_CONNECTED
+                                        ? "bluetooth-device-connected"
+                                        : "bluetooth-device-state-" + state,
+                                EVENT_DEBOUNCE_MS);
+                        return;
+                    }
+
                     if (BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
                         int state =
                                 intent.getIntExtra(
@@ -162,6 +175,7 @@ public class MonitorService extends Service {
     private void registerBluetoothEvents() {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
