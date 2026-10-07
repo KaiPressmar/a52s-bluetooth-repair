@@ -473,8 +473,7 @@ public class MainActivity extends Activity {
         }
         if (recoveryCard != null) {
             boolean blocked =
-                    health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
-                            || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO;
+                    health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO;
             recoveryCard.setVisibility(blocked ? View.VISIBLE : View.GONE);
         }
     }
