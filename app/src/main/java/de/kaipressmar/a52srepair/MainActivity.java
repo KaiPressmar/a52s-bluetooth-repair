@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private TextView metricScoValue;
     private TextView diagBluetoothValue;
     private TextView diagHfpValue;
+    private TextView diagCallValue;
     private TextView diagScoValue;
     private TextView diagSignatureValue;
     private Switch monitorSwitch;
@@ -192,6 +193,7 @@ public class MainActivity extends Activity {
         metricScoValue = null;
         diagBluetoothValue = null;
         diagHfpValue = null;
+        diagCallValue = null;
         diagScoValue = null;
         diagSignatureValue = null;
         monitorSwitch = null;
@@ -466,6 +468,8 @@ public class MainActivity extends Activity {
         diagBluetoothValue = diagnosticRow(diagnostic, "Bluetooth", "wird geprüft");
         diagnostic.addView(infoDivider());
         diagHfpValue = diagnosticRow(diagnostic, "HFP-Profil", "wird geprüft");
+        diagnostic.addView(infoDivider());
+        diagCallValue = diagnosticRow(diagnostic, "Anruf-Erkennung", "wird geprüft");
         diagnostic.addView(infoDivider());
         diagScoValue = diagnosticRow(diagnostic, "SCO/Telefonie", "wird geprüft");
         diagnostic.addView(infoDivider());
@@ -1081,17 +1085,13 @@ public class MainActivity extends Activity {
     private void verifyRepair(String logPrefix) {
         BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, verified.health);
-        boolean success = verified.health.scoSelected;
-        HealthHistoryStore.record(this, verified.health, success ? "repair" : "verify");
-        if (success) {
-            RepairStateStore.markRepair(this);
-            RepairStateStore.clearConsecutiveSuspect(this);
-        }
+        boolean routeSelected = verified.health.scoSelected;
+        HealthHistoryStore.record(this, verified.health, "verify");
         Diag.log(
                 this,
                 logPrefix
-                        + " success="
-                        + success
+                        + " routeSelected="
+                        + routeSelected
                         + "\n"
                         + Diag.snapshot(this, verified));
         refresh(false);
@@ -1286,6 +1286,24 @@ public class MainActivity extends Activity {
             diagHfpValue.setText(health.hfpProfileConnected ? "Verbunden" : "Nicht verbunden");
             diagHfpValue.setTextColor(
                     health.hfpProfileConnected ? AppPalette.SUCCESS : MUTED);
+
+            boolean phonePermission =
+                    Build.VERSION.SDK_INT < 31
+                            || checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                                    == PackageManager.PERMISSION_GRANTED;
+            boolean cellularCall = BluetoothRepair.currentCellularCallActive(this);
+            diagCallValue.setText(
+                    !phonePermission
+                            ? "Berechtigung fehlt"
+                            : (cellularCall
+                                    ? "Mobilfunkanruf aktiv"
+                                    : (health.inCommunication
+                                            ? "Audio-Kommunikation aktiv"
+                                            : "Kein aktiver Anruf")));
+            diagCallValue.setTextColor(
+                    !phonePermission
+                            ? AppPalette.WARNING
+                            : (health.inCommunication ? AppPalette.SUCCESS : MUTED));
 
             diagScoValue.setText(
                     health.scoSelected
