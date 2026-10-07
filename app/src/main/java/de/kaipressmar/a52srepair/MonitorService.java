@@ -182,7 +182,7 @@ public class MonitorService extends Service {
                             : result.message);
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-verify"),
-                    8_000L);
+                    RepairVerificationPolicy.FIRST_VERIFY_MS);
         } else if (decision.action == RepairDecision.Action.ESCALATE_VENDOR_STACK) {
             updateNotification("HFP verbunden · SCO-Systempfad blockiert");
         } else {
@@ -221,13 +221,14 @@ public class MonitorService extends Service {
                 verified.health.scoSelected
                         ? "Telefonie-Audio erfolgreich über Bluetooth geroutet"
                         : verified.health.summary);
-        if (!verified.health.scoSelected
-                && verified.health.inCommunication
-                && RepairStateStore.routeOwned(this)
-                && !"auto-repair-final".equals(reason)) {
+        if (RepairVerificationPolicy.needsFinalVerification(
+                verified.health.scoSelected,
+                verified.health.inCommunication,
+                RepairStateStore.routeOwned(this),
+                "auto-repair-final".equals(reason))) {
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-final"),
-                    22_000L);
+                    RepairVerificationPolicy.FINAL_GRACE_MS);
         }
     }
 
