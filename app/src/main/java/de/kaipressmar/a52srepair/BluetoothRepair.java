@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.os.Build;
+import android.telephony.TelephonyManager;
 
 final class BluetoothRepair {
     static final class Probe {
@@ -46,8 +47,12 @@ final class BluetoothRepair {
 
     private BluetoothRepair() {}
 
-    @SuppressWarnings("deprecation")
     static Probe probe(Context c) {
+        return probe(c, currentCellularCallActive(c));
+    }
+
+    @SuppressWarnings("deprecation")
+    static Probe probe(Context c, boolean cellularCallActiveHint) {
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         boolean permission =
                 Build.VERSION.SDK_INT < 31
@@ -132,17 +137,41 @@ final class BluetoothRepair {
                         hfpProfileConnected,
                         available,
                         selected,
-                        speakerphoneOn);
+                        speakerphoneOn,
+                        cellularCallActiveHint);
         return new Probe(health, current, candidate, mediaAvailable);
     }
 
+    @SuppressWarnings("deprecation")
+    static boolean currentCellularCallActive(Context c) {
+        if (Build.VERSION.SDK_INT < 31
+                || c.checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        try {
+            TelephonyManager tm =
+                    (TelephonyManager) c.getSystemService(Context.TELEPHONY_SERVICE);
+            return tm != null && tm.getCallState() == TelephonyManager.CALL_STATE_OFFHOOK;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     static RepairResult repairCommunicationRoute(Context c, boolean force) {
+        return repairCommunicationRoute(c, force, currentCellularCallActive(c));
+    }
+
+    static RepairResult repairCommunicationRoute(
+            Context c,
+            boolean force,
+            boolean cellularCallActiveHint) {
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) {
             return new RepairResult(false, false, "AudioManager nicht verfügbar.");
         }
 
-        Probe before = probe(c);
+        Probe before = probe(c, cellularCallActiveHint);
         if (!force && !before.health.needsRepair()) {
             return new RepairResult(false, before.health.scoSelected, "Kein reparierbarer Routingfehler erkannt.");
         }
