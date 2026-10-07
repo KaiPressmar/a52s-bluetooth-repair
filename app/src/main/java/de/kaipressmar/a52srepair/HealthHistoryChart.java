@@ -18,12 +18,12 @@ final class HealthHistoryChart extends View {
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private List<HealthHistoryStore.Entry> entries = Collections.emptyList();
 
-    private final int green = Color.rgb(20, 122, 78);
-    private final int amber = Color.rgb(190, 126, 27);
-    private final int red = Color.rgb(185, 67, 54);
-    private final int grey = Color.rgb(178, 190, 184);
-    private final int ink = Color.rgb(65, 79, 72);
-    private final int track = Color.rgb(231, 237, 233);
+    private final int green = AppPalette.PRIMARY;
+    private final int amber = AppPalette.WARNING;
+    private final int red = AppPalette.ERROR;
+    private final int grey = AppPalette.NEUTRAL;
+    private final int ink = AppPalette.MUTED;
+    private final int track = AppPalette.SURFACE_TINT;
 
     HealthHistoryChart(Context context) {
         super(context);
