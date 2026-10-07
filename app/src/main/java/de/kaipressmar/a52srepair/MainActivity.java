@@ -23,6 +23,7 @@ public class MainActivity extends Activity {
     private TextView statusPill;
     private TextView routeTitle;
     private TextView routeSub;
+    private TextView signatureSub;
     private TextView lastCheckTitle;
     private TextView lastCheckSub;
     private TextView monitorTitle;
@@ -33,12 +34,12 @@ public class MainActivity extends Activity {
     private TextView historySummary;
     private LinearLayout recoveryCard;
 
-    private final int GREEN = Color.rgb(15, 122, 82);
-    private final int GREEN_DARK = Color.rgb(5, 94, 61);
-    private final int INK = Color.rgb(18, 32, 26);
-    private final int MUTED = Color.rgb(102, 116, 109);
-    private final int BG = Color.rgb(246, 249, 247);
-    private final int BORDER = Color.rgb(226, 234, 229);
+    private final int GREEN = AppPalette.PRIMARY;
+    private final int GREEN_DARK = AppPalette.PRIMARY_DARK;
+    private final int INK = AppPalette.INK;
+    private final int MUTED = AppPalette.MUTED;
+    private final int BG = AppPalette.BACKGROUND;
+    private final int BORDER = AppPalette.BORDER;
 
     @Override
     public void onCreate(Bundle state) {
@@ -111,7 +112,7 @@ public class MainActivity extends Activity {
         TextView mark = label("B", 22, Typeface.BOLD, GREEN_DARK);
         mark.setTextColor(Color.WHITE);
         mark.setGravity(Gravity.CENTER);
-        mark.setBackground(round(GREEN_DARK, 18));
+        mark.setBackground(round(AppPalette.PRIMARY_DARK, 18));
         head.addView(mark, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
         LinearLayout brandBox = new LinearLayout(this);
@@ -135,7 +136,7 @@ public class MainActivity extends Activity {
 
         TextView gear = label("⚙", 25, Typeface.NORMAL, INK);
         gear.setGravity(Gravity.CENTER);
-        gear.setBackground(round(Color.WHITE, 18));
+        gear.setBackground(round(AppPalette.SURFACE, 18));
         gear.setElevation(dp(1));
         gear.setOnClickListener(
                 v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
@@ -146,21 +147,25 @@ public class MainActivity extends Activity {
 
         statusPill = label("●  Status wird geprüft", 13, Typeface.BOLD, GREEN_DARK);
         statusPill.setPadding(dp(12), dp(7), dp(12), dp(7));
-        statusPill.setBackground(round(Color.rgb(229, 246, 237), 99));
+        statusPill.setBackground(round(AppPalette.PRIMARY_SOFT, 99));
         add(statusPill, 16, -2);
 
         LinearLayout route = card();
         TextView icon = label("◉", 24, Typeface.BOLD, GREEN);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(round(Color.rgb(232, 247, 240), 99));
+        icon.setBackground(round(AppPalette.TEAL_SOFT, 99));
         route.addView(icon, new LinearLayout.LayoutParams(dp(50), dp(50)));
 
         LinearLayout rt = new LinearLayout(this);
         rt.setOrientation(LinearLayout.VERTICAL);
         routeTitle = label("Telefonie-Audio", 16, Typeface.BOLD, INK);
         routeSub = label("Verbindung wird geprüft …", 13, Typeface.NORMAL, MUTED);
+        signatureSub = label("Fehlersignatur wird bewertet …", 11, Typeface.BOLD, GREEN_DARK);
         rt.addView(routeTitle);
         rt.addView(routeSub);
+        LinearLayout.LayoutParams signatureParams = new LinearLayout.LayoutParams(-1, -2);
+        signatureParams.topMargin = dp(4);
+        rt.addView(signatureSub, signatureParams);
         LinearLayout.LayoutParams rtp = new LinearLayout.LayoutParams(0, -2, 1);
         rtp.leftMargin = dp(14);
         route.addView(rt, rtp);
@@ -200,7 +205,7 @@ public class MainActivity extends Activity {
         LinearLayout last = card();
         TextView clock = label("◷", 22, Typeface.BOLD, GREEN_DARK);
         clock.setGravity(Gravity.CENTER);
-        clock.setBackground(round(Color.rgb(235, 247, 241), 99));
+        clock.setBackground(round(AppPalette.PRIMARY_SOFT, 99));
         last.addView(clock, new LinearLayout.LayoutParams(dp(46), dp(46)));
         LinearLayout lastCopy = new LinearLayout(this);
         lastCopy.setOrientation(LinearLayout.VERTICAL);
@@ -214,10 +219,10 @@ public class MainActivity extends Activity {
         add(last, 10, -1);
 
         LinearLayout tip = card();
-        tip.setBackground(round(Color.rgb(233, 248, 240), 18));
+        tip.setBackground(round(AppPalette.SURFACE_TINT, 18));
         TextView bulb = label("i", 16, Typeface.BOLD, GREEN_DARK);
         bulb.setGravity(Gravity.CENTER);
-        bulb.setBackground(round(Color.WHITE, 99));
+        bulb.setBackground(round(AppPalette.SURFACE, 99));
         tip.addView(bulb, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView tt =
                 label(
@@ -253,9 +258,9 @@ public class MainActivity extends Activity {
 
         recoveryCard = card();
         recoveryCard.setOrientation(LinearLayout.VERTICAL);
-        recoveryCard.setBackground(round(Color.rgb(255, 247, 231), 18));
+        recoveryCard.setBackground(round(AppPalette.WARNING_SOFT, 18));
         TextView recoveryTitle =
-                label("Systempfad blockiert", 16, Typeface.BOLD, Color.rgb(125, 78, 0));
+                label("Systempfad blockiert", 16, Typeface.BOLD, AppPalette.WARNING);
         recoveryCard.addView(recoveryTitle);
         TextView recoveryCopy =
                 label(
@@ -408,16 +413,27 @@ public class MainActivity extends Activity {
                         ? "Kein Telefonie-Audiogerät aktiv"
                         : String.valueOf(current.getProductName()));
         routeSub.setText(health.summary);
+        signatureSub.setText(
+                probe.signature.label
+                        + (probe.signature.confidence == FailureSignature.Confidence.NONE
+                                ? ""
+                                : " · " + confidenceLabel(probe.signature.confidence)));
+        signatureSub.setTextColor(
+                probe.signature.matchesKnownSamsungFailure()
+                        ? AppPalette.WARNING
+                        : (probe.signature.kind == FailureSignature.Kind.HEALTHY_CALL
+                                ? AppPalette.PRIMARY_DARK
+                                : MUTED));
 
         switch (health.state) {
             case HEALTHY:
-                setStatus("●  " + health.summary, Color.rgb(229, 246, 237), GREEN_DARK);
+                setStatus("●  " + health.summary, AppPalette.PRIMARY_SOFT, GREEN_DARK);
                 break;
             case SUSPECT_ROUTING:
                 setStatus(
                         "●  Routingfehler erkannt",
-                        Color.rgb(255, 234, 226),
-                        Color.rgb(155, 55, 25));
+                        AppPalette.WARNING_SOFT,
+                        AppPalette.WARNING);
                 break;
             case HFP_CONNECTED_NO_SCO:
             case CALL_WITHOUT_SCO:
@@ -425,15 +441,15 @@ public class MainActivity extends Activity {
             case PERMISSION_REQUIRED:
                 setStatus(
                         "●  " + health.summary,
-                        Color.rgb(255, 244, 221),
-                        Color.rgb(143, 91, 0));
+                        AppPalette.WARNING_SOFT,
+                        AppPalette.WARNING);
                 break;
             case ERROR:
-                setStatus("●  Diagnosefehler", Color.rgb(255, 232, 232), Color.rgb(145, 35, 35));
+                setStatus("●  Diagnosefehler", AppPalette.ERROR_SOFT, AppPalette.ERROR);
                 break;
             case IDLE:
             default:
-                setStatus("●  Bereit", Color.rgb(232, 244, 238), GREEN_DARK);
+                setStatus("●  Bereit", AppPalette.SURFACE_TINT, GREEN_DARK);
                 break;
         }
 
@@ -473,7 +489,8 @@ public class MainActivity extends Activity {
         }
         if (recoveryCard != null) {
             boolean blocked =
-                    health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO;
+                    probe.signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE
+                            || probe.signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO;
             recoveryCard.setVisibility(blocked ? View.VISIBLE : View.GONE);
         }
     }
@@ -528,7 +545,7 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), dp(13), dp(14), dp(13));
-        row.setBackground(round(primary ? GREEN : Color.WHITE, 18));
+        row.setBackground(round(primary ? GREEN : AppPalette.SURFACE, 18));
         row.setElevation(dp(primary ? 3 : 1));
         row.setOnClickListener(click);
         row.setClickable(true);
@@ -539,7 +556,7 @@ public class MainActivity extends Activity {
                 round(
                         primary
                                 ? Color.argb(35, 255, 255, 255)
-                                : Color.rgb(235, 247, 241),
+                                : AppPalette.PRIMARY_SOFT,
                         99));
         row.addView(ico, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
@@ -551,7 +568,7 @@ public class MainActivity extends Activity {
                         subtitle,
                         12,
                         Typeface.NORMAL,
-                        primary ? Color.rgb(222, 244, 235) : MUTED);
+                        primary ? Color.rgb(224, 246, 238) : MUTED);
         copy.addView(t);
         copy.addView(sub);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1);
@@ -572,12 +589,12 @@ public class MainActivity extends Activity {
         GradientDrawable g =
                 new GradientDrawable(
                         GradientDrawable.Orientation.TL_BR,
-                        new int[] {GREEN_DARK, GREEN});
+                        new int[] {AppPalette.PRIMARY_DARK, AppPalette.TEAL});
         g.setCornerRadius(dp(24));
         h.setBackground(g);
         h.setElevation(dp(3));
 
-        h.addView(label("BLUETOOTH TELEFONIE", 11, Typeface.BOLD, Color.rgb(202, 239, 221)));
+        h.addView(label("BLUETOOTH TELEFONIE", 11, Typeface.BOLD, Color.rgb(204, 241, 232)));
 
         TextView title =
                 label(
@@ -596,7 +613,7 @@ public class MainActivity extends Activity {
                                 + ": HFP/SCO überwachen, Routingfehler erkennen und den Telefoniepfad gezielt neu auswählen.",
                         14,
                         Typeface.NORMAL,
-                        Color.rgb(224, 245, 235));
+                        Color.rgb(227, 247, 242));
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
         sp.topMargin = dp(8);
         h.addView(sub, sp);
@@ -635,7 +652,7 @@ public class MainActivity extends Activity {
         LinearLayout v = new LinearLayout(this);
         v.setGravity(Gravity.CENTER_VERTICAL);
         v.setPadding(dp(16), dp(15), dp(16), dp(15));
-        v.setBackground(round(Color.WHITE, 18));
+        v.setBackground(round(AppPalette.SURFACE, 18));
         v.setElevation(dp(1));
         return v;
     }
@@ -645,7 +662,7 @@ public class MainActivity extends Activity {
         nav.setTag("bottom-navigation");
         nav.setGravity(Gravity.CENTER);
         nav.setPadding(dp(8), dp(6), dp(8), dp(8));
-        nav.setBackgroundColor(Color.WHITE);
+        nav.setBackgroundColor(AppPalette.SURFACE);
         nav.setElevation(dp(10));
 
         nav.addView(
@@ -686,7 +703,7 @@ public class MainActivity extends Activity {
         TextView button = label(text, 12, Typeface.BOLD, GREEN_DARK);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(10), dp(10), dp(10), dp(10));
-        button.setBackground(round(Color.WHITE, 12));
+        button.setBackground(round(AppPalette.SURFACE, 12));
         button.setClickable(true);
         button.setOnClickListener(click);
         return button;
@@ -722,7 +739,7 @@ public class MainActivity extends Activity {
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
         g.setCornerRadius(dp(radius));
-        if (color == Color.WHITE) g.setStroke(dp(1), BORDER);
+        if (color == Color.WHITE || color == AppPalette.SURFACE) g.setStroke(dp(1), BORDER);
         return g;
     }
 
@@ -738,6 +755,20 @@ public class MainActivity extends Activity {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception e) {
             return "–";
+        }
+    }
+
+    private String confidenceLabel(FailureSignature.Confidence confidence) {
+        switch (confidence) {
+            case HIGH:
+                return "hohe Übereinstimmung";
+            case MEDIUM:
+                return "mittlere Übereinstimmung";
+            case LOW:
+                return "unspezifisch";
+            case NONE:
+            default:
+                return "";
         }
     }
 
