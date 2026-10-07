@@ -159,6 +159,12 @@ final class UpdateManager {
             return;
         }
 
+        if (!isTrustedDownloadUrl(release.apkUrl)
+                || !isTrustedDownloadUrl(release.checksumUrl)) {
+            postInstall(callback, "Update-Quelle ist nicht vertrauenswürdig.", true);
+            return;
+        }
+
         Context app = activity.getApplicationContext();
         postInstall(callback, "Update wird sicher heruntergeladen …", false);
 
@@ -223,6 +229,12 @@ final class UpdateManager {
                                 true);
                     }
                 });
+    }
+
+    static boolean isTrustedDownloadUrl(String url) {
+        return url != null
+                && url.startsWith(
+                        "https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/download/");
     }
 
     static String parseSha256(String text) {
@@ -334,9 +346,11 @@ final class UpdateManager {
     @SuppressWarnings("deprecation")
     private static String appVersion(Context context) {
         try {
-            return context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0)
-                    .versionName;
+            String version =
+                    context.getPackageManager()
+                            .getPackageInfo(context.getPackageName(), 0)
+                            .versionName;
+            return version == null ? "0.0.0" : version;
         } catch (Exception e) {
             return "0.0.0";
         }
