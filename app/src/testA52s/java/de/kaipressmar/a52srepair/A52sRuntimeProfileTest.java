@@ -20,5 +20,6 @@ public class A52sRuntimeProfileTest {
         assertTrue(
                 context.getString(R.string.device_reference_firmware)
                         .contains("A528BXXSBGYI3"));
+        assertTrue(RepairStateStore.preflightEnabled(context));
     }
 }
