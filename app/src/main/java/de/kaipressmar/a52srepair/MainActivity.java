@@ -1728,6 +1728,11 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 31 && !btPermission()) {
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
         }
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.READ_PHONE_STATE);
+        }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
