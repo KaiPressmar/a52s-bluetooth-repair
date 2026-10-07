@@ -134,6 +134,13 @@ public class MonitorService extends Service {
         int degradedCount =
                 RepairStateStore.updateConsecutiveDegraded(this, degraded);
 
+        if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
+                && degradedCount == 1
+                && RepairStateStore.routeOwned(this)) {
+            Diag.log(this, "WATCHDOG RECOVERY releasing stale app-owned route");
+            BluetoothRepair.releaseCommunicationRoute(this);
+        }
+
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
                         && RepairPolicy.canAutoRepair(
