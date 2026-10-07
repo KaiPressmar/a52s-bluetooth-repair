@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
- <color name="surface">#F7F9F8</color>
- <color name="text_primary">#13211B</color>
- <color name="text_secondary">#66736D</color>
- <color name="brand">#187A57</color>
- <color name="success">#14734E</color>
- <color name="warning">#9A6200</color>
+ <color name="surface">#F4F8F6</color>
+ <color name="surface_tint">#EEF6F2</color>
+ <color name="text_primary">#10211A</color>
+ <color name="text_secondary">#5E7067</color>
+ <color name="brand">#147D63</color>
+ <color name="brand_dark">#095644</color>
+ <color name="success">#147D63</color>
+ <color name="warning">#B06F16</color>
+ <color name="error">#B14940</color>
+ <color name="border">#DBE6E0</color>
 </resources>

@@ -141,13 +141,29 @@ public class MonitorService extends Service {
             BluetoothRepair.releaseCommunicationRoute(this);
         }
 
+        RepairDecision decision =
+                RepairDecision.decide(
+                        probe.signature,
+                        health,
+                        suspectCount,
+                        degradedCount,
+                        System.currentTimeMillis(),
+                        RepairStateStore.lastRepairAt(this));
+        Diag.log(
+                this,
+                "WATCHDOG DECISION signature="
+                        + probe.signature.kind
+                        + " confidence="
+                        + probe.signature.confidence
+                        + " action="
+                        + decision.action
+                        + " reason="
+                        + decision.reason);
+
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
-                        && RepairPolicy.canAutoRepair(
-                                health,
-                                suspectCount,
-                                System.currentTimeMillis(),
-                                RepairStateStore.lastRepairAt(this));
+                        && decision.action
+                                == RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE;
 
         if (repairAllowed) {
             BluetoothRepair.RepairResult result =
@@ -166,7 +182,9 @@ public class MonitorService extends Service {
                             : result.message);
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-verify"),
-                    8_000L);
+                    RepairVerificationPolicy.FIRST_VERIFY_MS);
+        } else if (decision.action == RepairDecision.Action.ESCALATE_VENDOR_STACK) {
+            updateNotification("HFP verbunden · SCO-Systempfad blockiert");
         } else {
             updateNotification(health.summary);
         }
@@ -203,13 +221,14 @@ public class MonitorService extends Service {
                 verified.health.scoSelected
                         ? "Telefonie-Audio erfolgreich über Bluetooth geroutet"
                         : verified.health.summary);
-        if (!verified.health.scoSelected
-                && verified.health.inCommunication
-                && RepairStateStore.routeOwned(this)
-                && !"auto-repair-final".equals(reason)) {
+        if (RepairVerificationPolicy.needsFinalVerification(
+                verified.health.scoSelected,
+                verified.health.inCommunication,
+                RepairStateStore.routeOwned(this),
+                "auto-repair-final".equals(reason))) {
             handler.postDelayed(
                     () -> verifyRepair("auto-repair-final"),
-                    22_000L);
+                    RepairVerificationPolicy.FINAL_GRACE_MS);
         }
     }
 
