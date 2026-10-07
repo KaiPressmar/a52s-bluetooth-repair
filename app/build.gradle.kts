@@ -25,9 +25,13 @@ android {
     productFlavors {
         create("a52s") {
             dimension = "device"
+            // Samsung's final official A52s runtime is Android 14 / One UI 6.1.
+            // Compile with API 36 for current toolchain support, but target the device's real OS.
+            targetSdk = 34
         }
         create("s22") {
             dimension = "device"
+            targetSdk = 36
         }
     }
 
