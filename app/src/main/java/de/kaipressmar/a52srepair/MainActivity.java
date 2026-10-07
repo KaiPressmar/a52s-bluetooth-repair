@@ -53,6 +53,9 @@ public class MainActivity extends Activity {
     private Switch autoRepairSwitch;
     private TextView autoRepairSubtitle;
     private boolean updatingAutoRepairSwitch;
+    private Switch preflightSwitch;
+    private TextView preflightSubtitle;
+    private boolean updatingPreflightSwitch;
 
     private HealthHistoryChart historyChart;
     private TextView historySummary;
@@ -204,6 +207,8 @@ public class MainActivity extends Activity {
         homeUpdateBannerText = null;
         autoRepairSwitch = null;
         autoRepairSubtitle = null;
+        preflightSwitch = null;
+        preflightSubtitle = null;
 
         historyChart = null;
         historySummary = null;
@@ -618,6 +623,57 @@ public class MainActivity extends Activity {
         repairSetting.addView(repairHint, hintParams);
         add(repairSetting, 9, -1);
 
+        if ("a52s".equalsIgnoreCase(getString(R.string.device_profile_key))) {
+            LinearLayout preflightSetting = card();
+            preflightSetting.setOrientation(LinearLayout.VERTICAL);
+
+            LinearLayout preflightTop = new LinearLayout(this);
+            preflightTop.setGravity(Gravity.CENTER_VERTICAL);
+            preflightTop.addView(
+                    iconBubble(R.drawable.ic_bluetooth, AppPalette.TEAL, AppPalette.TEAL_SOFT),
+                    new LinearLayout.LayoutParams(dp(46), dp(46)));
+
+            LinearLayout preflightCopy = new LinearLayout(this);
+            preflightCopy.setOrientation(LinearLayout.VERTICAL);
+            preflightCopy.addView(label("Telefoniekanal nach Fahrzeugverbindung testen", 15, Typeface.BOLD, INK));
+            preflightSubtitle =
+                    label(
+                            "Android 14: prüft den SCO-Kanal einmal vorsorglich, solange kein Anruf und keine Musik aktiv ist",
+                            11,
+                            Typeface.NORMAL,
+                            MUTED);
+            preflightCopy.addView(preflightSubtitle);
+            LinearLayout.LayoutParams preflightCopyParams =
+                    new LinearLayout.LayoutParams(0, -2, 1);
+            preflightCopyParams.leftMargin = dp(12);
+            preflightTop.addView(preflightCopy, preflightCopyParams);
+
+            preflightSwitch = new Switch(this);
+            preflightSwitch.setShowText(false);
+            tintSwitch(preflightSwitch);
+            preflightSwitch.setOnCheckedChangeListener(
+                    (buttonView, checked) -> {
+                        if (updatingPreflightSwitch) return;
+                        RepairStateStore.setPreflightEnabled(this, checked);
+                        refresh(false);
+                    });
+            preflightTop.addView(preflightSwitch);
+            preflightSetting.addView(preflightTop);
+
+            TextView preflightHint =
+                    label(
+                            "Der Vorabtest nutzt auf dem A52s/Android 14 die noch verfügbare off-call-SCO-API. Er läuft höchstens einmal pro Verbindungsphase mit einem begrenzten Wiederholungsversuch und wird während Anrufen oder Medienwiedergabe nicht gestartet.",
+                            11,
+                            Typeface.NORMAL,
+                            MUTED);
+            preflightHint.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams preflightHintParams =
+                    new LinearLayout.LayoutParams(-1, -2);
+            preflightHintParams.topMargin = dp(10);
+            preflightSetting.addView(preflightHint, preflightHintParams);
+            add(preflightSetting, 9, -1);
+        }
+
         add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 21, -1);
         buildFullUpdateCard();
 
@@ -693,6 +749,13 @@ public class MainActivity extends Activity {
         card.addView(infoRow("Referenz-Firmware", getString(R.string.device_reference_firmware)));
         card.addView(infoDivider());
         card.addView(infoRow("App-Ziel-SDK", "API " + getApplicationInfo().targetSdkVersion));
+        if ("a52s".equalsIgnoreCase(getString(R.string.device_profile_key))) {
+            card.addView(infoDivider());
+            card.addView(
+                    infoRow(
+                            "SCO-Vorabtest",
+                            RepairStateStore.preflightEnabled(this) ? "aktiv" : "aus"));
+        }
         card.addView(infoDivider());
         card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
@@ -1259,6 +1322,16 @@ public class MainActivity extends Activity {
                     autoRepair
                             ? "Bestätigte, öffentlich reparierbare Routingfehler automatisch beheben"
                             : "Nur erkennen, protokollieren und warnen");
+        }
+
+        if (preflightSwitch != null) {
+            updatingPreflightSwitch = true;
+            preflightSwitch.setChecked(RepairStateStore.preflightEnabled(this));
+            updatingPreflightSwitch = false;
+            preflightSubtitle.setText(
+                    RepairStateStore.preflightEnabled(this)
+                            ? "Aktiv · prüft den A52s-Telefoniekanal nach Fahrzeug/HFP-Verbindung"
+                            : "Aus · es erfolgt nur die normale ereignisbasierte Überwachung");
         }
 
         if (monitorSwitch != null) {

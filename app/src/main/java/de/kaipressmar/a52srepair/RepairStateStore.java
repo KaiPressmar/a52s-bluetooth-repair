@@ -16,6 +16,9 @@ final class RepairStateStore {
     private static final String KEY_CONSECUTIVE_SUSPECT = "consecutive_suspect";
     private static final String KEY_CONSECUTIVE_DEGRADED = "consecutive_degraded";
     private static final String KEY_ROUTE_OWNED = "route_owned";
+    private static final String KEY_PREFLIGHT_ENABLED = "preflight_enabled";
+    private static final String KEY_LAST_HFP_READY = "last_hfp_ready";
+    private static final String KEY_LAST_PREFLIGHT = "last_preflight";
     private static final String KEY_HFP_AUDIO_TRANSPORT = "hfp_audio_transport";
 
     private RepairStateStore() {}
@@ -38,6 +41,33 @@ final class RepairStateStore {
 
     static void setAutoRepairEnabled(Context c, boolean enabled) {
         prefs(c).edit().putBoolean(KEY_AUTO_REPAIR, enabled).apply();
+    }
+
+    static boolean preflightEnabled(Context c) {
+        boolean defaultEnabled =
+                "a52s".equalsIgnoreCase(c.getString(R.string.device_profile_key));
+        return prefs(c).getBoolean(KEY_PREFLIGHT_ENABLED, defaultEnabled);
+    }
+
+    static void setPreflightEnabled(Context c, boolean enabled) {
+        prefs(c).edit().putBoolean(KEY_PREFLIGHT_ENABLED, enabled).apply();
+    }
+
+    static void markHfpReady(Context c, long now) {
+        prefs(c).edit().putLong(KEY_LAST_HFP_READY, now).apply();
+    }
+
+    static boolean hfpRecentlyReady(Context c, long now, long maxAgeMs) {
+        long at = prefs(c).getLong(KEY_LAST_HFP_READY, 0L);
+        return at > 0L && now >= at && now - at <= maxAgeMs;
+    }
+
+    static long lastPreflightAt(Context c) {
+        return prefs(c).getLong(KEY_LAST_PREFLIGHT, 0L);
+    }
+
+    static void markPreflight(Context c, long now) {
+        prefs(c).edit().putLong(KEY_LAST_PREFLIGHT, now).apply();
     }
 
     static void saveHealth(Context c, BluetoothHealth health) {

@@ -17,17 +17,20 @@ final class BluetoothRepair {
         final AudioDeviceInfo current;
         final AudioDeviceInfo bluetoothCommunicationDevice;
         final boolean bluetoothMediaOutputAvailable;
+        final boolean musicActive;
         final FailureSignature signature;
 
         Probe(
                 BluetoothHealth health,
                 AudioDeviceInfo current,
                 AudioDeviceInfo bluetoothCommunicationDevice,
-                boolean bluetoothMediaOutputAvailable) {
+                boolean bluetoothMediaOutputAvailable,
+                boolean musicActive) {
             this.health = health;
             this.current = current;
             this.bluetoothCommunicationDevice = bluetoothCommunicationDevice;
             this.bluetoothMediaOutputAvailable = bluetoothMediaOutputAvailable;
+            this.musicActive = musicActive;
             this.signature =
                     FailureSignature.classify(health, bluetoothMediaOutputAvailable);
         }
@@ -90,7 +93,7 @@ final class BluetoothRepair {
                             false,
                             "AudioManager nicht verfügbar",
                             "Android stellt den Audio-Dienst momentan nicht bereit.");
-            return new Probe(health, null, null, false);
+            return new Probe(health, null, null, false, false);
         }
 
         AudioDeviceInfo current = am.getCommunicationDevice();
@@ -119,6 +122,12 @@ final class BluetoothRepair {
         } catch (RuntimeException ignored) {
             // Media output is supporting evidence only; never fail the primary diagnosis on it.
         }
+        boolean musicActive = false;
+        try {
+            musicActive = am.isMusicActive();
+        } catch (RuntimeException ignored) {
+        }
+
         boolean speakerphoneOn =
                 current != null && current.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
         if (!speakerphoneOn) {
@@ -139,7 +148,7 @@ final class BluetoothRepair {
                         selected,
                         speakerphoneOn,
                         cellularCallActiveHint);
-        return new Probe(health, current, candidate, mediaAvailable);
+        return new Probe(health, current, candidate, mediaAvailable, musicActive);
     }
 
     @SuppressWarnings("deprecation")

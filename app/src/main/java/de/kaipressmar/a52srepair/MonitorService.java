@@ -41,6 +41,12 @@ public class MonitorService extends Service {
     private int repairAttemptsInIncident;
     private int consecutiveTransportMismatch;
     private long transportMismatchSinceMillis;
+    private boolean preflightInProgress;
+    private boolean preflightConnectedSeen;
+    private int preflightAttemptsThisConnection;
+
+    private final Runnable preflightTimeout =
+            () -> finishScoPreflight(false, "timeout");
 
     private final Runnable tick =
             new Runnable() {
@@ -115,6 +121,30 @@ public class MonitorService extends Service {
                     String action = intent == null ? null : intent.getAction();
                     if (action == null) return;
 
+                    if (AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED.equals(action)) {
+                        int scoState =
+                                intent.getIntExtra(
+                                        AudioManager.EXTRA_SCO_AUDIO_STATE,
+                                        AudioManager.SCO_AUDIO_STATE_ERROR);
+                        if (preflightInProgress) {
+                            Diag.log(
+                                    MonitorService.this,
+                                    "SCO PREFLIGHT state="
+                                            + scoState
+                                            + " attempt="
+                                            + preflightAttemptsThisConnection);
+                            if (scoState == AudioManager.SCO_AUDIO_STATE_CONNECTED) {
+                                preflightConnectedSeen = true;
+                                RepairStateStore.markHfpReady(
+                                        MonitorService.this,
+                                        System.currentTimeMillis());
+                                finishScoPreflight(true, "connected");
+                            }
+                        }
+                        scheduleAfter("sco-state-" + scoState, 250L);
+                        return;
+                    }
+
                     if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
                         int state =
                                 intent.getIntExtra(
@@ -123,6 +153,8 @@ public class MonitorService extends Service {
                         if (state == BluetoothAdapter.STATE_OFF
                                 || state == BluetoothAdapter.STATE_TURNING_OFF) {
                             repairAttemptsInIncident = 0;
+                            preflightAttemptsThisConnection = 0;
+                            cancelScoPreflight("bluetooth-off");
                             consecutiveTransportMismatch = 0;
                             transportMismatchSinceMillis = 0L;
                             handler.removeCallbacks(tick);
@@ -133,6 +165,7 @@ public class MonitorService extends Service {
                             Diag.log(MonitorService.this, "WATCHDOG EVENT bluetooth-off");
                         } else if (state == BluetoothAdapter.STATE_ON) {
                             repairAttemptsInIncident = 0;
+                            preflightAttemptsThisConnection = 0;
                             scheduleAfter("bluetooth-on", EVENT_DEBOUNCE_MS);
                             handler.postDelayed(
                                     () -> scheduleSoon("bluetooth-on-settled"),
@@ -161,12 +194,15 @@ public class MonitorService extends Service {
                                         BluetoothProfile.STATE_DISCONNECTED);
                         if (state == BluetoothProfile.STATE_CONNECTED) {
                             repairAttemptsInIncident = 0;
+                            preflightAttemptsThisConnection = 0;
                             scheduleAfter("hfp-connected", EVENT_DEBOUNCE_MS);
                             handler.postDelayed(
                                     () -> scheduleSoon("hfp-connected-settled"),
                                     HFP_CONNECTED_SETTLE_MS);
                         } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                             repairAttemptsInIncident = 0;
+                            preflightAttemptsThisConnection = 0;
+                            cancelScoPreflight("hfp-disconnected");
                             consecutiveTransportMismatch = 0;
                             transportMismatchSinceMillis = 0L;
                             scheduleSoon("hfp-disconnected");
@@ -243,6 +279,7 @@ public class MonitorService extends Service {
         filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED);
 
         try {
             if (Build.VERSION.SDK_INT >= 33) {
@@ -362,6 +399,8 @@ public class MonitorService extends Service {
                 BluetoothRepair.releaseCommunicationRoute(this);
             }
             repairAttemptsInIncident = 0;
+            preflightAttemptsThisConnection = 0;
+            cancelScoPreflight("probe-bluetooth-off");
             RepairStateStore.updateConsecutiveSuspect(this, false);
             RepairStateStore.updateConsecutiveDegraded(this, false);
             RepairStateStore.saveHfpAudioTransport(this, null);
@@ -388,11 +427,17 @@ public class MonitorService extends Service {
             health = probe.health;
         }
 
+        long now = System.currentTimeMillis();
+        if (!health.inCommunication
+                && health.hfpProfileConnected
+                && health.scoAvailable) {
+            RepairStateStore.markHfpReady(this, now);
+        }
+
         Boolean hfpAudioConnected = hfpAudioTransportConnected();
         RepairStateStore.saveHfpAudioTransport(this, hfpAudioConnected);
         boolean transportMismatch =
                 HfpAudioTransportPolicy.isMismatch(health, hfpAudioConnected);
-        long now = System.currentTimeMillis();
         if (transportMismatch) {
             if (transportMismatchSinceMillis == 0L) {
                 transportMismatchSinceMillis = now;
@@ -436,6 +481,14 @@ public class MonitorService extends Service {
         boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
         int suspectCount =
                 RepairStateStore.updateConsecutiveSuspect(this, actionableSuspect);
+        boolean recentlyReady =
+                actionableSuspect
+                        && RepairStateStore.hfpRecentlyReady(
+                                this,
+                                now,
+                                ScoPreflightPolicy.READY_TTL_MS);
+        int effectiveSuspectCount =
+                recentlyReady ? Math.max(2, suspectCount) : suspectCount;
         boolean degraded =
                 health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
                         || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO;
@@ -453,7 +506,7 @@ public class MonitorService extends Service {
                 RepairDecision.decide(
                         probe.signature,
                         health,
-                        suspectCount,
+                        effectiveSuspectCount,
                         degradedCount,
                         now,
                         RepairStateStore.lastRepairAt(this));
@@ -485,7 +538,9 @@ public class MonitorService extends Service {
                         + " action="
                         + decision.action
                         + " reason="
-                        + decision.reason);
+                        + decision.reason
+                        + " recentlyReady="
+                        + recentlyReady);
 
         boolean repairAllowed =
                 RepairRetryPolicy.canAttempt(
@@ -540,8 +595,13 @@ public class MonitorService extends Service {
             updateNotification(health.summary);
         }
 
+        maybeRunScoPreflight(probe, reason, now);
+
         long nextDelay =
-                WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
+                WatchdogSchedule.nextDelayMillis(
+                        health,
+                        effectiveSuspectCount,
+                        degradedCount);
         if (transportDecision.action
                 == RepairDecision.Action.WAIT_FOR_CONFIRMATION) {
             long transportConfirmDelay =
@@ -611,6 +671,24 @@ public class MonitorService extends Service {
                 health.scoSelected && Boolean.FALSE.equals(hfpAudioConnected);
         boolean selectedButTransportUnknown =
                 health.scoSelected && hfpAudioConnected == null;
+        boolean retryableNow =
+                RepairRetryPolicy.shouldRetryAfterVerification(
+                                health,
+                                RepairStateStore.routeOwned(this),
+                                repairAttemptsInIncident)
+                        || (HfpAudioTransportPolicy.isMismatch(
+                                        health,
+                                        hfpAudioConnected)
+                                && repairAttemptsInIncident
+                                        < RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT);
+
+        if (!finalVerification && retryableNow) {
+            updateNotification("Route noch nicht aktiv · zweiter Reparaturversuch folgt");
+            handler.postDelayed(
+                    () -> scheduleSoon("repair-verification-retry"),
+                    RepairRetryPolicy.RETRY_AFTER_VERIFY_FAILURE_MS);
+            return;
+        }
 
         if (((selectedButTransportDown || selectedButTransportUnknown)
                         && !finalVerification)
@@ -626,16 +704,7 @@ public class MonitorService extends Service {
             return;
         }
 
-        if (finalVerification
-                && (RepairRetryPolicy.shouldRetryAfterVerification(
-                                health,
-                                RepairStateStore.routeOwned(this),
-                                repairAttemptsInIncident)
-                        || (HfpAudioTransportPolicy.isMismatch(
-                                        health,
-                                        hfpAudioConnected)
-                                && repairAttemptsInIncident
-                                        < RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT))) {
+        if (finalVerification && retryableNow) {
             updateNotification("Erster Versuch ohne Erfolg · zweiter Reparaturversuch folgt");
             handler.postDelayed(
                     () -> scheduleSoon("repair-verification-retry"),
@@ -653,6 +722,131 @@ public class MonitorService extends Service {
         } else {
             updateNotification(health.summary);
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void maybeRunScoPreflight(
+            BluetoothRepair.Probe probe,
+            String reason,
+            long now) {
+        if (preflightInProgress || audioManager == null) return;
+
+        boolean relevantEvent =
+                reason != null
+                        && (reason.startsWith("hfp-connected")
+                                || reason.startsWith("media-profile")
+                                || reason.startsWith("bluetooth-on-settled")
+                                || reason.startsWith("bluetooth-device-connected"));
+        if (!relevantEvent) return;
+
+        boolean eligible =
+                ScoPreflightPolicy.eligible(
+                        RepairStateStore.preflightEnabled(this),
+                        getString(R.string.device_profile_key),
+                        Build.VERSION.SDK_INT,
+                        probe,
+                        now,
+                        RepairStateStore.lastPreflightAt(this),
+                        preflightAttemptsThisConnection);
+        if (!eligible) return;
+
+        if (!audioManager.isBluetoothScoAvailableOffCall()) {
+            Diag.log(this, "SCO PREFLIGHT skipped: off-call SCO unavailable");
+            return;
+        }
+
+        RepairStateStore.markPreflight(this, now);
+        startScoPreflightAttempt();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void startScoPreflightAttempt() {
+        if (audioManager == null || preflightInProgress) return;
+
+        BluetoothRepair.Probe current =
+                BluetoothRepair.probe(
+                        this,
+                        cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
+        if (current.health.inCommunication
+                || !current.health.hfpProfileConnected
+                || !current.health.scoAvailable
+                || current.musicActive) {
+            Diag.log(this, "SCO PREFLIGHT cancelled before start: conditions changed");
+            return;
+        }
+
+        preflightAttemptsThisConnection++;
+        preflightInProgress = true;
+        preflightConnectedSeen = false;
+        handler.removeCallbacks(preflightTimeout);
+
+        Diag.log(
+                this,
+                "SCO PREFLIGHT start attempt="
+                        + preflightAttemptsThisConnection
+                        + "/"
+                        + ScoPreflightPolicy.MAX_ATTEMPTS_PER_CONNECTION);
+        try {
+            audioManager.startBluetoothSco();
+            updateNotification("Fahrzeug verbunden · Telefoniekanal wird vorab geprüft …");
+            handler.postDelayed(preflightTimeout, ScoPreflightPolicy.TIMEOUT_MS);
+        } catch (RuntimeException e) {
+            Diag.log(this, "SCO PREFLIGHT start error " + e.getClass().getSimpleName());
+            finishScoPreflight(false, "start-error");
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void finishScoPreflight(boolean success, String reason) {
+        if (!preflightInProgress && !preflightConnectedSeen) return;
+
+        handler.removeCallbacks(preflightTimeout);
+        try {
+            if (audioManager != null) audioManager.stopBluetoothSco();
+        } catch (RuntimeException e) {
+            Diag.log(this, "SCO PREFLIGHT stop error " + e.getClass().getSimpleName());
+        }
+
+        preflightInProgress = false;
+
+        if (success) {
+            preflightConnectedSeen = false;
+            preflightAttemptsThisConnection = ScoPreflightPolicy.MAX_ATTEMPTS_PER_CONNECTION;
+            RepairStateStore.markHfpReady(this, System.currentTimeMillis());
+            updateNotification("Fahrzeug verbunden · Telefoniekanal bereit");
+            Diag.log(this, "SCO PREFLIGHT success reason=" + reason);
+            return;
+        }
+
+        preflightConnectedSeen = false;
+        Diag.log(
+                this,
+                "SCO PREFLIGHT failed reason="
+                        + reason
+                        + " attempt="
+                        + preflightAttemptsThisConnection);
+
+        if (preflightAttemptsThisConnection
+                < ScoPreflightPolicy.MAX_ATTEMPTS_PER_CONNECTION) {
+            handler.postDelayed(this::startScoPreflightAttempt, 1_500L);
+        } else {
+            updateNotification(
+                    "Fahrzeug verbunden · Telefoniekanal konnte nicht vorab bestätigt werden");
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void cancelScoPreflight(String reason) {
+        handler.removeCallbacks(preflightTimeout);
+        if (preflightInProgress && audioManager != null) {
+            try {
+                audioManager.stopBluetoothSco();
+            } catch (RuntimeException ignored) {
+            }
+        }
+        preflightInProgress = false;
+        preflightConnectedSeen = false;
+        Diag.log(this, "SCO PREFLIGHT cancel reason=" + reason);
     }
 
     private void checkAppUpdates() {
@@ -692,6 +886,7 @@ public class MonitorService extends Service {
 
     @Override
     public void onDestroy() {
+        cancelScoPreflight("service-destroy");
         handler.removeCallbacksAndMessages(null);
 
         if (telephonyManager != null && callStateCallback != null) {
