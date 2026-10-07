@@ -16,6 +16,7 @@ public class MonitorService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
     private AudioManager.OnModeChangedListener modeChangedListener;
+    private AudioManager.OnCommunicationDeviceChangedListener communicationDeviceChangedListener;
     private String pendingReason = "scheduled";
 
     private final Runnable tick =
@@ -63,6 +64,10 @@ public class MonitorService extends Service {
                     mode -> scheduleSoon(
                             "audio-mode-" + mode);
             audioManager.addOnModeChangedListener(getMainExecutor(), modeChangedListener);
+            communicationDeviceChangedListener =
+                    device -> scheduleSoon("communication-route");
+            audioManager.addOnCommunicationDeviceChangedListener(
+                    getMainExecutor(), communicationDeviceChangedListener);
         }
 
         Diag.log(this, "WATCHDOG START energyMode=event-driven");
@@ -104,6 +109,7 @@ public class MonitorService extends Service {
         }
 
         RepairStateStore.saveHealth(this, health);
+        HealthHistoryStore.record(this, health, reason);
         Diag.log(
                 this,
                 "WATCHDOG CHECK reason="
@@ -122,6 +128,11 @@ public class MonitorService extends Service {
         boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
         int suspectCount =
                 RepairStateStore.updateConsecutiveSuspect(this, actionableSuspect);
+        boolean degraded =
+                health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
+                        || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO;
+        int degradedCount =
+                RepairStateStore.updateConsecutiveDegraded(this, degraded);
 
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
@@ -144,27 +155,17 @@ public class MonitorService extends Service {
                             + result.message);
             updateNotification(
                     result.routeSelected
-                            ? "Routingfehler erkannt und Reparatur ausgelöst"
+                            ? "Routingfehler erkannt · Neuauswahl wird verifiziert"
                             : result.message);
             handler.postDelayed(
-                    () -> {
-                        BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
-                        RepairStateStore.saveHealth(this, verified.health);
-                        Diag.log(
-                                this,
-                                "WATCHDOG VERIFY state="
-                                        + verified.health.state
-                                        + "\n"
-                                        + Diag.snapshot(this, verified));
-                        updateNotification(verified.health.summary);
-                    },
-                    1_500L);
+                    () -> verifyRepair("auto-repair-verify"),
+                    8_000L);
         } else {
             updateNotification(health.summary);
         }
 
         long nextDelay =
-                WatchdogSchedule.nextDelayMillis(health, suspectCount);
+                WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
         handler.postDelayed(tick, nextDelay);
         Diag.log(
                 this,
@@ -173,7 +174,28 @@ public class MonitorService extends Service {
                         + " state="
                         + health.state
                         + " suspectCount="
-                        + suspectCount);
+                        + suspectCount
+                        + " degradedCount="
+                        + degradedCount);
+    }
+
+    private void verifyRepair(String reason) {
+        if (!RepairStateStore.monitoringEnabled(this)) return;
+        BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
+        RepairStateStore.saveHealth(this, verified.health);
+        HealthHistoryStore.record(this, verified.health, "repair");
+        Diag.log(
+                this,
+                "WATCHDOG VERIFY reason="
+                        + reason
+                        + " state="
+                        + verified.health.state
+                        + "\n"
+                        + Diag.snapshot(this, verified));
+        updateNotification(
+                verified.health.scoSelected
+                        ? "Telefonie-Audio erfolgreich über Bluetooth geroutet"
+                        : verified.health.summary);
     }
 
     private void updateNotification(String text) {
@@ -211,6 +233,13 @@ public class MonitorService extends Service {
             if (modeChangedListener != null) {
                 try {
                     audioManager.removeOnModeChangedListener(modeChangedListener);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            if (communicationDeviceChangedListener != null) {
+                try {
+                    audioManager.removeOnCommunicationDeviceChangedListener(
+                            communicationDeviceChangedListener);
                 } catch (RuntimeException ignored) {
                 }
             }
