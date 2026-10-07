@@ -679,7 +679,16 @@ public class MainActivity extends Activity {
                                 ? "Passendes Geräteprofil"
                                 : "Gerät weicht vom Build-Profil ab"));
         card.addView(infoDivider());
-        card.addView(infoRow("Android-Ziel", "Android 16 · API 36"));
+        card.addView(
+                infoRow(
+                        "Geräte-Runtime",
+                        getString(R.string.device_runtime_name)
+                                + " · "
+                                + getString(R.string.device_runtime_api)));
+        card.addView(infoDivider());
+        card.addView(infoRow("Referenz-Firmware", getString(R.string.device_reference_firmware)));
+        card.addView(infoDivider());
+        card.addView(infoRow("App-Ziel-SDK", "API 36"));
         card.addView(infoDivider());
         card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
@@ -1072,8 +1081,19 @@ public class MainActivity extends Activity {
     private void verifyRepair(String logPrefix) {
         BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, verified.health);
-        HealthHistoryStore.record(this, verified.health, "repair");
-        Diag.log(this, logPrefix + "\n" + Diag.snapshot(this));
+        boolean success = verified.health.scoSelected;
+        HealthHistoryStore.record(this, verified.health, success ? "repair" : "verify");
+        if (success) {
+            RepairStateStore.markRepair(this);
+            RepairStateStore.clearConsecutiveSuspect(this);
+        }
+        Diag.log(
+                this,
+                logPrefix
+                        + " success="
+                        + success
+                        + "\n"
+                        + Diag.snapshot(this, verified));
         refresh(false);
     }
 
@@ -1229,11 +1249,13 @@ public class MainActivity extends Activity {
 
             boolean autoRepair = RepairStateStore.autoRepairEnabled(this);
             monitorSubtitle.setText(
-                    monitoring
-                            ? (autoRepair
-                                    ? "Aktiv · erkennt und repariert bestätigte Routingfehler"
-                                    : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")
-                            : "Aus · einschalten für automatische Erkennung im Hintergrund");
+                    !monitoring
+                            ? "Aus · einschalten für automatische Erkennung im Hintergrund"
+                            : (health.state == BluetoothHealth.State.BLUETOOTH_OFF
+                                    ? "Bluetooth aus · Prüfung und Reparatur pausieren automatisch"
+                                    : (autoRepair
+                                            ? "Aktiv · Bluetooth/HFP-Ereignisse triggern Prüfung und Reparatur"
+                                            : "Aktiv · erkennt und protokolliert; Auto-Reparatur ist aus")));
         }
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
