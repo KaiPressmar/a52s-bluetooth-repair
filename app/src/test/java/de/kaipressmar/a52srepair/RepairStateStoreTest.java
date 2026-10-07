@@ -19,6 +19,17 @@ public class RepairStateStoreTest {
         context.getSharedPreferences("repair-state", Context.MODE_PRIVATE).edit().clear().commit();
     }
 
+    @Test public void hfpAudioTransportPreservesConnectedDisconnectedAndUnknown() {
+        RepairStateStore.saveHfpAudioTransport(context, Boolean.TRUE);
+        assertEquals(Boolean.TRUE, RepairStateStore.lastHfpAudioTransport(context));
+
+        RepairStateStore.saveHfpAudioTransport(context, Boolean.FALSE);
+        assertEquals(Boolean.FALSE, RepairStateStore.lastHfpAudioTransport(context));
+
+        RepairStateStore.saveHfpAudioTransport(context, null);
+        assertNull(RepairStateStore.lastHfpAudioTransport(context));
+    }
+
     @Test public void monitoringAndAutoRepairArePersisted() {
         assertFalse(RepairStateStore.monitoringEnabled(context));
         assertTrue(RepairStateStore.autoRepairEnabled(context));
