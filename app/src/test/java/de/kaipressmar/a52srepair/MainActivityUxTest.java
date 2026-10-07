@@ -111,7 +111,9 @@ public class MainActivityUxTest {
         assertContains(text, "App & Updates");
         assertContains(text, "Benachrichtigungen");
         assertContains(text, "App-Info");
-        assertContains(text, "Android 16 · API 36");
+        assertContains(text, "Geräte-Runtime");
+        assertContains(text, "App-Ziel-SDK");
+        assertContains(text, "API 36");
         assertFalse(text.contains("Diagnoseprotokoll teilen"));
         assertFalse(text.contains("Technische Details anzeigen"));
         assertFalse(text.contains("SCO/HFP neu auswählen"));

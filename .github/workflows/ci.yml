@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test-lint-build:
-    name: ${{ matrix.label }} · Android 16
+    name: ${{ matrix.label }} · ${{ matrix.runtime }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -26,9 +26,11 @@ jobs:
           - flavor: A52s
             path: a52s
             label: Galaxy A52s 5G
+            runtime: Android 14 / One UI 6.1
           - flavor: S22
             path: s22
             label: Galaxy S22
+            runtime: Android 16
     steps:
       - uses: actions/checkout@v4
 
@@ -42,14 +44,14 @@ jobs:
         with:
           packages: ''
 
-      - name: Install Android 15 and Android 16 SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+      - name: Install Android 14 through Android 16 SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Unit tests including Android 16 compatibility
+      - name: Unit tests including device runtime coverage
         run: gradle :app:test${{ matrix.flavor }}DebugUnitTest --stacktrace
 
       - name: Android lint
@@ -73,7 +75,7 @@ jobs:
       - name: Upload device-specific debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: bluetooth-repair-${{ matrix.path }}-android16-debug-${{ github.sha }}
+          name: bluetooth-repair-${{ matrix.path }}-debug-${{ github.sha }}
           path: app/build/outputs/apk/${{ matrix.path }}/debug/app-${{ matrix.path }}-debug.apk
           if-no-files-found: error
           retention-days: 14
