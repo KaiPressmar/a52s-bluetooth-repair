@@ -335,14 +335,14 @@ public class MainActivity extends Activity {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, false);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), 1_500L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), 8_000L);
     }
 
     private void forceRepair() {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, true);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), 1_500L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), 8_000L);
     }
 
     private void verifyRepair(String logPrefix) {
