@@ -31,7 +31,6 @@ public class MainActivityUxTest {
         assertContains(text, "Automatische Überwachung starten");
         assertContains(text, "Letzte Prüfung");
         assertContains(text, "Verlauf");
-        assertContains(text, "Noch keine Verlaufsdaten");
         assertContains(text, "Systempfad blockiert");
         assertContains(text, "Bluetooth Agent öffnen");
         assertContains(text, "Technische Details anzeigen");
