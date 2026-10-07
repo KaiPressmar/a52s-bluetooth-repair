@@ -37,6 +37,20 @@ public class UpdateStateStoreTest {
                         now + UpdateStateStore.AUTO_CHECK_INTERVAL_MS));
     }
 
+    @Test public void failedChecksRetryAfterOneHour() {
+        long now = 1_000_000L;
+        UpdateStateStore.saveCheck(context, null, "offline", now);
+
+        assertFalse(
+                UpdateStateStore.shouldCheck(
+                        context,
+                        now + UpdateStateStore.FAILED_RETRY_INTERVAL_MS - 1L));
+        assertTrue(
+                UpdateStateStore.shouldCheck(
+                        context,
+                        now + UpdateStateStore.FAILED_RETRY_INTERVAL_MS));
+    }
+
     @Test public void cachedReleaseSurvivesProcessRestartStyleRead() {
         UpdateRelease release =
                 new UpdateRelease(
