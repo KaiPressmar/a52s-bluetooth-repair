@@ -119,6 +119,11 @@ final class Diag {
                 .append(probe.signature.kind)
                 .append(" confidence=")
                 .append(probe.signature.confidence)
+                .append(" hfpAudioTransport=")
+                .append(
+                        RepairStateStore.lastHfpAudioTransport(c) == null
+                                ? "unknown"
+                                : RepairStateStore.lastHfpAudioTransport(c))
                 .append(" routeOwned=")
                 .append(RepairStateStore.routeOwned(c))
                 .append(" summary=")
