@@ -15,11 +15,20 @@ final class BluetoothRepair {
         final BluetoothHealth health;
         final AudioDeviceInfo current;
         final AudioDeviceInfo bluetoothCommunicationDevice;
+        final boolean bluetoothMediaOutputAvailable;
+        final FailureSignature signature;
 
-        Probe(BluetoothHealth health, AudioDeviceInfo current, AudioDeviceInfo bluetoothCommunicationDevice) {
+        Probe(
+                BluetoothHealth health,
+                AudioDeviceInfo current,
+                AudioDeviceInfo bluetoothCommunicationDevice,
+                boolean bluetoothMediaOutputAvailable) {
             this.health = health;
             this.current = current;
             this.bluetoothCommunicationDevice = bluetoothCommunicationDevice;
+            this.bluetoothMediaOutputAvailable = bluetoothMediaOutputAvailable;
+            this.signature =
+                    FailureSignature.classify(health, bluetoothMediaOutputAvailable);
         }
     }
 
@@ -76,7 +85,7 @@ final class BluetoothRepair {
                             false,
                             "AudioManager nicht verfügbar",
                             "Android stellt den Audio-Dienst momentan nicht bereit.");
-            return new Probe(health, null, null);
+            return new Probe(health, null, null, false);
         }
 
         AudioDeviceInfo current = am.getCommunicationDevice();
@@ -94,6 +103,17 @@ final class BluetoothRepair {
 
         boolean selected = current != null && isBluetoothCommunicationDevice(current);
         boolean available = candidate != null;
+        boolean mediaAvailable = false;
+        try {
+            for (AudioDeviceInfo device : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                if (isBluetoothMediaOutput(device)) {
+                    mediaAvailable = true;
+                    break;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Media output is supporting evidence only; never fail the primary diagnosis on it.
+        }
         boolean speakerphoneOn =
                 current != null && current.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
         if (!speakerphoneOn) {
@@ -113,7 +133,7 @@ final class BluetoothRepair {
                         available,
                         selected,
                         speakerphoneOn);
-        return new Probe(health, current, candidate);
+        return new Probe(health, current, candidate, mediaAvailable);
     }
 
     static RepairResult repairCommunicationRoute(Context c, boolean force) {
@@ -180,6 +200,15 @@ final class BluetoothRepair {
             }
         }
         RepairStateStore.setRouteOwned(c, false);
+    }
+
+    static boolean isBluetoothMediaOutput(AudioDeviceInfo device) {
+        if (device == null) return false;
+        int type = device.getType();
+        return type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+                || type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                || type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+                || type == AudioDeviceInfo.TYPE_BLE_BROADCAST;
     }
 
     static boolean isBluetoothCommunicationDevice(AudioDeviceInfo device) {
