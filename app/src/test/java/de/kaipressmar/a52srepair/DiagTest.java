@@ -45,5 +45,8 @@ public class DiagTest {
         assertTrue(snapshot.contains("audioMode="));
         assertTrue(snapshot.contains("communicationDevice="));
         assertTrue(snapshot.contains("outputs:"));
+        assertTrue(snapshot.contains("btMediaOutput="));
+        assertTrue(snapshot.contains("signature="));
+        assertTrue(snapshot.contains("confidence="));
     }
 }
