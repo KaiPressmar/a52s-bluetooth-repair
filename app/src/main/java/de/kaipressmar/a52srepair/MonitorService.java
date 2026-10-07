@@ -11,18 +11,21 @@ import android.os.*;
 public class MonitorService extends Service {
     static final String CHANNEL_ID = "monitor";
     static final int NOTIFICATION_ID = 1;
-    private static final long IDLE_INTERVAL_MS = 30_000L;
-    private static final long CALL_INTERVAL_MS = 5_000L;
-    private static final long REPAIR_COOLDOWN_MS = 60_000L;
+    private static final long EVENT_DEBOUNCE_MS = 1_200L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
+    private AudioManager.OnModeChangedListener modeChangedListener;
+    private AudioManager.OnCommunicationDeviceChangedListener communicationDeviceChangedListener;
+    private String pendingReason = "scheduled";
 
     private final Runnable tick =
             new Runnable() {
                 @Override
                 public void run() {
-                    runCheck("scheduled");
+                    String reason = pendingReason;
+                    pendingReason = "scheduled";
+                    runCheck(reason);
                 }
             };
 
@@ -57,9 +60,17 @@ public class MonitorService extends Service {
 
         if (audioManager != null) {
             audioManager.registerAudioDeviceCallback(deviceCallback, handler);
+            modeChangedListener =
+                    mode -> scheduleSoon(
+                            "audio-mode-" + mode);
+            audioManager.addOnModeChangedListener(getMainExecutor(), modeChangedListener);
+            communicationDeviceChangedListener =
+                    device -> scheduleSoon("communication-route");
+            audioManager.addOnCommunicationDeviceChangedListener(
+                    getMainExecutor(), communicationDeviceChangedListener);
         }
 
-        Diag.log(this, "WATCHDOG START");
+        Diag.log(this, "WATCHDOG START energyMode=event-driven");
         handler.post(tick);
     }
 
@@ -73,9 +84,9 @@ public class MonitorService extends Service {
     }
 
     private void scheduleSoon(String reason) {
-        Diag.log(this, "WATCHDOG EVENT " + reason);
+        pendingReason = reason;
         handler.removeCallbacks(tick);
-        handler.postDelayed(tick, 750L);
+        handler.postDelayed(tick, EVENT_DEBOUNCE_MS);
     }
 
     private void runCheck(String reason) {
@@ -98,6 +109,7 @@ public class MonitorService extends Service {
         }
 
         RepairStateStore.saveHealth(this, health);
+        HealthHistoryStore.record(this, health, reason);
         Diag.log(
                 this,
                 "WATCHDOG CHECK reason="
@@ -111,11 +123,23 @@ public class MonitorService extends Service {
                         + " scoSelected="
                         + health.scoSelected
                         + "\n"
-                        + Diag.snapshot(this));
+                        + Diag.snapshot(this, probe));
 
         boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
         int suspectCount =
                 RepairStateStore.updateConsecutiveSuspect(this, actionableSuspect);
+        boolean degraded =
+                health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
+                        || health.state == BluetoothHealth.State.CALL_WITHOUT_SCO;
+        int degradedCount =
+                RepairStateStore.updateConsecutiveDegraded(this, degraded);
+
+        if (health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO
+                && degradedCount == 1
+                && RepairStateStore.routeOwned(this)) {
+            Diag.log(this, "WATCHDOG RECOVERY releasing stale app-owned route");
+            BluetoothRepair.releaseCommunicationRoute(this);
+        }
 
         boolean repairAllowed =
                 RepairStateStore.autoRepairEnabled(this)
@@ -138,28 +162,55 @@ public class MonitorService extends Service {
                             + result.message);
             updateNotification(
                     result.routeSelected
-                            ? "Routingfehler erkannt und Reparatur ausgelöst"
+                            ? "Routingfehler erkannt · Neuauswahl wird verifiziert"
                             : result.message);
             handler.postDelayed(
-                    () -> {
-                        BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
-                        RepairStateStore.saveHealth(this, verified.health);
-                        Diag.log(
-                                this,
-                                "WATCHDOG VERIFY state="
-                                        + verified.health.state
-                                        + "\n"
-                                        + Diag.snapshot(this));
-                        updateNotification(verified.health.summary);
-                    },
-                    1_500L);
+                    () -> verifyRepair("auto-repair-verify"),
+                    8_000L);
         } else {
             updateNotification(health.summary);
         }
 
-        handler.postDelayed(
-                tick,
-                health.inCommunication ? CALL_INTERVAL_MS : IDLE_INTERVAL_MS);
+        long nextDelay =
+                WatchdogSchedule.nextDelayMillis(health, suspectCount, degradedCount);
+        handler.postDelayed(tick, nextDelay);
+        Diag.log(
+                this,
+                "WATCHDOG NEXT inMs="
+                        + nextDelay
+                        + " state="
+                        + health.state
+                        + " suspectCount="
+                        + suspectCount
+                        + " degradedCount="
+                        + degradedCount);
+    }
+
+    private void verifyRepair(String reason) {
+        if (!RepairStateStore.monitoringEnabled(this)) return;
+        BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
+        RepairStateStore.saveHealth(this, verified.health);
+        HealthHistoryStore.record(this, verified.health, "repair");
+        Diag.log(
+                this,
+                "WATCHDOG VERIFY reason="
+                        + reason
+                        + " state="
+                        + verified.health.state
+                        + "\n"
+                        + Diag.snapshot(this, verified));
+        updateNotification(
+                verified.health.scoSelected
+                        ? "Telefonie-Audio erfolgreich über Bluetooth geroutet"
+                        : verified.health.summary);
+        if (!verified.health.scoSelected
+                && verified.health.inCommunication
+                && RepairStateStore.routeOwned(this)
+                && !"auto-repair-final".equals(reason)) {
+            handler.postDelayed(
+                    () -> verifyRepair("auto-repair-final"),
+                    22_000L);
+        }
     }
 
     private void updateNotification(String text) {
@@ -177,7 +228,7 @@ public class MonitorService extends Service {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("A52s Bluetooth Repair · Auto-Schutz")
+                .setContentTitle(getString(R.string.app_name) + " · Auto-Schutz")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(pi)
@@ -193,6 +244,19 @@ public class MonitorService extends Service {
             try {
                 audioManager.unregisterAudioDeviceCallback(deviceCallback);
             } catch (RuntimeException ignored) {
+            }
+            if (modeChangedListener != null) {
+                try {
+                    audioManager.removeOnModeChangedListener(modeChangedListener);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            if (communicationDeviceChangedListener != null) {
+                try {
+                    audioManager.removeOnCommunicationDeviceChangedListener(
+                            communicationDeviceChangedListener);
+                } catch (RuntimeException ignored) {
+                }
             }
         }
         BluetoothRepair.releaseCommunicationRoute(this);

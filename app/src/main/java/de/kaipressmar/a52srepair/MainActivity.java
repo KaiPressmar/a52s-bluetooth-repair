@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioDeviceInfo;
+import android.net.Uri;
 import android.os.*;
 import android.provider.Settings;
 import android.view.*;
@@ -28,6 +29,9 @@ public class MainActivity extends Activity {
     private TextView monitorSub;
     private TextView details;
     private TextView technicalToggle;
+    private HealthHistoryChart historyChart;
+    private TextView historySummary;
+    private LinearLayout recoveryCard;
 
     private final int GREEN = Color.rgb(15, 122, 82);
     private final int GREEN_DARK = Color.rgb(5, 94, 61);
@@ -40,11 +44,23 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle state) {
         super.onCreate(state);
 
-        getWindow().setStatusBarColor(BG);
-        getWindow().setNavigationBarColor(Color.WHITE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        getWindow().setDecorFitsSystemWindows(false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarDividerColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarContrastEnforced(false);
+        View decor = getWindow().getDecorView();
+        WindowInsetsController bars = decor.getWindowInsetsController();
+        if (bars != null) {
+            bars.setSystemBarsAppearance(
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        }
 
         LinearLayout root = new LinearLayout(this);
+        root.setTag("app-root");
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
 
@@ -54,12 +70,28 @@ public class MainActivity extends Activity {
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(18), dp(20), dp(30));
+        content.setPadding(dp(20), dp(16), dp(20), dp(26));
         scroll.addView(content);
 
+        View navigation = bottomNav();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        root.addView(bottomNav());
+        root.addView(navigation);
+        root.setOnApplyWindowInsetsListener(
+                (view, insets) -> {
+                    android.graphics.Insets systemBars =
+                            insets.getInsets(
+                                    WindowInsets.Type.systemBars()
+                                            | WindowInsets.Type.displayCutout());
+                    view.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
+                    navigation.setPadding(
+                            dp(8),
+                            dp(6),
+                            dp(8),
+                            dp(8) + Math.max(0, systemBars.bottom));
+                    return insets;
+                });
         setContentView(root);
+        root.requestApplyInsets();
 
         buildDashboard();
         requestNeededPermissions();
@@ -154,12 +186,12 @@ public class MainActivity extends Activity {
                 false,
                 v -> forceRepair());
 
-        add(sectionHeader("Auto-Schutz", "Hintergrunddienst mit periodischer Zustandsprüfung"), 24, -1);
+        add(sectionHeader("Auto-Schutz", "Ereignisbasiert prüfen, mit sparsamer Sicherheitskontrolle"), 24, -1);
         LinearLayout monitor =
                 action(
                         "●",
                         "Automatische Überwachung starten",
-                        "Im Hintergrund prüfen und einen bestätigten Routingfehler automatisch reparieren",
+                        "Bei Anruf- und Audioänderungen sofort prüfen; im Leerlauf nur selten kontrollieren",
                         false,
                         v -> toggleMonitor());
         monitorTitle = (TextView) ((LinearLayout) monitor.getChildAt(1)).getChildAt(0);
@@ -189,7 +221,7 @@ public class MainActivity extends Activity {
         tip.addView(bulb, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView tt =
                 label(
-                        "Auto-Schutz\nWährend eines Anrufs wird nur repariert, wenn Bluetooth-SCO/HFP verfügbar ist, aber bei zwei Prüfungen hintereinander nicht als Kommunikationspfad ausgewählt wurde. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
+                        "Auto-Schutz\nDie Überwachung reagiert hauptsächlich auf Anruf- und Audioereignisse. Im Leerlauf erfolgt nur etwa stündlich eine Sicherheitsprüfung. Ein verdächtiger HFP/SCO-Zustand wird nach kurzer Wartezeit bestätigt, bevor repariert wird. Ein absichtlich aktivierter Lautsprecher wird nicht überschrieben.",
                         13,
                         Typeface.NORMAL,
                         INK);
@@ -198,6 +230,55 @@ public class MainActivity extends Activity {
         ttp.leftMargin = dp(12);
         tip.addView(tt, ttp);
         add(tip, 12, -1);
+
+        add(sectionHeader("Verlauf", "Wie stabil der Telefoniepfad über die letzten Prüfungen war"), 24, -1);
+        LinearLayout history = card();
+        history.setOrientation(LinearLayout.VERTICAL);
+        historySummary = label("Noch keine Verlaufsdaten", 13, Typeface.BOLD, INK);
+        history.addView(historySummary);
+        historyChart = new HealthHistoryChart(this);
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(142));
+        chartParams.topMargin = dp(8);
+        history.addView(historyChart, chartParams);
+        TextView legend =
+                label(
+                        "● Stabil   ● Auffällig   ● Fehler/Blockade   ● Leerlauf",
+                        11,
+                        Typeface.NORMAL,
+                        MUTED);
+        LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
+        legendParams.topMargin = dp(4);
+        history.addView(legend, legendParams);
+        add(history, 10, -1);
+
+        recoveryCard = card();
+        recoveryCard.setOrientation(LinearLayout.VERTICAL);
+        recoveryCard.setBackground(round(Color.rgb(255, 247, 231), 18));
+        TextView recoveryTitle =
+                label("Systempfad blockiert", 16, Typeface.BOLD, Color.rgb(125, 78, 0));
+        recoveryCard.addView(recoveryTitle);
+        TextView recoveryCopy =
+                label(
+                        "HFP ist verbunden, Android stellt aber kein SCO/HFP-Gerät bereit. Die App kann dann keinen privilegierten Samsung-Dienst neu starten. Du kannst direkt den Bluetooth Agent öffnen und dort zuerst den Cache leeren; falls das nicht reicht, bleibt ein Soft-Neustart bzw. das Zurücksetzen der Bluetooth-Verbindungen die nächste Eskalationsstufe.",
+                        12,
+                        Typeface.NORMAL,
+                        INK);
+        LinearLayout.LayoutParams rcp = new LinearLayout.LayoutParams(-1, -2);
+        rcp.topMargin = dp(6);
+        recoveryCard.addView(recoveryCopy, rcp);
+        LinearLayout recoveryActions = new LinearLayout(this);
+        recoveryActions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView agent = compactButton("Bluetooth Agent öffnen", v -> openBluetoothAgentSettings());
+        TextView bt = compactButton("Bluetooth öffnen", v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        recoveryActions.addView(agent, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams btp = new LinearLayout.LayoutParams(0, -2, 1);
+        btp.leftMargin = dp(8);
+        recoveryActions.addView(bt, btp);
+        LinearLayout.LayoutParams rap = new LinearLayout.LayoutParams(-1, -2);
+        rap.topMargin = dp(12);
+        recoveryCard.addView(recoveryActions, rap);
+        recoveryCard.setVisibility(View.GONE);
+        add(recoveryCard, 12, -1);
 
         add(sectionHeader("Werkzeuge & Diagnose", "Details, Export und Android-Einstellungen"), 24, -1);
         action(
@@ -230,6 +311,7 @@ public class MainActivity extends Activity {
     private void manualDiagnosis() {
         BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, probe.health);
+        HealthHistoryStore.record(this, probe.health, "manual");
         Diag.log(this, "MANUAL DIAGNOSIS\n" + Diag.snapshot(this));
         refresh(false);
         Toast.makeText(this, probe.health.summary, Toast.LENGTH_LONG).show();
@@ -238,6 +320,7 @@ public class MainActivity extends Activity {
     private void manualCheckAndRepair() {
         BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, probe.health);
+        HealthHistoryStore.record(this, probe.health, "manual");
         Diag.log(this, "MANUAL CHECK\n" + Diag.snapshot(this));
 
         if (!probe.health.needsRepair()) {
@@ -252,19 +335,20 @@ public class MainActivity extends Activity {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, false);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), 1_500L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("MANUAL VERIFY"), 8_000L);
     }
 
     private void forceRepair() {
         BluetoothRepair.RepairResult result =
                 BluetoothRepair.repairCommunicationRoute(this, true);
         Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), 1_500L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyRepair("FORCED VERIFY"), 8_000L);
     }
 
     private void verifyRepair(String logPrefix) {
         BluetoothRepair.Probe verified = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, verified.health);
+        HealthHistoryStore.record(this, verified.health, "repair");
         Diag.log(this, logPrefix + "\n" + Diag.snapshot(this));
         refresh(false);
     }
@@ -358,8 +442,8 @@ public class MainActivity extends Activity {
                 monitoring ? "Automatische Überwachung stoppen" : "Automatische Überwachung starten");
         monitorSub.setText(
                 monitoring
-                        ? "Auto-Schutz aktiv · Prüfung alle 30 s, während Anrufen alle 5 s"
-                        : "Im Hintergrund prüfen und bestätigte HFP/SCO-Routingfehler reparieren");
+                        ? "Auto-Schutz aktiv · ereignisbasiert, Leerlauf-Check ca. stündlich"
+                        : "Energiesparend im Hintergrund prüfen und bestätigte HFP/SCO-Routingfehler reparieren");
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
         String lastSummary = RepairStateStore.lastSummary(this);
@@ -369,8 +453,29 @@ public class MainActivity extends Activity {
                 lastCheck == 0L
                         ? "Noch keine Hintergrundprüfung"
                         : lastSummary
-                                + " · Reparaturen: "
+                                + " · Reparaturversuche: "
                                 + RepairStateStore.repairCount(this));
+
+        List<HealthHistoryStore.Entry> historyEntries = HealthHistoryStore.read(this);
+        if (historyChart != null) historyChart.setEntries(historyEntries);
+        if (historySummary != null) {
+            long since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+            int problems = HealthHistoryStore.problemCount(historyEntries, since);
+            int healthyCalls = HealthHistoryStore.healthyCallCount(historyEntries, since);
+            historySummary.setText(
+                    historyEntries.isEmpty()
+                            ? "Noch keine Verlaufsdaten"
+                            : "Letzte 24 h · "
+                                    + healthyCalls
+                                    + " stabile Telefonie-Prüfungen · "
+                                    + problems
+                                    + " Auffälligkeiten");
+        }
+        if (recoveryCard != null) {
+            boolean blocked =
+                    health.state == BluetoothHealth.State.HFP_CONNECTED_NO_SCO;
+            recoveryCard.setVisibility(blocked ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void toggleTechnicalDetails() {
@@ -383,8 +488,17 @@ public class MainActivity extends Activity {
     private void showHistory() {
         long check = RepairStateStore.lastCheckAt(this);
         long repair = RepairStateStore.lastRepairAt(this);
+        List<HealthHistoryStore.Entry> entries = HealthHistoryStore.read(this);
+        long since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+        int problems = HealthHistoryStore.problemCount(entries, since);
+        int healthyCalls = HealthHistoryStore.healthyCallCount(entries, since);
         String message =
                 RepairStateStore.lastSummary(this)
+                        + "\n\nLetzte 24 Stunden"
+                        + "\nStabile Telefonie-Prüfungen: "
+                        + healthyCalls
+                        + "\nAuffälligkeiten: "
+                        + problems
                         + "\n\nLetzte Prüfung: "
                         + (check == 0L ? "–" : formatTime(check))
                         + "\nLetzte Reparatur: "
@@ -395,6 +509,12 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("Auto-Schutz Verlauf")
                 .setMessage(message)
+                .setNeutralButton(
+                        "Verlauf löschen",
+                        (dialog, which) -> {
+                            HealthHistoryStore.clear(this);
+                            refresh(false);
+                        })
                 .setPositiveButton("OK", null)
                 .show();
     }
@@ -522,23 +642,24 @@ public class MainActivity extends Activity {
 
     private View bottomNav() {
         LinearLayout nav = new LinearLayout(this);
+        nav.setTag("bottom-navigation");
         nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(8), dp(8), dp(8), dp(10));
+        nav.setPadding(dp(8), dp(6), dp(8), dp(8));
         nav.setBackgroundColor(Color.WHITE);
-        nav.setElevation(dp(8));
+        nav.setElevation(dp(10));
 
         nav.addView(
                 navItem("⌂", "Start", true, v -> refresh(false)),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("⌕", "Diagnose", false, v -> manualDiagnosis()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("↻", "Reparatur", false, v -> forceRepair()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         nav.addView(
                 navItem("≡", "Verlauf", false, v -> showHistory()),
-                new LinearLayout.LayoutParams(0, dp(58), 1));
+                new LinearLayout.LayoutParams(0, dp(56), 1));
         return nav;
     }
 
@@ -559,6 +680,33 @@ public class MainActivity extends Activity {
         x.addView(i);
         x.addView(n);
         return x;
+    }
+
+    private TextView compactButton(String text, View.OnClickListener click) {
+        TextView button = label(text, 12, Typeface.BOLD, GREEN_DARK);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        button.setBackground(round(Color.WHITE, 12));
+        button.setClickable(true);
+        button.setOnClickListener(click);
+        return button;
+    }
+
+    private void openBluetoothAgentSettings() {
+        Intent details =
+                new Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:com.sec.android.app.bluetoothagent"));
+        try {
+            startActivity(details);
+        } catch (RuntimeException e) {
+            Toast.makeText(
+                            this,
+                            "Bluetooth Agent konnte nicht direkt geöffnet werden.",
+                            Toast.LENGTH_LONG)
+                    .show();
+            startActivity(new Intent(Settings.ACTION_APPLICATION_SETTINGS));
+        }
     }
 
     private TextView label(String text, float size, int style, int color) {

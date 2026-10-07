@@ -131,7 +131,7 @@ final class BluetoothHealth {
                     false,
                     speakerphoneOn,
                     "HFP verbunden, aber SCO fehlt",
-                    "Das Headset-/Freisprechprofil ist verbunden, Android bietet aber kein routbares SCO/HFP-Kommunikationsgerät an. Das entspricht dem bekannten A52s-Fehlerbild; eine normale App kann den System-Bluetoothdienst nicht privilegiert neu starten.");
+                    "Das Headset-/Freisprechprofil ist verbunden, Android bietet aber kein routbares SCO/HFP-Kommunikationsgerät an. Das entspricht dem beobachteten Samsung-/Android-Telefoniefehlerbild; eine normale App kann den System-Bluetoothdienst nicht privilegiert neu starten.");
         }
 
         return new BluetoothHealth(

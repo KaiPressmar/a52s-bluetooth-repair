@@ -17,25 +17,25 @@ public class RepairPolicyTest {
     }
 
     @Test public void oneSuspectSampleIsNotEnough() {
-        assertFalse(RepairPolicy.canAutoRepair(suspect(false), 1, 100_000L, 0L));
+        assertFalse(RepairPolicy.canAutoRepair(suspect(false), 1, 1_000_000L, 0L));
     }
 
     @Test public void twoSuspectSamplesAllowRepairAfterCooldown() {
-        assertTrue(RepairPolicy.canAutoRepair(suspect(false), 2, 100_000L, 0L));
+        assertTrue(RepairPolicy.canAutoRepair(suspect(false), 2, 1_000_000L, 0L));
     }
 
     @Test public void speakerphoneBlocksAutomaticRepair() {
-        assertFalse(RepairPolicy.canAutoRepair(suspect(true), 3, 100_000L, 0L));
+        assertFalse(RepairPolicy.canAutoRepair(suspect(true), 3, 1_000_000L, 0L));
     }
 
     @Test public void cooldownBlocksRouteThrashing() {
-        long now = 100_000L;
+        long now = 1_000_000L;
         long recentRepair = now - RepairPolicy.MIN_REPAIR_INTERVAL_MS + 1L;
         assertFalse(RepairPolicy.canAutoRepair(suspect(false), 3, now, recentRepair));
     }
 
     @Test public void cooldownBoundaryAllowsRepair() {
-        long now = 100_000L;
+        long now = 1_000_000L;
         long previousRepair = now - RepairPolicy.MIN_REPAIR_INTERVAL_MS;
         assertTrue(RepairPolicy.canAutoRepair(suspect(false), 2, now, previousRepair));
     }
@@ -44,12 +44,12 @@ public class RepairPolicyTest {
         BluetoothHealth noSco = BluetoothHealth.assess(
                 true, true, AudioManager.MODE_IN_CALL, true, false, false, false);
         assertEquals(BluetoothHealth.State.HFP_CONNECTED_NO_SCO, noSco.state);
-        assertFalse(RepairPolicy.canAutoRepair(noSco, 99, 100_000L, 0L));
+        assertFalse(RepairPolicy.canAutoRepair(noSco, 99, 1_000_000L, 0L));
     }
 
     @Test public void healthyStateNeverRepairs() {
         BluetoothHealth healthy = BluetoothHealth.assess(
                 true, true, AudioManager.MODE_IN_CALL, true, true, true, false);
-        assertFalse(RepairPolicy.canAutoRepair(healthy, 99, 100_000L, 0L));
+        assertFalse(RepairPolicy.canAutoRepair(healthy, 99, 1_000_000L, 0L));
     }
 }

@@ -14,6 +14,7 @@ final class RepairStateStore {
     private static final String KEY_LAST_REPAIR = "last_repair";
     private static final String KEY_REPAIR_COUNT = "repair_count";
     private static final String KEY_CONSECUTIVE_SUSPECT = "consecutive_suspect";
+    private static final String KEY_CONSECUTIVE_DEGRADED = "consecutive_degraded";
     private static final String KEY_ROUTE_OWNED = "route_owned";
 
     private RepairStateStore() {}
@@ -89,6 +90,13 @@ final class RepairStateStore {
 
     static void clearConsecutiveSuspect(Context c) {
         prefs(c).edit().putInt(KEY_CONSECUTIVE_SUSPECT, 0).apply();
+    }
+
+    static int updateConsecutiveDegraded(Context c, boolean degraded) {
+        SharedPreferences p = prefs(c);
+        int next = degraded ? p.getInt(KEY_CONSECUTIVE_DEGRADED, 0) + 1 : 0;
+        p.edit().putInt(KEY_CONSECUTIVE_DEGRADED, next).apply();
+        return next;
     }
 
     static boolean routeOwned(Context c) {
