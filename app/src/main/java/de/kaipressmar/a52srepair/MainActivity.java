@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -22,7 +23,8 @@ public class MainActivity extends Activity {
     private enum Page {
         HOME,
         HISTORY,
-        TOOLS
+        TOOLS,
+        SETTINGS
     }
 
     private LinearLayout content;
@@ -36,17 +38,20 @@ public class MainActivity extends Activity {
     private TextView metricAutoValue;
     private TextView metricHfpValue;
     private TextView metricScoValue;
-    private TextView monitorTitle;
-    private TextView monitorSub;
-    private TextView lastCheckTitle;
-    private TextView lastCheckSub;
+    private Switch monitorSwitch;
+    private TextView monitorSubtitle;
+    private TextView homeLastCheck;
     private LinearLayout recoveryCard;
+    private LinearLayout homeUpdateBanner;
+    private TextView homeUpdateBannerText;
+    private boolean updatingMonitorSwitch;
 
     private HealthHistoryChart historyChart;
     private TextView historySummary;
     private TextView historyHealthyValue;
     private TextView historyProblemValue;
     private TextView historyRepairValue;
+    private LinearLayout recentEventsContainer;
 
     private TextView details;
     private TextView technicalToggle;
@@ -96,7 +101,7 @@ public class MainActivity extends Activity {
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(18), dp(12), dp(18), dp(28));
+        content.setPadding(dp(18), dp(12), dp(18), dp(30));
         scroll.addView(content);
 
         navigation = bottomNav();
@@ -111,9 +116,9 @@ public class MainActivity extends Activity {
                                             | WindowInsets.Type.displayCutout());
                     view.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
                     navigation.setPadding(
-                            dp(10),
-                            dp(7),
-                            dp(10),
+                            dp(8),
+                            dp(6),
+                            dp(8),
                             dp(8) + Math.max(0, systemBars.bottom));
                     return insets;
                 });
@@ -156,6 +161,9 @@ public class MainActivity extends Activity {
             case TOOLS:
                 buildToolsPage();
                 break;
+            case SETTINGS:
+                buildSettingsPage();
+                break;
             case HOME:
             default:
                 buildHomePage();
@@ -175,29 +183,35 @@ public class MainActivity extends Activity {
         metricAutoValue = null;
         metricHfpValue = null;
         metricScoValue = null;
-        monitorTitle = null;
-        monitorSub = null;
-        lastCheckTitle = null;
-        lastCheckSub = null;
+        monitorSwitch = null;
+        monitorSubtitle = null;
+        homeLastCheck = null;
         recoveryCard = null;
+        homeUpdateBanner = null;
+        homeUpdateBannerText = null;
+
         historyChart = null;
         historySummary = null;
         historyHealthyValue = null;
         historyProblemValue = null;
         historyRepairValue = null;
+        recentEventsContainer = null;
+
         details = null;
         technicalToggle = null;
+
         updateTitle = null;
         updateSub = null;
         updateAction = null;
     }
 
     private void buildHomePage() {
-        buildTopBar("Übersicht", "Telefonie-Audio im Blick, ohne Technik-Chaos");
+        buildTopBar("Übersicht", "Dein Bluetooth-Telefoniepfad auf einen Blick");
 
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(20), dp(20), dp(20), dp(20));
+        hero.setPadding(dp(20), dp(20), dp(20), dp(19));
+
         GradientDrawable gradient =
                 new GradientDrawable(
                         GradientDrawable.Orientation.TL_BR,
@@ -206,37 +220,57 @@ public class MainActivity extends Activity {
         hero.setBackground(gradient);
         hero.setElevation(dp(3));
 
-        TextView kicker = label("BLUETOOTH CALL GUARD", 10, Typeface.BOLD, Color.rgb(220, 244, 255));
-        hero.addView(kicker);
+        hero.addView(label("CALL GUARD", 10, Typeface.BOLD, Color.rgb(221, 241, 255)));
 
         TextView heroTitle =
-                label("Deine Verbindung.\nAutomatisch geschützt.", 27, Typeface.BOLD, Color.WHITE);
-        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
-        hp.topMargin = dp(8);
-        hero.addView(heroTitle, hp);
+                label(
+                        "Telefonie-Audio.\nAutomatisch geschützt.",
+                        27,
+                        Typeface.BOLD,
+                        Color.WHITE);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(7);
+        hero.addView(heroTitle, titleParams);
 
         TextView heroCopy =
                 label(
-                        "Erkennt festhängende HFP/SCO-Routen und repariert nur dann, wenn Android einen sicheren öffentlichen Reparaturpfad anbietet.",
+                        "Die App erkennt typische HFP/SCO-Ausfälle und greift nur ein, wenn Android einen sicheren Reparaturpfad anbietet.",
                         13,
                         Typeface.NORMAL,
-                        Color.rgb(232, 246, 252));
+                        Color.rgb(233, 246, 252));
         heroCopy.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams hcp = new LinearLayout.LayoutParams(-1, -2);
-        hcp.topMargin = dp(8);
-        hero.addView(heroCopy, hcp);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(-1, -2);
+        copyParams.topMargin = dp(8);
+        hero.addView(heroCopy, copyParams);
 
         statusPill = label("●  Status wird geprüft", 12, Typeface.BOLD, Color.WHITE);
         statusPill.setPadding(dp(11), dp(7), dp(11), dp(7));
-        statusPill.setBackground(round(Color.argb(40, 255, 255, 255), 99));
-        LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(-2, -2);
-        spp.topMargin = dp(14);
-        hero.addView(statusPill, spp);
-
+        statusPill.setBackground(round(Color.argb(42, 255, 255, 255), 99));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-2, -2);
+        statusParams.topMargin = dp(14);
+        hero.addView(statusPill, statusParams);
         add(hero, 12, -1);
 
+        homeUpdateBanner = new LinearLayout(this);
+        homeUpdateBanner.setOrientation(LinearLayout.HORIZONTAL);
+        homeUpdateBanner.setGravity(Gravity.CENTER_VERTICAL);
+        homeUpdateBanner.setPadding(dp(13), dp(11), dp(13), dp(11));
+        homeUpdateBanner.setBackground(round(AppPalette.PRIMARY_SOFT, 17));
+        homeUpdateBanner.setClickable(true);
+        homeUpdateBanner.setOnClickListener(v -> showPage(Page.SETTINGS));
+        homeUpdateBanner.addView(
+                iconBubble(R.drawable.ic_update, PRIMARY_DARK, Color.WHITE),
+                new LinearLayout.LayoutParams(dp(38), dp(38)));
+        homeUpdateBannerText =
+                label("Update verfügbar", 12, Typeface.BOLD, PRIMARY_DARK);
+        LinearLayout.LayoutParams updateTextParams = new LinearLayout.LayoutParams(0, -2, 1);
+        updateTextParams.leftMargin = dp(10);
+        homeUpdateBanner.addView(homeUpdateBannerText, updateTextParams);
+        homeUpdateBanner.addView(label("›", 23, Typeface.NORMAL, PRIMARY_DARK));
+        homeUpdateBanner.setVisibility(View.GONE);
+        add(homeUpdateBanner, 9, -1);
+
         LinearLayout metrics = new LinearLayout(this);
-        metrics.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout autoMetric = metricCard("AUTO", "Aus", AppPalette.PRIMARY_SOFT);
         LinearLayout hfpMetric = metricCard("HFP", "–", AppPalette.TEAL_SOFT);
         LinearLayout scoMetric = metricCard("SCO", "–", AppPalette.CYAN_SOFT);
@@ -245,87 +279,96 @@ public class MainActivity extends Activity {
         metricScoValue = (TextView) scoMetric.getChildAt(1);
 
         metrics.addView(autoMetric, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, -2, 1);
-        mp.leftMargin = dp(8);
-        mp.rightMargin = dp(8);
-        metrics.addView(hfpMetric, mp);
+        LinearLayout.LayoutParams centerMetric = new LinearLayout.LayoutParams(0, -2, 1);
+        centerMetric.leftMargin = dp(8);
+        centerMetric.rightMargin = dp(8);
+        metrics.addView(hfpMetric, centerMetric);
         metrics.addView(scoMetric, new LinearLayout.LayoutParams(0, -2, 1));
         add(metrics, 10, -1);
 
+        add(sectionHeader("Verbindung", "Was Android gerade für Telefonie verwendet"), 21, -1);
+
         LinearLayout routeCard = card();
-        ImageView routeIcon = iconBubble(R.drawable.ic_bluetooth, AppPalette.TEAL, AppPalette.TEAL_SOFT);
-        routeCard.addView(routeIcon, new LinearLayout.LayoutParams(dp(50), dp(50)));
+        routeCard.addView(
+                iconBubble(R.drawable.ic_bluetooth, AppPalette.TEAL, AppPalette.TEAL_SOFT),
+                new LinearLayout.LayoutParams(dp(50), dp(50)));
 
         LinearLayout routeCopy = new LinearLayout(this);
         routeCopy.setOrientation(LinearLayout.VERTICAL);
         routeTitle = label("Telefonie-Audio", 16, Typeface.BOLD, INK);
         routeSub = label("Verbindung wird geprüft …", 12, Typeface.NORMAL, MUTED);
-        signatureSub = label("Fehlersignatur wird bewertet …", 11, Typeface.BOLD, PRIMARY_DARK);
+        signatureSub =
+                label("Fehlersignatur wird bewertet …", 11, Typeface.BOLD, PRIMARY_DARK);
         routeCopy.addView(routeTitle);
         routeCopy.addView(routeSub);
-        LinearLayout.LayoutParams sigParams = new LinearLayout.LayoutParams(-1, -2);
-        sigParams.topMargin = dp(4);
-        routeCopy.addView(signatureSub, sigParams);
+        LinearLayout.LayoutParams signatureParams = new LinearLayout.LayoutParams(-1, -2);
+        signatureParams.topMargin = dp(4);
+        routeCopy.addView(signatureSub, signatureParams);
 
-        LinearLayout.LayoutParams rcp = new LinearLayout.LayoutParams(0, -2, 1);
-        rcp.leftMargin = dp(13);
-        routeCard.addView(routeCopy, rcp);
-        add(routeCard, 10, -1);
+        LinearLayout.LayoutParams routeCopyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        routeCopyParams.leftMargin = dp(13);
+        routeCard.addView(routeCopy, routeCopyParams);
+        add(routeCard, 9, -1);
 
-        add(sectionHeader("Schnellzugriff", "Die zwei Aktionen, die im Alltag wirklich zählen"), 22, -1);
-
-        LinearLayout primaryAction =
+        add(
                 actionCard(
                         R.drawable.ic_search,
                         "Jetzt prüfen",
-                        "Zustand analysieren und nur bei bestätigtem Routingfehler automatisch reparieren",
+                        "Status analysieren und einen bestätigten Routingfehler automatisch reparieren",
                         true,
-                        v -> manualCheckAndRepair());
-        add(primaryAction, 10, -1);
+                        v -> manualCheckAndRepair()),
+                10,
+                -1);
 
-        LinearLayout monitorCard =
-                actionCard(
-                        R.drawable.ic_shield,
-                        "Auto-Schutz aktivieren",
-                        "Ereignisbasiert und energiesparend im Hintergrund überwachen",
-                        false,
-                        v -> toggleMonitor());
-        monitorTitle = (TextView) ((LinearLayout) monitorCard.getChildAt(1)).getChildAt(0);
-        monitorSub = (TextView) ((LinearLayout) monitorCard.getChildAt(1)).getChildAt(1);
-        add(monitorCard, 9, -1);
+        add(sectionHeader("Auto-Schutz", "Einmal einschalten, danach läuft die Überwachung sparsam im Hintergrund"), 21, -1);
 
-        LinearLayout lastCard = card();
-        ImageView historyIcon = iconBubble(R.drawable.ic_history, PRIMARY, AppPalette.PRIMARY_SOFT);
-        lastCard.addView(historyIcon, new LinearLayout.LayoutParams(dp(46), dp(46)));
-        LinearLayout lastCopy = new LinearLayout(this);
-        lastCopy.setOrientation(LinearLayout.VERTICAL);
-        lastCheckTitle = label("Letzte Prüfung", 14, Typeface.BOLD, INK);
-        lastCheckSub = label("Noch keine Hintergrundprüfung", 12, Typeface.NORMAL, MUTED);
-        lastCopy.addView(lastCheckTitle);
-        lastCopy.addView(lastCheckSub);
-        LinearLayout.LayoutParams lcp = new LinearLayout.LayoutParams(0, -2, 1);
-        lcp.leftMargin = dp(12);
-        lastCard.addView(lastCopy, lcp);
-        TextView historyLink = smallButton("Verlauf", v -> showPage(Page.HISTORY), false);
-        lastCard.addView(historyLink);
-        add(lastCard, 9, -1);
+        LinearLayout protectionCard = card();
+        protectionCard.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout protectionTop = new LinearLayout(this);
+        protectionTop.setGravity(Gravity.CENTER_VERTICAL);
+        protectionTop.addView(
+                iconBubble(R.drawable.ic_shield, PRIMARY, AppPalette.PRIMARY_SOFT),
+                new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        LinearLayout protectionCopy = new LinearLayout(this);
+        protectionCopy.setOrientation(LinearLayout.VERTICAL);
+        protectionCopy.addView(label("Automatische Überwachung", 15, Typeface.BOLD, INK));
+        monitorSubtitle =
+                label(
+                        "Ereignisbasiert, mit seltenem Sicherheitscheck im Leerlauf",
+                        12,
+                        Typeface.NORMAL,
+                        MUTED);
+        protectionCopy.addView(monitorSubtitle);
+        LinearLayout.LayoutParams protectionCopyParams =
+                new LinearLayout.LayoutParams(0, -2, 1);
+        protectionCopyParams.leftMargin = dp(12);
+        protectionTop.addView(protectionCopy, protectionCopyParams);
+
+        monitorSwitch = new Switch(this);
+        monitorSwitch.setShowText(false);
+        tintSwitch(monitorSwitch);
+        monitorSwitch.setOnCheckedChangeListener(
+                (buttonView, checked) -> {
+                    if (!updatingMonitorSwitch) setMonitoringEnabled(checked);
+                });
+        protectionTop.addView(monitorSwitch);
+        protectionCard.addView(protectionTop);
+
+        homeLastCheck = label("Noch keine automatische Prüfung", 11, Typeface.NORMAL, MUTED);
+        LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(-1, -2);
+        checkParams.topMargin = dp(12);
+        protectionCard.addView(homeLastCheck, checkParams);
+        add(protectionCard, 9, -1);
 
         recoveryCard = blockedRouteCard();
         recoveryCard.setVisibility(View.GONE);
-        add(recoveryCard, 12, -1);
-
-        buildCompactUpdateCard();
+        add(recoveryCard, 11, -1);
     }
 
     private void buildHistoryPage() {
-        buildTopBar("Verlauf", "Stabilität, Auffälligkeiten und Reparaturen auf einen Blick");
-
-        add(pageIntroCard(
-                R.drawable.ic_history,
-                "Stabilität statt Log-Datei",
-                "Die Historie fasst wichtige Zustandswechsel zusammen. Wiederholte identische Hintergrundchecks werden bewusst verdichtet."),
-                12,
-                -1);
+        buildTopBar("Verlauf", "Stabilität und Auffälligkeiten ohne technische Rohdaten");
 
         LinearLayout stats = new LinearLayout(this);
         LinearLayout healthy = metricCard("STABIL", "0", AppPalette.SUCCESS_SOFT);
@@ -336,19 +379,20 @@ public class MainActivity extends Activity {
         historyRepairValue = (TextView) repairs.getChildAt(1);
 
         stats.addView(healthy, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, -2, 1);
-        sp.leftMargin = dp(8);
-        sp.rightMargin = dp(8);
-        stats.addView(problems, sp);
+        LinearLayout.LayoutParams centerStat = new LinearLayout.LayoutParams(0, -2, 1);
+        centerStat.leftMargin = dp(8);
+        centerStat.rightMargin = dp(8);
+        stats.addView(problems, centerStat);
         stats.addView(repairs, new LinearLayout.LayoutParams(0, -2, 1));
         add(stats, 12, -1);
 
-        add(sectionHeader("Letzte 24 Stunden", "Telefoniepfad und erkannte Fehlerzustände"), 22, -1);
+        add(sectionHeader("Letzte 24 Stunden", "Verdichtete Zustände des Telefoniepfads"), 21, -1);
 
         LinearLayout chartCard = card();
         chartCard.setOrientation(LinearLayout.VERTICAL);
         historySummary = label("Noch keine Verlaufsdaten", 14, Typeface.BOLD, INK);
         chartCard.addView(historySummary);
+
         historyChart = new HealthHistoryChart(this);
         LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(180));
         chartParams.topMargin = dp(8);
@@ -363,105 +407,118 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(3);
         chartCard.addView(legend, legendParams);
-        add(chartCard, 10, -1);
+        add(chartCard, 9, -1);
 
-        LinearLayout last = card();
-        ImageView infoIcon = iconBubble(R.drawable.ic_history, AppPalette.CYAN, AppPalette.CYAN_SOFT);
-        last.addView(infoIcon, new LinearLayout.LayoutParams(dp(46), dp(46)));
-        LinearLayout lastCopy = new LinearLayout(this);
-        lastCopy.setOrientation(LinearLayout.VERTICAL);
-        lastCheckTitle = label("Letzte Prüfung", 14, Typeface.BOLD, INK);
-        lastCheckSub = label("Noch keine Hintergrundprüfung", 12, Typeface.NORMAL, MUTED);
-        lastCopy.addView(lastCheckTitle);
-        lastCopy.addView(lastCheckSub);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
-        lp.leftMargin = dp(12);
-        last.addView(lastCopy, lp);
-        add(last, 10, -1);
+        add(sectionHeader("Letzte Ereignisse", "Die wichtigsten Zustandswechsel in verständlicher Form"), 21, -1);
+        recentEventsContainer = card();
+        recentEventsContainer.setOrientation(LinearLayout.VERTICAL);
+        add(recentEventsContainer, 9, -1);
 
-        add(sectionHeader("Historie verwalten", "Daten lokal auf diesem Gerät"), 22, -1);
+        add(sectionHeader("Daten", "Der Verlauf bleibt ausschließlich lokal auf dem Gerät"), 21, -1);
         add(
                 actionCard(
-                        R.drawable.ic_settings,
+                        R.drawable.ic_clear,
                         "Verlauf zurücksetzen",
                         "Gespeicherte Verlaufspunkte löschen; Reparaturzähler bleibt erhalten",
                         false,
                         v -> confirmClearHistory()),
-                10,
-                -1);
-        add(
-                actionCard(
-                        R.drawable.ic_update,
-                        "Diagnoseprotokoll teilen",
-                        "Technische Details als Text exportieren",
-                        false,
-                        v -> shareLog()),
                 9,
                 -1);
     }
 
     private void buildToolsPage() {
-        buildTopBar("Werkzeuge", "Diagnose, Reparatur, Updates und Systemeinstellungen");
+        buildTopBar("Werkzeuge", "Manuelle Diagnose und Recovery für Sonderfälle");
 
-        add(pageIntroCard(
-                R.drawable.ic_tools,
-                "Alles Technische an einem Ort",
-                "Die Navigation wechselt jetzt zwischen echten Bereichen. Aktionen liegen dort, wo man sie erwartet."),
-                12,
-                -1);
-
-        add(sectionHeader("Diagnose & Reparatur", "Manuelle Werkzeuge für Sonderfälle"), 22, -1);
+        add(sectionHeader("Diagnose", "Nur nutzen, wenn du genauer nachsehen möchtest"), 12, -1);
         add(
                 actionCard(
                         R.drawable.ic_search,
                         "Nur Diagnose",
-                        "Zustand prüfen und protokollieren, ohne das Routing zu verändern",
+                        "Zustand und Fehlersignatur prüfen, ohne das Audio-Routing zu verändern",
                         false,
                         v -> manualDiagnosis()),
-                10,
+                9,
                 -1);
+
+        add(sectionHeader("Reparatur", "Bewusste Eingriffe außerhalb der Automatik"), 21, -1);
         add(
                 actionCard(
                         R.drawable.ic_repair,
                         "SCO/HFP neu auswählen",
-                        "Bluetooth-Kommunikationsgerät bewusst neu anfordern",
+                        "Bluetooth-Kommunikationsgerät gezielt neu anfordern",
                         false,
                         v -> forceRepair()),
                 9,
                 -1);
 
-        add(sectionHeader("System", "Android- und Samsung-Einstellungen"), 22, -1);
-        add(
-                actionCard(
-                        R.drawable.ic_bluetooth,
-                        "Bluetooth-Einstellungen",
-                        "Verbindungen, Geräte und Telefonieprofile verwalten",
-                        false,
-                        v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS))),
-                10,
-                -1);
+        add(sectionHeader("Recovery", "Für den tieferen Zustand „HFP verbunden, SCO fehlt“"), 21, -1);
         add(
                 actionCard(
                         R.drawable.ic_settings,
-                        "Bluetooth Agent",
-                        "Samsung-Komponente für den tieferen HFP/SCO-Fehler öffnen",
+                        "Samsung Bluetooth Agent",
+                        "App-Info der Samsung-Bluetooth-Komponente öffnen; dort kann der Cache geprüft werden",
                         false,
                         v -> openBluetoothAgentSettings()),
                 9,
                 -1);
+        add(
+                actionCard(
+                        R.drawable.ic_bluetooth,
+                        "Bluetooth-Einstellungen",
+                        "Geräte, Profile und Verbindungen direkt in Android verwalten",
+                        false,
+                        v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS))),
+                8,
+                -1);
+        add(
+                actionCard(
+                        R.drawable.ic_developer,
+                        "Entwickleroptionen",
+                        "Nur für bekannte Workarounds wie A2DP-Offload/SAP manuell öffnen",
+                        false,
+                        v -> openDeveloperOptions()),
+                8,
+                -1);
 
-        add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 22, -1);
+        LinearLayout note = noteCard(
+                "Automatische Grenze",
+                "Wenn Android kein SCO/HFP-Kommunikationsgerät mehr anbietet, startet die App keine aggressiven Systemdienste neu. Dieser Zustand wird erkannt und hier gezielt eskaliert.",
+                AppPalette.WARNING_SOFT,
+                AppPalette.WARNING);
+        add(note, 11, -1);
+    }
+
+    private void buildSettingsPage() {
+        buildTopBar("Einstellungen", "Updates, Benachrichtigungen und technische Informationen");
+
+        add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 12, -1);
         buildFullUpdateCard();
 
-        add(sectionHeader("Technische Details", "Für Fehlersuche und Bugreports"), 22, -1);
+        add(sectionHeader("Hintergrund", "Systemzugriff und Benachrichtigungen verwalten"), 21, -1);
+        add(
+                actionCard(
+                        R.drawable.ic_notifications,
+                        "Benachrichtigungen",
+                        "Status- und Update-Benachrichtigungen in Android konfigurieren",
+                        false,
+                        v -> openNotificationSettings()),
+                9,
+                -1);
+
+        add(sectionHeader("Diagnose & Support", "Technische Daten nur bei Bedarf einblenden"), 21, -1);
+
         details = label("", 11, Typeface.NORMAL, MUTED);
         details.setTypeface(Typeface.MONOSPACE);
         details.setPadding(dp(15), dp(14), dp(15), dp(14));
         details.setBackground(round(AppPalette.SURFACE, 18));
         details.setVisibility(View.GONE);
-        add(details, 8, -1);
+        add(details, 9, -1);
 
-        technicalToggle = smallButton("Technische Details anzeigen", v -> toggleTechnicalDetails(), false);
+        technicalToggle =
+                smallButton(
+                        "Technische Details anzeigen",
+                        v -> toggleTechnicalDetails(),
+                        false);
         technicalToggle.setGravity(Gravity.CENTER);
         add(technicalToggle, 8, -1);
 
@@ -469,11 +526,14 @@ public class MainActivity extends Activity {
                 actionCard(
                         R.drawable.ic_update,
                         "Diagnoseprotokoll teilen",
-                        "Zustände, Fehlersignaturen und Reparaturversuche exportieren",
+                        "Zustände, Fehlersignaturen und Reparaturversuche als Text exportieren",
                         false,
                         v -> shareLog()),
-                14,
+                10,
                 -1);
+
+        add(sectionHeader("App-Info", "Installierter Build und Geräteprofil"), 21, -1);
+        add(appInfoCard(), 9, -1);
     }
 
     private void buildTopBar(String title, String subtitle) {
@@ -494,44 +554,60 @@ public class MainActivity extends Activity {
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.addView(label(title, 20, Typeface.BOLD, INK));
-        copy.addView(label(subtitle, 11, Typeface.NORMAL, MUTED));
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1);
-        cp.leftMargin = dp(12);
-        header.addView(copy, cp);
-
-        LinearLayout profile = new LinearLayout(this);
-        profile.setOrientation(LinearLayout.VERTICAL);
-        profile.setGravity(Gravity.RIGHT);
-        TextView version = label("v" + appVersion(), 11, Typeface.BOLD, PRIMARY_DARK);
-        version.setGravity(Gravity.RIGHT);
-        TextView device = label(getString(R.string.device_profile_name), 9, Typeface.NORMAL, MUTED);
-        device.setGravity(Gravity.RIGHT);
-        profile.addView(version);
-        profile.addView(device);
-        header.addView(profile, new LinearLayout.LayoutParams(-2, -2));
+        TextView subtitleView = label(subtitle, 11, Typeface.NORMAL, MUTED);
+        subtitleView.setMaxLines(2);
+        copy.addView(subtitleView);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(12);
+        header.addView(copy, copyParams);
 
         content.addView(header);
     }
 
-    private LinearLayout pageIntroCard(int iconRes, String title, String copyText) {
+    private LinearLayout appInfoCard() {
         LinearLayout card = card();
         card.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(iconBubble(iconRes, PRIMARY, AppPalette.PRIMARY_SOFT), new LinearLayout.LayoutParams(dp(46), dp(46)));
-        TextView titleView = label(title, 17, Typeface.BOLD, INK);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1);
-        tp.leftMargin = dp(12);
-        top.addView(titleView, tp);
-        card.addView(top);
+        boolean profileMatch =
+                DeviceProfile.matchesTarget(
+                        getString(R.string.device_profile_key), Build.MODEL, Build.DEVICE);
 
-        TextView copy = label(copyText, 12, Typeface.NORMAL, MUTED);
-        copy.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
-        cp.topMargin = dp(10);
-        card.addView(copy, cp);
+        card.addView(infoRow("Version", "v" + appVersion()));
+        card.addView(infoDivider());
+        card.addView(infoRow("Build", getString(R.string.device_profile_name)));
+        card.addView(infoDivider());
+        card.addView(
+                infoRow(
+                        "Gerät",
+                        profileMatch
+                                ? "Passendes Geräteprofil"
+                                : "Gerät weicht vom Build-Profil ab"));
+        card.addView(infoDivider());
+        card.addView(infoRow("Android-Ziel", "Android 16 · API 36"));
+        card.addView(infoDivider());
+        card.addView(infoRow("Update-Prüfung", "automatisch, höchstens alle 12 Stunden"));
         return card;
+    }
+
+    private View infoDivider() {
+        View divider = new View(this);
+        divider.setBackgroundColor(BORDER);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(1));
+        params.topMargin = dp(10);
+        params.bottomMargin = dp(10);
+        divider.setLayoutParams(params);
+        return divider;
+    }
+
+    private LinearLayout infoRow(String key, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView left = label(key, 12, Typeface.NORMAL, MUTED);
+        TextView right = label(value, 12, Typeface.BOLD, INK);
+        right.setGravity(Gravity.RIGHT);
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(right, new LinearLayout.LayoutParams(0, -2, 1));
+        return row;
     }
 
     private LinearLayout blockedRouteCard() {
@@ -542,48 +618,49 @@ public class MainActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(iconBubble(R.drawable.ic_repair, AppPalette.WARNING, Color.WHITE), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        top.addView(
+                iconBubble(R.drawable.ic_repair, AppPalette.WARNING, Color.WHITE),
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView title = label("Systempfad blockiert", 15, Typeface.BOLD, AppPalette.WARNING);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1);
-        tp.leftMargin = dp(11);
-        top.addView(title, tp);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, -2, 1);
+        titleParams.leftMargin = dp(11);
+        top.addView(title, titleParams);
         card.addView(top);
 
         TextView copy =
                 label(
-                        "HFP ist verbunden, aber Android bietet kein SCO/HFP-Kommunikationsgerät mehr an. Das entspricht dem tieferen Samsung/Vendor-Fehlerbild. Die App kann dann nicht sicher per öffentlicher API reparieren.",
+                        "HFP ist verbunden, Android bietet aber kein SCO/HFP-Gerät mehr an. Dieser tiefere Vendor-Zustand braucht einen manuellen Recovery-Schritt.",
                         12,
                         Typeface.NORMAL,
                         INK);
         copy.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
-        cp.topMargin = dp(9);
-        card.addView(copy, cp);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(-1, -2);
+        copyParams.topMargin = dp(9);
+        card.addView(copy, copyParams);
 
-        TextView button = smallButton("Recovery-Tools öffnen", v -> showPage(Page.TOOLS), true);
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
-        bp.topMargin = dp(11);
-        card.addView(button, bp);
+        TextView button = smallButton("Recovery öffnen", v -> showPage(Page.TOOLS), true);
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, -2);
+        buttonParams.topMargin = dp(11);
+        card.addView(button, buttonParams);
         return card;
     }
 
-    private void buildCompactUpdateCard() {
-        updateTitle = label("App ist aktuell · v" + appVersion(), 13, Typeface.BOLD, INK);
-        updateSub = label("Automatische Update-Prüfung aktiv", 11, Typeface.NORMAL, MUTED);
-        updateAction = smallButton("Prüfen", v -> onUpdateAction(), false);
-
-        LinearLayout card = card();
-        card.addView(iconBubble(R.drawable.ic_update, PRIMARY, AppPalette.PRIMARY_SOFT), new LinearLayout.LayoutParams(dp(42), dp(42)));
-
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.addView(updateTitle);
-        copy.addView(updateSub);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1);
-        cp.leftMargin = dp(11);
-        card.addView(copy, cp);
-        card.addView(updateAction);
-        add(card, 12, -1);
+    private LinearLayout noteCard(
+            String title,
+            String copy,
+            int background,
+            int titleColor) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(15), dp(14), dp(15), dp(14));
+        card.setBackground(round(background, 18));
+        card.addView(label(title, 13, Typeface.BOLD, titleColor));
+        TextView body = label(copy, 12, Typeface.NORMAL, INK);
+        body.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(-1, -2);
+        bodyParams.topMargin = dp(5);
+        card.addView(body, bodyParams);
+        return card;
     }
 
     private void buildFullUpdateCard() {
@@ -592,29 +669,31 @@ public class MainActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(iconBubble(R.drawable.ic_update, PRIMARY, AppPalette.PRIMARY_SOFT), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        top.addView(
+                iconBubble(R.drawable.ic_update, PRIMARY, AppPalette.PRIMARY_SOFT),
+                new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         updateTitle = label("Update-Status wird geprüft", 15, Typeface.BOLD, INK);
         updateSub =
                 label(
-                        "GitHub-Releases werden automatisch geprüft und Downloads vor Installation per SHA-256 verifiziert.",
+                        "Downloads werden vor der Installation per SHA-256 und Paketmetadaten verifiziert.",
                         12,
                         Typeface.NORMAL,
                         MUTED);
         copy.addView(updateTitle);
         copy.addView(updateSub);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1);
-        cp.leftMargin = dp(12);
-        top.addView(copy, cp);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(12);
+        top.addView(copy, copyParams);
         card.addView(top);
 
         updateAction = smallButton("Nach Updates suchen", v -> onUpdateAction(), true);
-        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2);
-        ap.topMargin = dp(12);
-        card.addView(updateAction, ap);
-        add(card, 10, -1);
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+        actionParams.topMargin = dp(12);
+        card.addView(updateAction, actionParams);
+        add(card, 9, -1);
     }
 
     private LinearLayout actionCard(
@@ -645,27 +724,28 @@ public class MainActivity extends Activity {
                 iconBubble(
                         iconRes,
                         primary ? Color.WHITE : PRIMARY,
-                        primary ? Color.argb(35, 255, 255, 255) : AppPalette.PRIMARY_SOFT);
+                        primary
+                                ? Color.argb(35, 255, 255, 255)
+                                : AppPalette.PRIMARY_SOFT);
         row.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         TextView titleView = label(title, 15, Typeface.BOLD, primary ? Color.WHITE : INK);
-        TextView subView =
+        TextView subtitleView =
                 label(
                         subtitle,
                         12,
                         Typeface.NORMAL,
-                        primary ? Color.rgb(232, 232, 255) : MUTED);
-        subView.setLineSpacing(dp(1), 1f);
+                        primary ? Color.rgb(234, 233, 255) : MUTED);
+        subtitleView.setLineSpacing(dp(1), 1f);
         copy.addView(titleView);
-        copy.addView(subView);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1);
-        cp.leftMargin = dp(12);
-        row.addView(copy, cp);
+        copy.addView(subtitleView);
 
-        TextView chevron = label("›", 25, Typeface.NORMAL, primary ? Color.WHITE : MUTED);
-        row.addView(chevron);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(12);
+        row.addView(copy, copyParams);
+        row.addView(label("›", 25, Typeface.NORMAL, primary ? Color.WHITE : MUTED));
         return row;
     }
 
@@ -674,12 +754,14 @@ public class MainActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(11), dp(12), dp(11));
         box.setBackground(round(AppPalette.SURFACE, 17));
+
         TextView label = label(title, 9, Typeface.BOLD, MUTED);
         TextView current = label(value, 13, Typeface.BOLD, INK);
-        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2);
-        vp.topMargin = dp(3);
         box.addView(label);
-        box.addView(current, vp);
+        LinearLayout.LayoutParams currentParams = new LinearLayout.LayoutParams(-1, -2);
+        currentParams.topMargin = dp(3);
+        box.addView(current, currentParams);
+
         View stripe = new View(this);
         stripe.setBackground(round(tint, 99));
         LinearLayout.LayoutParams stripeParams = new LinearLayout.LayoutParams(dp(28), dp(3));
@@ -688,14 +770,14 @@ public class MainActivity extends Activity {
         return box;
     }
 
-    private LinearLayout sectionHeader(String title, String sub) {
+    private LinearLayout sectionHeader(String title, String subtitle) {
         LinearLayout section = new LinearLayout(this);
         section.setOrientation(LinearLayout.VERTICAL);
         section.addView(label(title, 17, Typeface.BOLD, INK));
-        TextView subtitle = label(sub, 11, Typeface.NORMAL, MUTED);
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
-        sp.topMargin = dp(2);
-        section.addView(subtitle, sp);
+        TextView subtitleView = label(subtitle, 11, Typeface.NORMAL, MUTED);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(2);
+        section.addView(subtitleView, subtitleParams);
         return section;
     }
 
@@ -719,11 +801,7 @@ public class MainActivity extends Activity {
 
     private TextView smallButton(String text, View.OnClickListener click, boolean filled) {
         TextView button =
-                label(
-                        text,
-                        12,
-                        Typeface.BOLD,
-                        filled ? Color.WHITE : PRIMARY_DARK);
+                label(text, 12, Typeface.BOLD, filled ? Color.WHITE : PRIMARY_DARK);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(12), dp(10), dp(12), dp(10));
         button.setBackground(round(filled ? PRIMARY : AppPalette.PRIMARY_SOFT, 14));
@@ -736,7 +814,7 @@ public class MainActivity extends Activity {
         LinearLayout nav = new LinearLayout(this);
         nav.setTag("bottom-navigation");
         nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(10), dp(7), dp(10), dp(8));
+        nav.setPadding(dp(8), dp(6), dp(8), dp(8));
         nav.setBackgroundColor(AppPalette.SURFACE);
         nav.setElevation(dp(10));
 
@@ -749,6 +827,9 @@ public class MainActivity extends Activity {
         nav.addView(
                 navDestination(Page.TOOLS, R.drawable.ic_tools, "Werkzeuge", "nav-tools"),
                 new LinearLayout.LayoutParams(0, dp(62), 1));
+        nav.addView(
+                navDestination(Page.SETTINGS, R.drawable.ic_settings, "Einstellungen", "nav-settings"),
+                new LinearLayout.LayoutParams(0, dp(62), 1));
         return nav;
     }
 
@@ -757,32 +838,36 @@ public class MainActivity extends Activity {
         item.setTag(tag);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
-        item.setPadding(dp(8), dp(6), dp(8), dp(6));
+        item.setPadding(dp(5), dp(6), dp(5), dp(6));
         item.setClickable(true);
         item.setOnClickListener(v -> showPage(page));
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
         icon.setColorFilter(MUTED);
-        item.addView(icon, new LinearLayout.LayoutParams(dp(22), dp(22)));
+        item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
 
-        TextView label = label(title, 10, Typeface.NORMAL, MUTED);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.topMargin = dp(3);
-        item.addView(label, lp);
+        TextView label = label(title, 9, Typeface.NORMAL, MUTED);
+        label.setMaxLines(1);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-2, -2);
+        labelParams.topMargin = dp(3);
+        item.addView(label, labelParams);
         return item;
     }
 
     private void updateNavigationSelection() {
         if (navigation == null) return;
+
         for (int i = 0; i < navigation.getChildCount(); i++) {
             View child = navigation.getChildAt(i);
             if (!(child instanceof LinearLayout)) continue;
+
             LinearLayout item = (LinearLayout) child;
             boolean active =
                     (currentPage == Page.HOME && "nav-home".equals(item.getTag()))
                             || (currentPage == Page.HISTORY && "nav-history".equals(item.getTag()))
-                            || (currentPage == Page.TOOLS && "nav-tools".equals(item.getTag()));
+                            || (currentPage == Page.TOOLS && "nav-tools".equals(item.getTag()))
+                            || (currentPage == Page.SETTINGS && "nav-settings".equals(item.getTag()));
 
             item.setBackground(active ? round(AppPalette.NAV_ACTIVE, 18) : null);
             ImageView icon = (ImageView) item.getChildAt(0);
@@ -794,13 +879,41 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void tintSwitch(Switch toggle) {
+        int[][] states =
+                new int[][] {
+                    new int[] {android.R.attr.state_checked},
+                    new int[] {-android.R.attr.state_checked}
+                };
+        toggle.setThumbTintList(
+                new ColorStateList(
+                        states,
+                        new int[] {Color.WHITE, Color.rgb(245, 246, 250)}));
+        toggle.setTrackTintList(
+                new ColorStateList(
+                        states,
+                        new int[] {PRIMARY, AppPalette.NEUTRAL}));
+    }
+
     private void manualDiagnosis() {
         BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
         RepairStateStore.saveHealth(this, probe.health);
         HealthHistoryStore.record(this, probe.health, "manual");
         Diag.log(this, "MANUAL DIAGNOSIS\n" + Diag.snapshot(this));
         refresh(false);
-        Toast.makeText(this, probe.health.summary, Toast.LENGTH_LONG).show();
+
+        String signature =
+                probe.signature.label
+                        + (probe.signature.confidence == FailureSignature.Confidence.NONE
+                                ? ""
+                                : "\nÜbereinstimmung: "
+                                        + confidenceLabel(probe.signature.confidence));
+
+        new AlertDialog.Builder(this)
+                .setTitle(probe.health.summary)
+                .setMessage(probe.health.detail + "\n\n" + signature)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void manualCheckAndRepair() {
@@ -815,7 +928,7 @@ public class MainActivity extends Activity {
                 new AlertDialog.Builder(this)
                         .setTitle("Systempfad blockiert")
                         .setMessage(probe.health.detail)
-                        .setPositiveButton("Werkzeuge öffnen", (d, w) -> showPage(Page.TOOLS))
+                        .setPositiveButton("Recovery öffnen", (d, w) -> showPage(Page.TOOLS))
                         .setNegativeButton("Schließen", null)
                         .show();
             } else {
@@ -851,21 +964,22 @@ public class MainActivity extends Activity {
         refresh(false);
     }
 
-    private void toggleMonitor() {
-        boolean enabled = RepairStateStore.monitoringEnabled(this);
+    private void setMonitoringEnabled(boolean enabled) {
+        boolean currentlyEnabled = RepairStateStore.monitoringEnabled(this);
+        if (enabled == currentlyEnabled) {
+            refresh(false);
+            return;
+        }
+
         if (enabled) {
-            RepairStateStore.setMonitoringEnabled(this, false);
-            stopService(new Intent(this, MonitorService.class));
-            BluetoothRepair.releaseCommunicationRoute(this);
-            Toast.makeText(this, "Auto-Schutz beendet.", Toast.LENGTH_SHORT).show();
-        } else {
             if (!btPermission()) {
                 requestNeededPermissions();
                 Toast.makeText(
                                 this,
-                                "Bluetooth-Berechtigung erteilen und Auto-Schutz erneut starten.",
+                                "Bluetooth-Berechtigung erteilen und Auto-Schutz danach erneut aktivieren.",
                                 Toast.LENGTH_LONG)
                         .show();
+                refresh(false);
                 return;
             }
 
@@ -873,17 +987,22 @@ public class MainActivity extends Activity {
             RepairStateStore.setAutoRepairEnabled(this, true);
             try {
                 startForegroundService(new Intent(this, MonitorService.class));
-                Toast.makeText(
-                                this,
-                                "Auto-Schutz aktiv. Die Benachrichtigung zeigt den aktuellen Zustand.",
-                                Toast.LENGTH_LONG)
-                        .show();
+                Toast.makeText(this, "Auto-Schutz ist aktiv.", Toast.LENGTH_SHORT).show();
             } catch (RuntimeException e) {
                 RepairStateStore.setMonitoringEnabled(this, false);
-                Toast.makeText(this, "Auto-Schutz konnte nicht gestartet werden.", Toast.LENGTH_LONG)
+                Toast.makeText(
+                                this,
+                                "Auto-Schutz konnte nicht gestartet werden.",
+                                Toast.LENGTH_LONG)
                         .show();
             }
+        } else {
+            RepairStateStore.setMonitoringEnabled(this, false);
+            stopService(new Intent(this, MonitorService.class));
+            BluetoothRepair.releaseCommunicationRoute(this);
+            Toast.makeText(this, "Auto-Schutz beendet.", Toast.LENGTH_SHORT).show();
         }
+
         refresh(false);
     }
 
@@ -916,7 +1035,9 @@ public class MainActivity extends Activity {
                     probe.signature.label
                             + (probe.signature.confidence == FailureSignature.Confidence.NONE
                                     ? ""
-                                    : " · " + confidenceLabel(probe.signature.confidence)));
+                                    : " · "
+                                            + confidenceLabel(
+                                                    probe.signature.confidence)));
             signatureSub.setTextColor(
                     probe.signature.matchesKnownSamsungFailure()
                             ? AppPalette.WARNING
@@ -928,10 +1049,13 @@ public class MainActivity extends Activity {
         if (statusPill != null) {
             switch (health.state) {
                 case HEALTHY:
-                    setHeroStatus("●  " + health.summary, AppPalette.SUCCESS_SOFT, Color.WHITE);
+                    setHeroStatus("●  " + health.summary, AppPalette.SUCCESS, Color.WHITE);
                     break;
                 case SUSPECT_ROUTING:
-                    setHeroStatus("●  Routingfehler erkannt", AppPalette.WARNING, Color.WHITE);
+                    setHeroStatus(
+                            "●  Routingfehler erkannt",
+                            AppPalette.WARNING,
+                            Color.WHITE);
                     break;
                 case HFP_CONNECTED_NO_SCO:
                 case CALL_WITHOUT_SCO:
@@ -944,12 +1068,16 @@ public class MainActivity extends Activity {
                     break;
                 case IDLE:
                 default:
-                    setHeroStatus("●  Bereit", Color.argb(40, 255, 255, 255), Color.WHITE);
+                    setHeroStatus(
+                            "●  Bereit",
+                            Color.argb(42, 255, 255, 255),
+                            Color.WHITE);
                     break;
             }
         }
 
         boolean monitoring = RepairStateStore.monitoringEnabled(this);
+
         if (metricAutoValue != null) {
             metricAutoValue.setText(monitoring ? "Aktiv" : "Aus");
             metricAutoValue.setTextColor(monitoring ? AppPalette.SUCCESS : MUTED);
@@ -971,58 +1099,178 @@ public class MainActivity extends Activity {
                                     : MUTED));
         }
 
-        if (monitorTitle != null) {
-            monitorTitle.setText(monitoring ? "Auto-Schutz stoppen" : "Auto-Schutz aktivieren");
-            monitorSub.setText(
+        if (monitorSwitch != null) {
+            updatingMonitorSwitch = true;
+            monitorSwitch.setChecked(monitoring);
+            updatingMonitorSwitch = false;
+
+            monitorSubtitle.setText(
                     monitoring
-                            ? "Aktiv · ereignisbasiert · Leerlauf-Check ca. stündlich"
-                            : "Energiesparend im Hintergrund auf HFP/SCO-Fehler reagieren");
+                            ? "Aktiv · ereignisbasiert · Leerlauf-Check etwa stündlich"
+                            : "Aus · einschalten für automatische Erkennung und Reparatur");
         }
 
         long lastCheck = RepairStateStore.lastCheckAt(this);
         String lastSummary = RepairStateStore.lastSummary(this);
-        if (lastCheckTitle != null) {
-            lastCheckTitle.setText(
+        if (homeLastCheck != null) {
+            homeLastCheck.setText(
                     lastCheck == 0L
-                            ? "Letzte Prüfung"
-                            : "Letzte Prüfung · " + formatTime(lastCheck));
-            lastCheckSub.setText(
-                    lastCheck == 0L
-                            ? "Noch keine Hintergrundprüfung"
-                            : lastSummary);
+                            ? "Noch keine automatische Prüfung"
+                            : "Zuletzt "
+                                    + formatTime(lastCheck)
+                                    + " · "
+                                    + lastSummary);
         }
 
         List<HealthHistoryStore.Entry> entries = HealthHistoryStore.read(this);
         if (historyChart != null) historyChart.setEntries(entries);
-        if (historySummary != null
-                || historyHealthyValue != null
-                || historyProblemValue != null
-                || historyRepairValue != null) {
-            long since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
-            int healthyCalls = HealthHistoryStore.healthyCallCount(entries, since);
-            int problems = HealthHistoryStore.problemCount(entries, since);
-            if (historySummary != null) {
-                historySummary.setText(
-                        entries.isEmpty()
-                                ? "Noch keine Verlaufsdaten"
-                                : healthyCalls
-                                        + " stabile Telefonie-Prüfungen · "
-                                        + problems
-                                        + " Auffälligkeiten");
-            }
-            if (historyHealthyValue != null) historyHealthyValue.setText(String.valueOf(healthyCalls));
-            if (historyProblemValue != null) historyProblemValue.setText(String.valueOf(problems));
-            if (historyRepairValue != null) {
-                historyRepairValue.setText(String.valueOf(RepairStateStore.repairCount(this)));
-            }
+
+        long since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+        int healthyCalls = HealthHistoryStore.healthyCallCount(entries, since);
+        int problems = HealthHistoryStore.problemCount(entries, since);
+
+        if (historySummary != null) {
+            historySummary.setText(
+                    entries.isEmpty()
+                            ? "Noch keine Verlaufsdaten"
+                            : healthyCalls
+                                    + " stabile Telefonie-Prüfungen · "
+                                    + problems
+                                    + " Auffälligkeiten");
+        }
+        if (historyHealthyValue != null) {
+            historyHealthyValue.setText(String.valueOf(healthyCalls));
+        }
+        if (historyProblemValue != null) {
+            historyProblemValue.setText(String.valueOf(problems));
+        }
+        if (historyRepairValue != null) {
+            historyRepairValue.setText(String.valueOf(RepairStateStore.repairCount(this)));
+        }
+        if (recentEventsContainer != null) {
+            renderRecentEvents(entries);
         }
 
         if (recoveryCard != null) {
             boolean blocked =
-                    probe.signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE
-                            || probe.signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO;
+                    probe.signature.kind
+                                    == FailureSignature.Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE
+                            || probe.signature.kind
+                                    == FailureSignature.Kind.HFP_CONNECTED_NO_SCO;
             recoveryCard.setVisibility(blocked ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private void renderRecentEvents(List<HealthHistoryStore.Entry> entries) {
+        recentEventsContainer.removeAllViews();
+        List<HealthHistoryStore.Entry> recent = HealthHistoryStore.recent(entries, 6);
+
+        if (recent.isEmpty()) {
+            LinearLayout empty = new LinearLayout(this);
+            empty.setGravity(Gravity.CENTER_VERTICAL);
+            empty.addView(
+                    iconBubble(R.drawable.ic_history, AppPalette.NEUTRAL, AppPalette.SURFACE_TINT),
+                    new LinearLayout.LayoutParams(dp(42), dp(42)));
+
+            LinearLayout copy = new LinearLayout(this);
+            copy.setOrientation(LinearLayout.VERTICAL);
+            copy.addView(label("Noch keine Ereignisse", 13, Typeface.BOLD, INK));
+            copy.addView(
+                    label(
+                            "Nach den ersten Prüfungen erscheint hier eine verständliche Kurzchronik.",
+                            11,
+                            Typeface.NORMAL,
+                            MUTED));
+            LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+            copyParams.leftMargin = dp(11);
+            empty.addView(copy, copyParams);
+            recentEventsContainer.addView(empty);
+            return;
+        }
+
+        Collections.reverse(recent);
+        for (int i = 0; i < recent.size(); i++) {
+            HealthHistoryStore.Entry entry = recent.get(i);
+            recentEventsContainer.addView(eventRow(entry));
+            if (i < recent.size() - 1) recentEventsContainer.addView(infoDivider());
+        }
+    }
+
+    private View eventRow(HealthHistoryStore.Entry entry) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        View dot = new View(this);
+        dot.setBackground(round(historyColor(entry), 99));
+        row.addView(dot, new LinearLayout.LayoutParams(dp(9), dp(9)));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(label(historyTitle(entry), 12, Typeface.BOLD, INK));
+        copy.addView(
+                label(
+                        formatTime(entry.timestamp) + " · " + historySource(entry.source),
+                        10,
+                        Typeface.NORMAL,
+                        MUTED));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(11);
+        row.addView(copy, copyParams);
+        return row;
+    }
+
+    private int historyColor(HealthHistoryStore.Entry entry) {
+        switch (entry.state) {
+            case HEALTHY:
+                return AppPalette.SUCCESS;
+            case SUSPECT_ROUTING:
+            case HFP_CONNECTED_NO_SCO:
+            case CALL_WITHOUT_SCO:
+                return AppPalette.WARNING;
+            case ERROR:
+            case BLUETOOTH_OFF:
+            case PERMISSION_REQUIRED:
+                return AppPalette.ERROR;
+            case IDLE:
+            default:
+                return AppPalette.NEUTRAL;
+        }
+    }
+
+    private String historyTitle(HealthHistoryStore.Entry entry) {
+        switch (entry.state) {
+            case HEALTHY:
+                return entry.inCommunication
+                        ? "Telefoniepfad stabil"
+                        : "Bluetooth-Telefonie bereit";
+            case SUSPECT_ROUTING:
+                return "Routingabweichung erkannt";
+            case HFP_CONNECTED_NO_SCO:
+                return "HFP verbunden, SCO fehlt";
+            case CALL_WITHOUT_SCO:
+                return "Anruf ohne Bluetooth-Telefoniepfad";
+            case BLUETOOTH_OFF:
+                return "Bluetooth ausgeschaltet";
+            case PERMISSION_REQUIRED:
+                return "Bluetooth-Berechtigung fehlt";
+            case ERROR:
+                return "Diagnosefehler";
+            case IDLE:
+            default:
+                return "Bereit";
+        }
+    }
+
+    private String historySource(String source) {
+        if ("manual".equals(source)) return "manuelle Prüfung";
+        if ("repair".equals(source)) return "Reparaturprüfung";
+        if ("recovery".equals(source)) return "Recovery";
+        if (source != null && source.startsWith("audio-mode")) return "Anrufereignis";
+        if ("communication-route".equals(source)) return "Routingänderung";
+        if ("device-added".equals(source) || "device-removed".equals(source)) {
+            return "Geräteänderung";
+        }
+        return "Auto-Schutz";
     }
 
     private void renderUpdateState() {
@@ -1032,6 +1280,18 @@ public class MainActivity extends Activity {
             availableUpdate = cached;
         } else {
             availableUpdate = null;
+        }
+
+        if (homeUpdateBanner != null) {
+            if (availableUpdate != null) {
+                homeUpdateBannerText.setText(
+                        "Update v"
+                                + availableUpdate.version
+                                + " verfügbar · in Einstellungen installieren");
+                homeUpdateBanner.setVisibility(View.VISIBLE);
+            } else {
+                homeUpdateBanner.setVisibility(View.GONE);
+            }
         }
 
         if (updateTitle == null || updateSub == null || updateAction == null) return;
@@ -1044,7 +1304,7 @@ public class MainActivity extends Activity {
             updateTitle.setTextColor(PRIMARY_DARK);
             updateSub.setText(
                     getString(R.string.device_profile_name)
-                            + " · signierte Release-APK · SHA-256 wird vor Installation geprüft");
+                            + " · signierte APK · Integrität wird vor Installation geprüft");
             updateAction.setText("Installieren");
             return;
         }
@@ -1064,7 +1324,7 @@ public class MainActivity extends Activity {
             updateSub.setText("Letzte Prüfung " + formatTime(checked));
         }
 
-        updateAction.setText(currentPage == Page.TOOLS ? "Nach Updates suchen" : "Prüfen");
+        updateAction.setText("Nach Updates suchen");
     }
 
     private void checkForUpdates(boolean force) {
@@ -1153,14 +1413,33 @@ public class MainActivity extends Activity {
     }
 
     private void openBluetoothAgentSettings() {
-        Intent detailsIntent =
+        Intent intent =
                 new Intent(
                         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         Uri.parse("package:com.sec.android.app.bluetoothagent"));
         try {
-            startActivity(detailsIntent);
+            startActivity(intent);
         } catch (RuntimeException e) {
             startActivity(new Intent(Settings.ACTION_APPLICATION_SETTINGS));
+        }
+    }
+
+    private void openDeveloperOptions() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+        } catch (RuntimeException e) {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+        }
+    }
+
+    private void openNotificationSettings() {
+        Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+        intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        try {
+            startActivity(intent);
+        } catch (RuntimeException e) {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + getPackageName())));
         }
     }
 
@@ -1198,9 +1477,7 @@ public class MainActivity extends Activity {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(color);
         drawable.setCornerRadius(dp(radius));
-        if (color == AppPalette.SURFACE) {
-            drawable.setStroke(dp(1), BORDER);
-        }
+        if (color == AppPalette.SURFACE) drawable.setStroke(dp(1), BORDER);
         return drawable;
     }
 
