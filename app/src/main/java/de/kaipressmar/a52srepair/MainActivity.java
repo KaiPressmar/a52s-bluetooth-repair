@@ -45,7 +45,8 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarDividerColor(Color.TRANSPARENT);
         getWindow().setNavigationBarContrastEnforced(false);
-        WindowInsetsController bars = getWindow().getInsetsController();
+        View decor = getWindow().getDecorView();
+        WindowInsetsController bars = decor.getWindowInsetsController();
         if (bars != null) {
             bars.setSystemBarsAppearance(
                     WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
