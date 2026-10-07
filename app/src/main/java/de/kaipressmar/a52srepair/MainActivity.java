@@ -489,8 +489,17 @@ public class MainActivity extends Activity {
     private void showHistory() {
         long check = RepairStateStore.lastCheckAt(this);
         long repair = RepairStateStore.lastRepairAt(this);
+        List<HealthHistoryStore.Entry> entries = HealthHistoryStore.read(this);
+        long since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+        int problems = HealthHistoryStore.problemCount(entries, since);
+        int healthyCalls = HealthHistoryStore.healthyCallCount(entries, since);
         String message =
                 RepairStateStore.lastSummary(this)
+                        + "\n\nLetzte 24 Stunden"
+                        + "\nStabile Telefonie-Prüfungen: "
+                        + healthyCalls
+                        + "\nAuffälligkeiten: "
+                        + problems
                         + "\n\nLetzte Prüfung: "
                         + (check == 0L ? "–" : formatTime(check))
                         + "\nLetzte Reparatur: "
@@ -501,6 +510,12 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("Auto-Schutz Verlauf")
                 .setMessage(message)
+                .setNeutralButton(
+                        "Verlauf löschen",
+                        (dialog, which) -> {
+                            HealthHistoryStore.clear(this);
+                            refresh(false);
+                        })
                 .setPositiveButton("OK", null)
                 .show();
     }
