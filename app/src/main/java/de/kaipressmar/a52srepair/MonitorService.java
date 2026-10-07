@@ -114,7 +114,7 @@ public class MonitorService extends Service {
                         + " scoSelected="
                         + health.scoSelected
                         + "\n"
-                        + Diag.snapshot(this));
+                        + Diag.snapshot(this, probe));
 
         boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
         int suspectCount =
@@ -152,7 +152,7 @@ public class MonitorService extends Service {
                                 "WATCHDOG VERIFY state="
                                         + verified.health.state
                                         + "\n"
-                                        + Diag.snapshot(this));
+                                        + Diag.snapshot(this, verified));
                         updateNotification(verified.health.summary);
                     },
                     1_500L);
