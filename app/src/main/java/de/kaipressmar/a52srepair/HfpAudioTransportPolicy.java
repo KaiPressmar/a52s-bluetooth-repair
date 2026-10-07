@@ -5,6 +5,8 @@ package de.kaipressmar.a52srepair;
  * SCO audio transport itself is not connected.
  */
 final class HfpAudioTransportPolicy {
+    static final long MIN_MISMATCH_CONFIRM_MS = 5_000L;
+
     private HfpAudioTransportPolicy() {}
 
     static boolean isMismatch(
@@ -22,6 +24,7 @@ final class HfpAudioTransportPolicy {
             BluetoothHealth health,
             Boolean hfpAudioTransportConnected,
             int consecutiveMismatch,
+            long mismatchSinceMillis,
             long nowMillis,
             long lastRepairAtMillis) {
         if (!isMismatch(health, hfpAudioTransportConnected)) {
@@ -30,7 +33,10 @@ final class HfpAudioTransportPolicy {
                     "Kein bestätigter HFP-Audiotransportfehler");
         }
 
-        if (consecutiveMismatch < 2) {
+        boolean confirmedLongEnough =
+                mismatchSinceMillis > 0L
+                        && nowMillis - mismatchSinceMillis >= MIN_MISMATCH_CONFIRM_MS;
+        if (consecutiveMismatch < 2 || !confirmedLongEnough) {
             return new RepairDecision(
                     RepairDecision.Action.WAIT_FOR_CONFIRMATION,
                     "HFP-Audiotransport ist noch nicht verbunden; Zustand wird kurz bestätigt");
@@ -45,6 +51,13 @@ final class HfpAudioTransportPolicy {
         return new RepairDecision(
                 RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE,
                 "HFP ist verbunden, aber der SCO-Audiotransport selbst ist nicht aktiv");
+    }
+
+    static long confirmationDelayMillis(long mismatchSinceMillis, long nowMillis) {
+        if (mismatchSinceMillis <= 0L) return MIN_MISMATCH_CONFIRM_MS;
+        long remaining =
+                MIN_MISMATCH_CONFIRM_MS - Math.max(0L, nowMillis - mismatchSinceMillis);
+        return Math.max(500L, remaining);
     }
 
     static boolean verificationSucceeded(
