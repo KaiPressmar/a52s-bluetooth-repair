@@ -1,8 +1,10 @@
 package de.kaipressmar.a52srepair;
 
 import android.app.Activity;
+import android.graphics.Insets;
 import android.os.Build;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import org.junit.Test;
@@ -36,6 +38,31 @@ public class Android16CompatibilityTest {
                         false);
         assertEquals(BluetoothHealth.State.SUSPECT_ROUTING, health.state);
         assertTrue(health.needsRepair());
+    }
+
+    @Test public void bottomNavigationStaysAboveThreeButtonSystemNavigation() {
+        Activity activity =
+                Robolectric.buildActivity(MainActivity.class).create().start().resume().get();
+
+        View root = activity.findViewById(android.R.id.content).findViewWithTag("app-root");
+        View navigation =
+                activity.findViewById(android.R.id.content).findViewWithTag("bottom-navigation");
+        assertNotNull(root);
+        assertNotNull(navigation);
+
+        int simulatedThreeButtonBar = 96;
+        WindowInsets insets =
+                new WindowInsets.Builder()
+                        .setInsets(
+                                WindowInsets.Type.navigationBars(),
+                                Insets.of(0, 0, 0, simulatedThreeButtonBar))
+                        .build();
+
+        root.dispatchApplyWindowInsets(insets);
+
+        assertTrue(
+                "Bottom navigation must add the system navigation inset to its own padding",
+                navigation.getPaddingBottom() > simulatedThreeButtonBar);
     }
 
     private String allText(View root) {
