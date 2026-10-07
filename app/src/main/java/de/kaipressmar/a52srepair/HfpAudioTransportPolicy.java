@@ -50,7 +50,8 @@ final class HfpAudioTransportPolicy {
     static boolean verificationSucceeded(
             BluetoothHealth health,
             Boolean hfpAudioTransportConnected) {
-        if (health == null || !health.scoSelected) return false;
-        return !Boolean.FALSE.equals(hfpAudioTransportConnected);
+        return health != null
+                && health.scoSelected
+                && Boolean.TRUE.equals(hfpAudioTransportConnected);
     }
 }
