@@ -16,43 +16,64 @@ concurrency:
 
 jobs:
   test-lint-build:
+    name: ${{ matrix.label }} · Android 16
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: A52s
+            path: a52s
+            label: Galaxy A52s 5G
+          - flavor: S22
+            path: s22
+            label: Galaxy S22
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: ''
-      - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Android 15 and Android 16 SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
-      - name: Unit tests
-        run: gradle :app:testDebugUnitTest --stacktrace
+          gradle-version: '8.13'
+
+      - name: Unit tests including Android 16 compatibility
+        run: gradle :app:test${{ matrix.flavor }}DebugUnitTest --stacktrace
+
       - name: Android lint
-        run: gradle :app:lintDebug --stacktrace
+        run: gradle :app:lint${{ matrix.flavor }}Debug --stacktrace
+
       - name: Build installable debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assemble${{ matrix.flavor }}Debug --stacktrace
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ci-reports
+          name: ci-reports-${{ matrix.path }}-${{ github.sha }}
           path: |
-            app/build/reports/tests/
-            app/build/reports/lint-results-debug.html
+            app/build/reports/tests/test${{ matrix.flavor }}DebugUnitTest/
+            app/build/reports/lint-results-${{ matrix.path }}Debug.html
+            app/build/reports/lint-results-${{ matrix.path }}Debug.xml
           if-no-files-found: ignore
           retention-days: 14
-      - name: Upload debug APK
+
+      - name: Upload device-specific debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: a52s-bluetooth-repair-debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: bluetooth-repair-${{ matrix.path }}-android16-debug-${{ github.sha }}
+          path: app/build/outputs/apk/${{ matrix.path }}/debug/app-${{ matrix.path }}-debug.apk
           if-no-files-found: error
           retention-days: 14
