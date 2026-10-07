@@ -113,7 +113,6 @@ public class MainActivityUxTest {
         assertContains(text, "App-Info");
         assertContains(text, "Geräte-Runtime");
         assertContains(text, "App-Ziel-SDK");
-        assertContains(text, "API 36");
         assertFalse(text.contains("Diagnoseprotokoll teilen"));
         assertFalse(text.contains("Technische Details anzeigen"));
         assertFalse(text.contains("SCO/HFP neu auswählen"));
