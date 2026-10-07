@@ -283,7 +283,7 @@ public class MainActivity extends Activity {
         recoveryCard.addView(recoveryTitle);
         TextView recoveryCopy =
                 label(
-                        "HFP ist verbunden, Android stellt aber kein SCO/HFP-Gerät bereit. Die App kann dann keinen privilegierten Samsung-Dienst neu starten. Du kannst direkt den Bluetooth Agent öffnen und dort zuerst den Cache leeren; falls das nicht reicht, bleibt ein Soft-Neustart bzw. das Zurücksetzen der Bluetooth-Verbindungen die nächste Eskalationsstufe.",
+                        "HFP ist verbunden, Android stellt aber kein SCO/HFP-Gerät bereit. Wenn Medien-Bluetooth gleichzeitig weiter verfügbar ist, entspricht das sehr genau dem bekannten Fehlerbild. Eine normale App kann den privilegierten Samsung-Bluetoothdienst nicht neu starten. Erste Eskalation: Bluetooth-Agent-Cache prüfen. Community-Berichte nennen außerdem A2DP-Offload/SAP in den Entwickleroptionen als möglichen temporären Workaround.",
                         12,
                         Typeface.NORMAL,
                         INK);
@@ -301,6 +301,21 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams rap = new LinearLayout.LayoutParams(-1, -2);
         rap.topMargin = dp(12);
         recoveryCard.addView(recoveryActions, rap);
+        TextView developer =
+                compactButton(
+                        "Entwickleroptionen öffnen",
+                        v -> {
+                            try {
+                                startActivity(
+                                        new Intent(
+                                                Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+                            } catch (RuntimeException e) {
+                                startActivity(new Intent(Settings.ACTION_SETTINGS));
+                            }
+                        });
+        LinearLayout.LayoutParams devParams = new LinearLayout.LayoutParams(-1, -2);
+        devParams.topMargin = dp(8);
+        recoveryCard.addView(developer, devParams);
         recoveryCard.setVisibility(View.GONE);
         add(recoveryCard, 12, -1);
 
@@ -321,7 +336,7 @@ public class MainActivity extends Activity {
         details = label("", 11, Typeface.NORMAL, MUTED);
         details.setTypeface(Typeface.MONOSPACE);
         details.setPadding(dp(16), dp(14), dp(16), dp(14));
-        details.setBackground(round(Color.WHITE, 16));
+        details.setBackground(round(AppPalette.SURFACE, 16));
         details.setVisibility(View.GONE);
         add(details, 10, -1);
 
