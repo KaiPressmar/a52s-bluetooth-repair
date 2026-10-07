@@ -75,6 +75,8 @@ final class Diag {
 
         s.append("audioMode=")
                 .append(am.getMode())
+                .append(" telephonyCallActive=")
+                .append(BluetoothRepair.currentCellularCallActive(c))
                 .append(" speaker=")
                 .append(am.isSpeakerphoneOn())
                 .append(" musicActive=")
