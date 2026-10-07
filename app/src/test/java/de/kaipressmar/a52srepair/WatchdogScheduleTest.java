@@ -20,7 +20,7 @@ public class WatchdogScheduleTest {
                 false);
     }
 
-    @Test public void idleUsesThirtyMinuteHeartbeat() {
+    @Test public void idleUsesHourlyHeartbeat() {
         BluetoothHealth idle =
                 health(AudioManager.MODE_NORMAL, true, true, false);
         assertEquals(
