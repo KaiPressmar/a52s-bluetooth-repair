@@ -14,7 +14,9 @@ val hasReleaseSigning =
 
 android {
     namespace = "de.kaipressmar.a52srepair"
-    compileSdk = 36
+    // Compile against the newest SDK (required by current AndroidX); targetSdk stays at 36 so
+    // Android 17 behavior changes are adopted deliberately, not as a side effect.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.kaipressmar.a52srepair"
@@ -57,6 +59,8 @@ android {
         // English default + German; generates android:localeConfig for the per-app language
         // setting (Android 13+). The default locale is declared in res/resources.properties.
         generateLocaleConfig = true
+        // Ship only the app's languages, so library UI (dialogs, pickers) never mixes in a third one.
+        localeFilters += setOf("en", "de")
     }
 
     buildFeatures {
@@ -66,6 +70,9 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // Robolectric 4.17's Android 16 runtime reads FileDescriptor internals through
+        // jdk.internal.access, which JDK 17+ does not export to unnamed modules.
+        unitTests.all { it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED") }
     }
 
     lint {

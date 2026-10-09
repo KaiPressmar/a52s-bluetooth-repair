@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installs the CI toolchain (JDK 21, Gradle 8.13, Android SDK 34-36) into user space; no sudo.
+# Installs the CI toolchain (JDK 21, Gradle 9.8, Android SDK 37 + build-tools 36) into user space; no sudo.
 # Usage: scripts/setup-dev-env.sh [install-dir]   then: source <install-dir>/env.sh
 set -euo pipefail
 
 DEST="${1:-$HOME/dev-tools}"
-GRADLE_VERSION=8.13
+GRADLE_VERSION=9.8.0
 CMDLINE_TOOLS=commandlinetools-linux-13114758_latest.zip
 mkdir -p "$DEST"
 cd "$DEST"
@@ -43,7 +43,7 @@ ENV
 source env.sh
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
-sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;36.0.0"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "sdk.dir=$ANDROID_HOME" > "$REPO_DIR/local.properties"

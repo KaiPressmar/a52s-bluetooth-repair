@@ -4,6 +4,13 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+### Changed
+
+- Build toolchain: Android Gradle Plugin 9.4.1, Gradle 9.8, compileSdk 37 (Android 17 SDK), build-tools 36. targetSdk stays at 36 on purpose.
+- Libraries: AndroidX Core 1.19.1, AppCompat 1.8.0, RecyclerView 1.4.0, Material 1.14.0; test stack: Robolectric 4.17, AndroidX Test 1.7 / ext-junit 1.3.
+- The APK ships only English and German resources (`localeFilters`), so library UI never mixes in a third language; release APK ≈1.9 MB.
+- Dependabot: AGP and Gradle wrapper move together and majors are migrated deliberately; 7/30-day cooldown; minor/patch grouped, majors separate; dev container image and features tracked; labels and commit prefixes.
+
 ### Added
 
 - Full English and German UI: English is the default and fallback, German is a complete translation. In-app language setting (System default / Deutsch / English) and the Android 13+ per-app language setting (`localeConfig`). Update and setup error messages are now translatable too.
