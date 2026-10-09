@@ -94,6 +94,7 @@ public final class CallRepairEngine {
     private long audioSince = -1L;
     private AudioRoute lastRoute = AudioRoute.UNKNOWN;
     private long bluetoothSince = -1L;
+    private long usableBluetoothSince = -1L;
     private boolean lastBluetoothUsable;
     private boolean everOnBluetooth;
     private boolean bluetoothEverAvailable;
@@ -261,11 +262,20 @@ public final class CallRepairEngine {
                 }
                 userLeftBluetooth = false;
             }
-            lastBluetoothUsable = s.phase.carriesAudio()
+            boolean usableEvidence = s.phase.carriesAudio() && s.callCount == 1
+                    && s.bluetoothRouteAvailable
                     && !Boolean.FALSE.equals(s.scoAudioConnected)
                     && !Boolean.FALSE.equals(s.voiceOnBluetooth)
-                    && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth))
-                    && now - bluetoothSince >= STEADY_BLUETOOTH_MS;
+                    && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth));
+            if (usableEvidence) {
+                if (usableBluetoothSince < 0L) usableBluetoothSince = now;
+            } else {
+                usableBluetoothSince = -1L;
+            }
+            // Ringing time and a brief positive pulse cannot establish an answered SCO link.
+            // A hands-free answer may fall back without another Bluetooth selection callback.
+            lastBluetoothUsable = usableBluetoothSince >= 0L
+                    && now - usableBluetoothSince >= VERIFY_MS;
             everOnBluetooth = true;
         } else {
             boolean leftBluetooth = lastRoute == AudioRoute.BLUETOOTH;
@@ -300,6 +310,7 @@ public final class CallRepairEngine {
                 }
             }
             bluetoothSince = -1L;
+            usableBluetoothSince = -1L;
         }
         lastRoute = s.route;
     }

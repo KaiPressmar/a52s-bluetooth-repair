@@ -65,6 +65,42 @@ public class CallRepairEngineTest {
         }
     }
 
+    @Test public void answeringInCarWithPhoneRouteNeedsNoBluetoothSelection() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                droppedToPhone().toBuilder().phase(CallPhase.RINGING).build());
+        h.runFor(45_000L);
+        assertTrue(h.executed.isEmpty());
+        h.state = h.state.toBuilder().phase(CallPhase.ACTIVE).build();
+        h.runFor(15_000L); // No manual route selection or repeated tap occurs.
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertEquals(CallOutcome.REPAIRED, h.end().outcome);
+    }
+
+    @Test public void ringingAudioEvidenceCannotEstablishTheAnsweredBluetoothLink() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().phase(CallPhase.RINGING).build());
+        h.runFor(45_000L); // Positive signals while ringing must not count toward call stability.
+        h.state = h.state.toBuilder().phase(CallPhase.ACTIVE).build();
+        h.tick();
+        h.now += 198L;
+        h.state = droppedToPhone(); // Auto-answer's first SCO attempt collapses.
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertFalse(h.end().userLeftBluetooth);
+    }
+
+    @Test public void brieflyHealthyAnsweredLinkCannotLatchHandsOffOnFallback() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, FaultClassifierTest.carCall().build());
+        h.tick();
+        h.now += CallRepairEngine.STEADY_BLUETOOTH_MS;
+        h.tick();
+        h.now += 100L;
+        h.state = droppedToPhone();
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertFalse(h.end().userLeftBluetooth);
+    }
+
     @Test public void ringingFallbackDoesNotDisableRepairAfterAnswer() {
         Harness h = new Harness(PreventiveRebuildMode.OFF,
                 FaultClassifierTest.carCall().phase(CallPhase.RINGING)
