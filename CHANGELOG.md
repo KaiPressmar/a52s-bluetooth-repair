@@ -2,7 +2,7 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
-## Unreleased
+## 0.18.0 - English UI, dev container and modern toolchain
 
 ### Changed
 
