@@ -14,7 +14,7 @@ public final class VoiceStream {
         this.audio = audio;
     }
 
-    /** Whether Android plays voice audio on a Bluetooth device; null when unknown (API < 33). */
+    /** Predicted Bluetooth routing for voice attributes; not proof of audible speech. */
     public Boolean playsOnBluetooth() {
         if (audio == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null;
         try {
