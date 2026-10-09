@@ -85,6 +85,8 @@ public final class CallRepairEngine {
     private long operationSince;
     private boolean operationPreventive;
     private boolean returnRequestRepeated;
+    private boolean directRouteFailed;
+    private long healthySince = -1L;
     private long lastCommandAt = Long.MIN_VALUE / 2;
     private long lastRouteChangeAt = Long.MIN_VALUE / 2;
     private boolean dropForgiven;
@@ -130,7 +132,17 @@ public final class CallRepairEngine {
         if (audioSince < 0 && s.phase.carriesAudio()) audioSince = now;
         trackRoute(s, now);
 
-        if (routeOperationActive() && (!s.bluetoothRouteAvailable || !s.phase.carriesAudio())) {
+        boolean healthyEvidence = s.phase.carriesAudio() && s.bluetoothRouteAvailable
+                && s.route == AudioRoute.BLUETOOTH && FaultClassifier.classify(s) == Fault.NONE
+                && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth));
+        if (healthyEvidence) {
+            if (healthySince < 0L) healthySince = now;
+        } else {
+            healthySince = -1L;
+        }
+
+        if (routeOperationActive() && (!s.bluetoothRouteAvailable || !s.phase.carriesAudio()
+                || s.callCount > 1)) {
             // Bluetooth off/on and held calls must not keep emitting stale route commands.
             endOperation();
             currentFault = Fault.NONE;
@@ -154,9 +166,14 @@ public final class CallRepairEngine {
         }
 
         if (fault == Fault.NONE) {
-            // No observable Bluetooth audio (off, ringing, held, speaker) is not recovery.
-            if (s.phase.carriesAudio() && s.bluetoothRouteAvailable
-                    && s.route == AudioRoute.BLUETOOTH) lastConfirmedFault = Fault.NONE;
+            if (lastConfirmedFault != Fault.NONE) {
+                if (healthySince < 0L) return step(FAST_TICK_MS, "recovery not verified: Bluetooth audio evidence missing");
+                long steady = now - healthySince;
+                if (steady < VERIFY_MS) return step(VERIFY_MS - steady, "confirming stable Bluetooth recovery");
+                lastConfirmedFault = Fault.NONE;
+                directRouteFailed = false;
+            }
+            if (s.route == AudioRoute.UNKNOWN) return step(FAST_TICK_MS, "waiting for Telecom route");
             return maybePreventiveRebuild(s, now);
         }
 
@@ -168,6 +185,8 @@ public final class CallRepairEngine {
 
         confirmedFaults.add(fault);
         lastConfirmedFault = fault;
+
+        if (s.callCount > 1) return step(FAST_TICK_MS, fault + " observed; repair deferred for multiple calls");
 
         if (!fault.repairable) return step(SLOW_TICK_MS, fault + " not repairable");
         if (!repairEnabled) return step(SLOW_TICK_MS, fault + " observed (repair disabled)");
@@ -182,6 +201,7 @@ public final class CallRepairEngine {
                 return step(VERIFY_MS, "restore voice volume", RepairCommand.RESTORE_VOICE_VOLUME);
             case CALL_NOT_ON_BLUETOOTH:
                 if (!takeRouteAttempt()) return exhausted();
+                if (directRouteFailed) return startRebuild(s, now, false, "rebuild after failed Bluetooth route request");
                 begin(Operation.ROUTE_REQUEST, now, false);
                 return step(500L, "route call to Bluetooth", RepairCommand.ROUTE_TO_BLUETOOTH);
             case SCO_DISCONNECTED:
@@ -244,6 +264,7 @@ public final class CallRepairEngine {
             lastBluetoothUsable = s.phase.carriesAudio()
                     && !Boolean.FALSE.equals(s.scoAudioConnected)
                     && !Boolean.FALSE.equals(s.voiceOnBluetooth)
+                    && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth))
                     && now - bluetoothSince >= STEADY_BLUETOOTH_MS;
             everOnBluetooth = true;
         } else {
@@ -264,7 +285,7 @@ public final class CallRepairEngine {
                     && !commanded
                     && s.bluetoothRouteAvailable
                     && s.route != AudioRoute.UNKNOWN) {
-                if (!s.phase.carriesAudio() || !lastBluetoothUsable) {
+                if (!s.phase.carriesAudio() || s.callCount > 1 || !lastBluetoothUsable) {
                     // A Telecom route label is not proof that SCO connected. The dialer may
                     // show Bluetooth for only a few hundred ms before falling back to phone.
                     // Keep diagnosis active so CALL_NOT_ON_BLUETOOTH can be confirmed.
@@ -318,11 +339,19 @@ public final class CallRepairEngine {
                     return step(VERIFY_MS, "on Bluetooth, verifying");
                 }
                 if (age >= ROUTE_REQUEST_TIMEOUT_MS) {
+                    directRouteFailed = true;
                     endOperation();
                     return null;
                 }
                 return step(500L, "waiting for Bluetooth route");
             case VERIFYING_ROUTE:
+                if (FaultClassifier.classify(s) != Fault.NONE) {
+                    endOperation();
+                    return null;
+                }
+                if (age < VERIFY_MS) return step(VERIFY_MS - age, "verifying");
+                endOperation();
+                return null;
             case VERIFYING_VOLUME:
                 if (age < VERIFY_MS) return step(VERIFY_MS - age, "verifying");
                 endOperation();

@@ -54,7 +54,7 @@ final class CallSession {
     CallSession(Context context, Host host) {
         this.context = context.getApplicationContext();
         this.host = host;
-        headset = new HeadsetMonitor(this.context);
+        headset = new HeadsetMonitor(this.context, this::onEvent);
         voice = new VoiceStream(this.context.getSystemService(AudioManager.class));
         reports = new CallReportRepository(this.context);
 
@@ -131,7 +131,14 @@ final class CallSession {
                             + (step.commands.isEmpty() ? "" : " " + step.commands));
         }
 
-        for (RepairCommand command : step.commands) execute(command);
+        for (RepairCommand command : step.commands) {
+            try {
+                execute(command);
+            } catch (RuntimeException e) {
+                // Binder/permission failures must not kill call observation or reset budgets.
+                DiagnosticLog.log(context, "CALL command " + command + " failed: " + e.getClass().getSimpleName());
+            }
+        }
         schedule(step.nextCheckInMs);
     }
 

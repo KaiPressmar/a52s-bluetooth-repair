@@ -1,6 +1,6 @@
 # Galaxy A52s 5G – Bluetooth call-audio failure
 
-Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-09 (v0.16.0).
+Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-09 (v0.19.0). Current resilience rules and sources: [CALL_REPAIR_RESILIENCE.md](CALL_REPAIR_RESILIENCE.md).
 
 ## Symptom variants
 
@@ -20,7 +20,7 @@ Variant D is the one in the 2026-10-07 field report ([field-reports/2026-10-07-v
 - **One UI 6.1 / Android 14 + security patch 2025-01-01** (e.g. `A528BXXSAGYA2`): many A52s 5G owners report that Bluetooth call audio stops working with every car and headset, while music keeps working. Reboot helps for a while.
 - **2025 patches**: some users report that the April 2025 patch together with a cache-partition wipe and re-pairing helped. Others continue to see the fault on later builds.
 - **`A528BXXSBGYI3`** (the build in this repo's field reports, 2025-09 patch level) still shows the fault in 2026.
-- Users report that Samsung said no further updates will ship for the A52s. Assume there will be **no vendor fix**.
+- User reports do not establish Samsung's future firmware plans or guarantee a vendor fix. The app must operate within the public APIs available on the affected installed firmware.
 - The custom ROM UN1CA had a matching "calls go to the speaker" bug on the A52s that was traced to a missing build-system patch, not to hardware. That supports a **software (vendor audio/BT integration) cause**, not a radio defect.
 
 ## Community workarounds (all temporary)
@@ -40,11 +40,11 @@ The pattern behind all of these: the fault **builds up over runtime** and is cle
 
 | Signal | API | Useful for |
 |---|---|---|
-| Call active | `TelephonyCallback.CallStateListener` (OFFHOOK) | Gating all repairs. More reliable than `getMode()`, which may still report `MODE_NORMAL` |
-| Selected communication device | `AudioManager.getCommunicationDevice()` | Variant A |
-| Available SCO device | `getAvailableCommunicationDevices()` | Variants A/B |
+| Call active | Telecom `Call` state callbacks | Gating repairs to call audio; no background telephony listener |
+| Selected call route | `CallAudioState` and API 34+ `CallEndpoint` | Variant A |
+| Available call outputs | Telecom route mask and API 34+ endpoint availability | Variants A/B |
 | HFP SCO link up | `BluetoothHeadset.isAudioConnected()` | Variant C |
-| **Device used for voice playback** | `getAudioDevicesForAttributes(USAGE_VOICE_COMMUNICATION)` (API 33+) | **Variant D: downlink not on Bluetooth** |
+| **Predicted device for voice playback** | `getAudioDevicesForAttributes(USAGE_VOICE_COMMUNICATION)` (API 33+) | **Variant D: routing evidence, not actual speech content** |
 | **Voice-call volume / mute** | `getStreamVolume/isStreamMute(STREAM_VOICE_CALL)` | **Variant D: silenced downlink** |
 | Downlink audio content | *not accessible to apps* | – |
 

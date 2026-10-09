@@ -1,8 +1,11 @@
 package de.kaipressmar.a52srepair.telecom;
 
+import android.os.Build;
 import android.telecom.Call;
 import android.telecom.CallAudioState;
+import android.telecom.CallEndpoint;
 import android.telecom.InCallService;
+import androidx.annotation.RequiresApi;
 import de.kaipressmar.a52srepair.core.report.CallReport;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
@@ -18,6 +21,13 @@ import java.util.List;
 public final class CallAudioService extends InCallService implements CallSession.Host {
     private static WeakReference<CallAudioService> activeService = new WeakReference<>(null);
     private CallSession session;
+    private EndpointAudioState endpoints;
+
+    @RequiresApi(34)
+    private EndpointAudioState endpoints() {
+        if (endpoints == null) endpoints = new EndpointAudioState();
+        return endpoints;
+    }
 
     /** Read on the main thread, like the service callbacks and diagnostic export. */
     public static CallReport activeReport() {
@@ -53,6 +63,7 @@ public final class CallAudioService extends InCallService implements CallSession
         if (getCalls().isEmpty()) {
             session.finish();
             session = null;
+            endpoints = null;
             if (activeService.get() == this) activeService.clear();
         } else {
             session.onEvent();
@@ -62,7 +73,22 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @SuppressWarnings("deprecation")
     public void onCallAudioStateChanged(CallAudioState audioState) {
+        if (Build.VERSION.SDK_INT >= 34) audioState = endpoints().merge(audioState);
         if (session != null) session.onAudioStateChanged(audioState);
+    }
+
+    @Override
+    @RequiresApi(34)
+    public void onCallEndpointChanged(CallEndpoint endpoint) {
+        endpoints().selected(endpoint);
+        if (session != null) session.onAudioStateChanged(audioState());
+    }
+
+    @Override
+    @RequiresApi(34)
+    public void onAvailableCallEndpointsChanged(List<CallEndpoint> available) {
+        endpoints().available(available);
+        if (session != null) session.onAudioStateChanged(audioState());
     }
 
     @Override
@@ -78,7 +104,8 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @SuppressWarnings("deprecation")
     public CallAudioState audioState() {
-        return getCallAudioState();
+        CallAudioState legacy = getCallAudioState();
+        return Build.VERSION.SDK_INT >= 34 ? endpoints().merge(legacy) : legacy;
     }
 
     @Override
