@@ -1,4 +1,4 @@
-# Call-audio resilience, v0.19.0
+# Call-audio resilience, v0.19.1
 
 ## Evidence and sources
 
@@ -55,6 +55,34 @@ cannot reliably distinguish every earpiece fallback from a manual phone choice;
 the engine uses the preceding audio evidence, its own commands and the existing
 one-time repair grace. It does not restart Bluetooth, change SAP/AVRCP settings,
 record calls or restart the vendor HAL.
+
+## Hands-free answer without phone input
+
+Repeated Bluetooth selections are diagnostic observations, not a requirement for
+repair. With call access granted and protection enabled, the bound InCallService
+tracks ACTIVE call state, Telecom Bluetooth availability, HFP/SCO, predicted voice
+routing and voice volume. A call remaining on the earpiece while Bluetooth is
+available confirms a route fault after 3 seconds; a persistent disconnected SCO
+or non-Bluetooth voice route confirms after 2 seconds. In-call checks continue
+even when no further callback or screen tap arrives.
+
+Version 0.19.1 fixes an additional answer transition: time spent ringing cannot
+establish working call audio. Positive link evidence must persist for 2.5 seconds
+during an audio-carrying single call before a subsequent phone switch is treated
+as a departure from working Bluetooth. This also rejects a short healthy pulse.
+The shared attempt budget and speaker/wired/streaming choices are unchanged.
+
+Public observations do not reliably reveal whether the answer button was pressed
+on the car or phone. A later automatic fallback from established working audio can
+still look like an intentional phone choice. Healthy routing with silent remote
+speech is also unobservable through these APIs; the existing optional preventive
+rebuild is a mitigation, not a successful fault diagnosis. Without call access or
+a Telecom binding the app cannot observe the call at all.
+
+Validate three cases without touching the phone: answer while the earpiece is
+already selected, answer after a long ring then lose SCO immediately, and receive
+brief positive audio signals before fallback. Expect bounded automatic commands;
+also verify that a deliberate phone switch after established audio stays respected.
 
 ## Real-device validation still required
 

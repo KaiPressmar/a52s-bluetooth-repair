@@ -4,6 +4,18 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.19.1 - recognize hands-free answer fallbacks
+
+### Fixed
+
+- Ringing time no longer counts as stable answered Bluetooth audio. A car-answered call that briefly reports Bluetooth and falls back to the phone remains eligible for automatic repair without another manual selection.
+- Establishing a working Bluetooth link for the hands-off decision requires 2.5 seconds of continuous positive SCO or voice-route evidence during a single audio-carrying call. Brief positive pulses, missing evidence and held/multiple-call states reset that evidence window.
+- Added regressions for answering with the phone route already selected, long ringing followed by a failed SCO attempt and a brief healthy answered link. No screen taps are needed in any of these scenarios.
+
+### Validation
+
+- Automated tests exercise route decisions without user input. Physical A52s/car validation remains pending; a vendor downlink fault with healthy public API signals cannot be directly detected.
+
 ## 0.19.0 - verify Bluetooth recovery and handle asynchronous call audio
 
 ### Repair and detection

@@ -23,7 +23,7 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 - No action without a confirmed fault: 3 s for "call not on Bluetooth", 2 s for SCO/downlink faults, 1.5 s for muted volume. Transient faults are ignored.
 - At most 3 route operations and 2 volume restores per call; every operation is verified before the next one.
 - Speaker and wired headsets are never overridden, not even in the middle of a rebuild.
-- Leaving established Bluetooth audio stops repairs until Bluetooth is selected again. Ringing, failed selections and unknown audio evidence do not establish a working link. Exception: the first drop to the phone within 8 s of one of our own route changes is repaired once; a further drop from working audio is respected.
+- Leaving established Bluetooth audio stops repairs until Bluetooth is selected again. Establishing that link requires 2.5 s of continuous positive evidence during a single audio-carrying call; ringing time, failed selections and unknown audio evidence do not count. Exception: the first drop to the phone within 8 s of one of our own route changes is repaired once; a further drop from working audio is respected.
 - Ignored direct route requests can escalate to a teardown/return sequence within the same attempt budget. Multiple calls defer repairs without spending another attempt.
 - A confirmed fault clears only after 2.5 s of positive SCO or voice-route evidence without a conflicting fault. Missing evidence or a brief healthy pulse is not verified recovery.
 - The preventive rebuild runs at most once, only within the first 30 s, only on a single call, and only after 1 s of steady Bluetooth.
@@ -31,7 +31,7 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 - With automatic repair switched off, the engine observes and reports only.
 - Diagnostics never change the audio mode (instrumentation smoke test).
 
-## Real-device protocol (v0.19)
+## Real-device protocol (v0.19.1)
 
 Setup:
 
@@ -52,6 +52,8 @@ When the fault occurs ("they hear me, I hear nothing"):
 The `CALL …` lines in the report show the Telecom route, the SCO link, the voice route and the volume for every state change, and the repair command the engine chose.
 
 For v0.19 also exercise the [additional device cases](docs/CALL_REPAIR_RESILIENCE.md#real-device-validation-still-required): incoming/outgoing calls, repeated failed selections, Bluetooth off/on, hold/call waiting, two peripherals, permission revocation and hang-up during a pending profile bind. Export once during the call and again afterwards. A live report is provisional.
+
+For v0.19.1 also run the [hands-free answer scenarios](docs/CALL_REPAIR_RESILIENCE.md#hands-free-answer-without-phone-input) without touching the phone. A long ringing interval and a brief positive audio pulse must not suppress repair of an immediate answer fallback.
 
 Status: the supplied reports predate v0.19. No physical A52s call has been performed in this workspace; these checks remain pending on the affected phone.
 
