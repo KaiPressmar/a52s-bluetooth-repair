@@ -115,7 +115,8 @@ public class CallRepairEngineTest {
             }
         };
         h.runFor(60_000L);
-        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.engine.report(h.now).routeAttempts);
+        int commandsAfterBudget = h.executed.size();
         for (long selectionDuration : new long[] {198L, 253L, 483L}) {
             h.state = FaultClassifierTest.carCall().scoAudioConnected(false)
                     .voiceOnBluetooth(false).build();
@@ -124,7 +125,7 @@ public class CallRepairEngineTest {
             h.state = droppedToPhone();
             h.runFor(10_000L);
         }
-        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
+        assertEquals(commandsAfterBudget, h.executed.size());
         assertEquals(CallOutcome.UNRESOLVED, h.end().outcome);
     }
 
@@ -197,6 +198,70 @@ public class CallRepairEngineTest {
         h.runFor(20_000L);
         assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
         assertTrue(h.end().userLeftBluetooth);
+    }
+
+    @Test public void ignoredDirectRequestEscalatesToBluetoothRebuild() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, droppedToPhone()) {
+            boolean tornDown;
+            @Override void react(RepairCommand c) {
+                if (c == RepairCommand.ROUTE_TO_EARPIECE) tornDown = true;
+                if (tornDown) super.react(c);
+            }
+        };
+        h.runFor(30_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH,
+                RepairCommand.ROUTE_TO_EARPIECE, RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertEquals(CallOutcome.REPAIRED, h.end().outcome);
+    }
+
+    @Test public void unknownAudioAfterFaultCannotProveRecovery() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        e.onSnapshot(broken, T0);
+        e.onSnapshot(broken, T0 + 2_000L);
+        CallAudioSnapshot unknown = broken.toBuilder().scoAudioConnected(null).voiceOnBluetooth(null).build();
+        e.onSnapshot(unknown, T0 + 3_000L);
+        e.onSnapshot(unknown, T0 + 10_000L);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 10_000L).outcome);
+    }
+
+    @Test public void briefHealthyPulseCannotClearConfirmedFault() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        e.onSnapshot(broken, T0);
+        e.onSnapshot(broken, T0 + 2_000L);
+        e.onSnapshot(FaultClassifierTest.carCall().build(), T0 + 3_000L);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 3_000L).outcome);
+        e.onSnapshot(broken, T0 + 3_198L);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 3_198L).outcome);
+    }
+
+    @Test public void stableHealthyEvidenceClearsConfirmedFault() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        e.onSnapshot(broken, T0);
+        e.onSnapshot(broken, T0 + 2_000L);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.onSnapshot(ok, T0 + 3_000L);
+        e.onSnapshot(ok, T0 + 3_000L + CallRepairEngine.VERIFY_MS);
+        assertEquals(CallOutcome.REPAIRED, e.report(T0 + 6_000L).outcome);
+    }
+
+    @Test public void multipleCallsDeferRepairWithoutSpendingBudget() {
+        Harness h = new Harness(PreventiveRebuildMode.ALWAYS, droppedToPhone().toBuilder().callCount(2).build());
+        h.runFor(20_000L);
+        assertTrue(h.executed.isEmpty());
+        assertEquals(0, h.engine.report(h.now).routeAttempts);
+        h.state = h.state.toBuilder().callCount(1).build();
+        h.runFor(20_000L);
+        assertFalse(h.executed.isEmpty());
+    }
+
+    @Test public void noRouteRequestsWhenTelecomRouteIsUnknown() {
+        Harness h = new Harness(PreventiveRebuildMode.ALWAYS,
+                FaultClassifierTest.carCall().route(AudioRoute.UNKNOWN).build());
+        h.runFor(20_000L);
+        assertTrue(h.executed.isEmpty());
     }
 
     @Test public void healthyCallWithoutPreventiveModeIsLeftAlone() {

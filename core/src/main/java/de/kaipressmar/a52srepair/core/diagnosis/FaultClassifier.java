@@ -10,15 +10,16 @@ public final class FaultClassifier {
     public static Fault classify(CallAudioSnapshot s) {
         if (s == null || !s.phase.carriesAudio()) return Fault.NONE;
 
-        if (!s.bluetoothRouteAvailable) {
-            return s.hfpConnected ? Fault.BLUETOOTH_ROUTE_MISSING : Fault.NONE;
-        }
-
         // Speaker and wired headsets are deliberate choices, never a Bluetooth fault.
         if (s.route == AudioRoute.SPEAKER
                 || s.route == AudioRoute.WIRED_HEADSET
                 || s.route == AudioRoute.STREAMING) {
             return Fault.NONE;
+        }
+
+        if (s.route == AudioRoute.UNKNOWN) return Fault.NONE;
+        if (!s.bluetoothRouteAvailable) {
+            return s.hfpConnected ? Fault.BLUETOOTH_ROUTE_MISSING : Fault.NONE;
         }
 
         if (s.route != AudioRoute.BLUETOOTH) return Fault.CALL_NOT_ON_BLUETOOTH;

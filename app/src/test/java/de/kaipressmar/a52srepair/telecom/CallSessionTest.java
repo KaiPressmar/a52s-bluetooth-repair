@@ -35,7 +35,7 @@ public class CallSessionTest {
             CallAudioState.ROUTE_EARPIECE | CallAudioState.ROUTE_BLUETOOTH | CallAudioState.ROUTE_SPEAKER;
 
     /** Telecom stand-in that follows route requests like the real CallAudioRouteStateMachine. */
-    private static final class FakeTelecom implements CallSession.Host {
+    private static class FakeTelecom implements CallSession.Host {
         CallAudioState audio = new CallAudioState(false, CallAudioState.ROUTE_BLUETOOTH, ALL_ROUTES);
         int callState = Call.STATE_ACTIVE;
         final List<Integer> requests = new ArrayList<>();
@@ -97,7 +97,8 @@ public class CallSessionTest {
 
         assertEquals(CallAudioState.ROUTE_BLUETOOTH, (int) telecom.requests.get(0));
         telecom.session.finish();
-        assertEquals(CallOutcome.REPAIRED,
+        // Robolectric supplies neither SCO nor voice-route evidence: request != proven recovery.
+        assertEquals(CallOutcome.UNRESOLVED,
                 new CallReportRepository(context).history().latestBluetoothCall().outcome);
     }
 
@@ -132,6 +133,35 @@ public class CallSessionTest {
         assertFalse(telecom.requests.isEmpty());
         telecom.session.finish();
         assertEquals(1, new CallReportRepository(context).history().all().size());
+    }
+
+    @Test public void routeCommandFailureDoesNotKillObservationOrResetBudget() {
+        FakeTelecom telecom = new FakeTelecom() {
+            @Override public void requestRoute(int route) {
+                requests.add(route);
+                throw new SecurityException("unavailable call routing");
+            }
+        };
+        telecom.audio = new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, ALL_ROUTES);
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(60_000L);
+        assertEquals(3, telecom.session.report().routeAttempts);
+        assertTrue(DiagnosticLog.readAll(context).contains("failed: SecurityException"));
+        telecom.session.finish();
+        assertEquals(CallOutcome.UNRESOLVED,
+                new CallReportRepository(context).history().latestBluetoothCall().outcome);
+    }
+
+    @Test public void callbacksAfterFinishNeverRequestAnotherRoute() {
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        telecom.session.finish();
+        telecom.session.onEvent();
+        telecom.session.onAudioStateChanged(telecom.audio);
+        advance(60_000L);
+        assertTrue(telecom.requests.isEmpty());
     }
 
     @Test public void finishIsIdempotent() {

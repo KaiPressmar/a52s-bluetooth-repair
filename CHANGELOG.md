@@ -4,6 +4,22 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.19.0 - verify Bluetooth recovery and handle asynchronous call audio
+
+### Repair and detection
+
+- Confirmed faults clear only after 2.5 seconds of healthy Bluetooth routing with positive SCO or voice-route evidence. Unknown audio signals and short healthy pulses do not prove recovery.
+- If a direct Bluetooth route request fails, the next bounded attempt rebuilds the call route through the earpiece instead of repeating the same ineffective request.
+- Route repairs pause for multiple calls, held calls and unavailable Bluetooth. Unknown Telecom routes are observed rather than treated as a phone route. Explicit non-Bluetooth choices remain respected.
+- Android 14+ endpoint callbacks supplement legacy call-audio callbacks, including empty availability lists and stale legacy routes. Android 12–13 keep the legacy path.
+- HFP audio, profile and adapter-state events trigger checks only during the call. Receivers are removed at session end, and late profile-proxy callbacks are closed.
+- Telecom command exceptions are logged without killing observation or resetting the repair budget.
+
+### Validation and limits
+
+- Added regression coverage for ignored route requests, transient and unknown recovery evidence, call waiting, endpoint-only updates, Bluetooth event lifetimes, denied permissions and command failures.
+- Research and manual A52s validation scenarios are in `docs/CALL_REPAIR_RESILIENCE.md`. Positive API signals verify routing, not audible remote speech; vendor audio/HAL silence may remain unobservable and unrepairable without a system restart.
+
 ### Project
 
 - Releases are published only from `release/X.Y` branches: cut from `main` for every minor version, patches cherry-picked from `main` (`scripts/release.sh`). Release notes come from this changelog, *Latest* stays on the highest version, and pre-release versions are refused because the in-app updater would offer them to everyone. `RELEASE_VERSION` is now the only place the version name is set.
