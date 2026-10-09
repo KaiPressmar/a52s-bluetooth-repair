@@ -1,14 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
- <color name="surface">#F6F7FC</color>
- <color name="surface_tint">#F1F3FC</color>
- <color name="text_primary">#14192B</color>
- <color name="text_secondary">#656F87</color>
- <color name="brand">#635BFF</color>
- <color name="brand_dark">#4338CA</color>
- <color name="accent">#00A8A6</color>
- <color name="success">#0F9D78</color>
- <color name="warning">#E28F20</color>
- <color name="error">#D65258</color>
- <color name="border">#E1E5F0</color>
+    <!-- Material 3 baseline derived from seed #3A5BD9 (calm blue). Dynamic color overrides
+         these on Android 12+ when the wallpaper palette is available. -->
+    <color name="md_primary">#3A5BD9</color>
+    <color name="md_on_primary">#FFFFFF</color>
+    <color name="md_primary_container">#DCE1FF</color>
+    <color name="md_on_primary_container">#00164E</color>
+    <color name="md_secondary">#595D72</color>
+    <color name="md_secondary_container">#DEE1F9</color>
+    <color name="md_on_secondary_container">#161B2C</color>
+    <color name="md_surface">#FBF8FF</color>
+    <color name="md_on_surface">#1B1B21</color>
+    <color name="md_on_surface_variant">#45464F</color>
+    <color name="md_outline_variant">#C6C5D0</color>
+
+    <!-- Semantic status colors used for call outcomes. -->
+    <color name="status_good">#1B6C3A</color>
+    <color name="status_good_container">#C9F0D2</color>
+    <color name="status_warn">#7A5900</color>
+    <color name="status_warn_container">#FFE08E</color>
+    <color name="status_bad">#B3261E</color>
+    <color name="status_bad_container">#F9DEDC</color>
+    <color name="status_neutral">#45464F</color>
+    <color name="status_neutral_container">#E3E1EC</color>
+    <color name="on_status_container">#1B1B21</color>
+
+    <color name="ic_launcher_background">#3A5BD9</color>
 </resources>

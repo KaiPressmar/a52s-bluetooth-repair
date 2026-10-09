@@ -4,16 +4,16 @@
 
 This project investigates a device-specific Bluetooth call-audio failure. Treat every proposed repair as a hypothesis until it is supported by logs and real-device reproduction.
 
-- Prefer the smallest reversible intervention.
-- Keep diagnosis read-only.
+- The app must stay invisible: no background service, no notifications, no polling. Work happens only while Telecom has the app bound during a call.
+- Repairs must be hands-free: the user is driving and can only accept calls through the car.
+- Prefer the smallest reversible intervention, and route changes only through Telecom (`InCallService.setAudioRoute`).
+- Decisions belong in `:core` (pure Java, unit-tested); `:app` only collects state and executes commands.
+- Keep diagnosis read-only and log state before and after each repair step.
 - Never silently broaden permissions or add root/Shizuku requirements.
-- Do not perform automatic routing changes during an active call.
-- Preserve evidence: log state before and after each repair attempt.
-- Keep Android/vendor-specific side effects behind testable decision logic.
 
 ## Development flow
 
-Create a focused branch and pull request. Add or update a failing test first for deterministic behavior. Make the smallest implementation change that passes it. Run unit tests, lint and a debug build. For Bluetooth/HFP/SCO behavior, document the real-device scenario separately because emulator/JVM success cannot prove the Samsung/Qualcomm path is fixed.
+Create a focused branch and pull request. Add or update a failing test first for deterministic behavior. Make the smallest implementation change that passes it. Run `./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest`, lint for both flavors and a debug build. Check the rendered screenshots in `app/build/screenshots/` for UI changes. For Bluetooth/HFP/SCO behavior, document the real-device scenario separately because emulator/JVM success cannot prove the Samsung/Qualcomm path is fixed.
 
 ## Pull requests
 

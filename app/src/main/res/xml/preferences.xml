@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_category_protection">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:iconSpaceReserved="false"
+            app:key="protection_enabled"
+            app:summary="@string/pref_protection_summary"
+            app:title="@string/pref_protection_title" />
+        <ListPreference
+            app:entries="@array/preventive_mode_entries"
+            app:entryValues="@array/preventive_mode_values"
+            app:iconSpaceReserved="false"
+            app:defaultValue="@string/default_preventive_mode"
+            app:key="preventive_mode"
+            app:title="@string/pref_preventive_title"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="car_link"
+            app:title="@string/pref_car_link_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_category_diagnostics">
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="share_report"
+            app:summary="@string/pref_share_summary"
+            app:title="@string/pref_share_title" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="clear_history"
+            app:title="@string/pref_clear_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_category_updates">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:iconSpaceReserved="false"
+            app:key="auto_update_check"
+            app:title="@string/pref_auto_update_title" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="check_update"
+            app:title="@string/pref_check_update_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_category_about">
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="about_version"
+            app:title="@string/pref_version_title" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="about_device"
+            app:title="@string/pref_device_title" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="about_project"
+            app:summary="@string/project_url"
+            app:title="@string/pref_project_title" />
+    </PreferenceCategory>
+</PreferenceScreen>

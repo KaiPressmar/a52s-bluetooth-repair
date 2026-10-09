@@ -48,17 +48,15 @@ jobs:
         run: sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
 
-      - name: Unit tests including device runtime coverage
-        run: gradle :app:test${{ matrix.flavor }}DebugUnitTest --stacktrace
+      - name: Unit tests (core domain + device runtime)
+        run: ./gradlew :core:test :app:test${{ matrix.flavor }}DebugUnitTest --stacktrace
 
       - name: Android lint
-        run: gradle :app:lint${{ matrix.flavor }}Debug --stacktrace
+        run: ./gradlew :app:lint${{ matrix.flavor }}Debug --stacktrace
 
       - name: Build installable debug APK
-        run: gradle :app:assemble${{ matrix.flavor }}Debug --stacktrace
+        run: ./gradlew :app:assemble${{ matrix.flavor }}Debug --stacktrace
 
       - name: Upload reports
         if: always()
@@ -66,7 +64,9 @@ jobs:
         with:
           name: ci-reports-${{ matrix.path }}-${{ github.sha }}
           path: |
+            core/build/reports/tests/test/
             app/build/reports/tests/test${{ matrix.flavor }}DebugUnitTest/
+            app/build/screenshots/
             app/build/reports/lint-results-${{ matrix.path }}Debug.html
             app/build/reports/lint-results-${{ matrix.path }}Debug.xml
           if-no-files-found: ignore

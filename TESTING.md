@@ -1,68 +1,49 @@
-# Testing strategy
+# Testing
 
-The goal is to develop the A52s Bluetooth repair experimentally without turning an unverified hypothesis into a broad or destructive Bluetooth reset.
+The goal is a repair that works hands-free in the car without ever turning a hypothesis into a broad or destructive reset.
 
-## TDD rule
+## Test layers
 
-Every bug fix starts with a failing test or a captured reproducible device scenario. Pure decision logic belongs outside Android framework classes so it can be exercised by fast JVM tests. Android API integration gets Robolectric tests where practical and on-device instrumentation tests where framework behavior matters.
+1. **`:core` JVM tests** (`./gradlew :core:test`): fault classification, the per-call repair state machine with a simulated clock and a simulated Telecom, call-report encoding and statistics, version and device helpers. Every safety rule lives here.
+2. **Robolectric tests** (`:app:test<Flavor>DebugUnitTest`):
+   - Telecom constant mapping;
+   - an end-to-end `CallSession` with a fake Telecom host (preventive rebuild, stuck-on-phone repair, persistence);
+   - repository, log rotation, update parsing and verification;
+   - activity and navigation smoke tests;
+   - per-flavor defaults (`testA52s`, `testS22`);
+   - rendered screenshots of every screen in light and dark (`app/build/screenshots/`, uploaded by CI).
+3. **Instrumentation** (`androidTest`): read-only smoke checks on a real device.
+4. **Real A52s calls:** the only layer that can prove the HFP/SCO fault is repaired.
 
-## Test pyramid
+## Safety invariants (enforced by `CallRepairEngineTest`)
 
-1. **Pure JVM tests**: health classification, repair eligibility, state transitions, cooldowns and safety invariants.
-2. **Robolectric tests**: persistence and Android-facing UI behavior that can be simulated reliably.
-3. **Instrumentation tests**: read-only diagnostics and carefully scoped integration checks on a real Android device.
-4. **Manual A52s fault reproduction**: the only layer that can prove the real HFP/SCO failure has been fixed.
+- No action without a confirmed fault: 3 s for "call not on Bluetooth", 2 s for SCO/downlink faults, 1.5 s for muted volume. Transient faults are ignored.
+- At most 3 route operations and 2 volume restores per call; every operation is verified before the next one.
+- Speaker and wired headsets are never overridden.
+- When the call leaves Bluetooth without our command (user or car chose the phone), the engine stops acting for that call.
+- The preventive rebuild runs at most once, only within the first 30 s, only on a single call, and only after 1 s of steady Bluetooth.
+- "HFP connected but no Bluetooth route" is reported, never "repaired".
+- With automatic repair switched off, the engine observes and reports only.
+- Diagnostics never change the audio mode (instrumentation smoke test).
 
-## Non-negotiable safety invariants
+## Real-device protocol (v0.16)
 
-Automatic repair is opt-in through Auto-Schutz. It may only act when all of the following are true: Bluetooth permission is present, Bluetooth is enabled, an active call/communication mode is detected, a Bluetooth SCO/HFP communication device is available, that Bluetooth device is not currently selected, the same suspect condition has been observed twice consecutively, speakerphone is not explicitly active, and the repair cooldown has elapsed.
+Setup:
 
-The automatic path may only clear/reselect the public Android communication route, bounce it once via the built-in earpiece for a confirmed one-way-audio (downlink) fault or as the once-per-call preventive rebuild on the A52s, or restore a muted/zero voice-call volume. It must not toggle Bluetooth, clear Bluetooth app data, restart vendor/system services, change `AudioManager` mode, or attempt hidden/private API resets. Every repair attempt and verification snapshot must be logged.
+1. Install the release APK. Allow Bluetooth access and link the car (or run the adb command from the setup screen).
+2. Confirm that the status screen shows **Schutz aktiv**.
 
-## Required regression scenarios
+Healthy path:
 
-- Bluetooth permission missing.
-- Bluetooth disabled.
-- Bluetooth enabled but no active call.
-- Active call with no SCO/HFP endpoint.
-- Healthy active Bluetooth SCO/HFP route.
-- Suspect active route for one sample: no automatic repair yet.
-- Suspect active route for repeated samples: eligible for automatic repair.
-- Active speakerphone route: automatic repair blocked.
-- Cooldown prevents repair thrashing.
-- Diagnostic logging appends rather than destroys earlier evidence.
-- Snapshot contains communication device, available communication devices and output devices.
-- Diagnostic snapshot does not alter `AudioManager` mode.
-- Auto-Schutz preference and last state survive Activity recreation/app restart.
-- One-way audio: SCO selected but voice playback not on Bluetooth → `DOWNLINK_ROUTE_MISMATCH`, confirmed twice, then route bounce.
-- One-way audio: SCO selected but voice stream muted/zero → `DOWNLINK_SILENCED`, volume restore.
-- Unknown downlink signals (API < 33, vendor errors) never create a fault on their own.
-- Preventive call-start rebuild: only on A52s, only when enabled, 2–20 s after off-hook, once per call, never on speakerphone or when a detectable fault exists.
-- User report "Ich höre nichts" during a call: volume restore, reselect or bounce; escalate when no SCO device exists; no action outside a call.
+3. Make a call through the car. Expect a short (≈1 s) switch to the phone and back after the call connects: that's the preventive rebuild. Afterwards **Verlauf** shows "Alles in Ordnung · Vorsorglich neu aufgebaut".
+4. During a call, switch to the phone speaker yourself. The app must not switch back.
 
-## Real A52s protocol
+When the fault occurs ("they hear me, I hear nothing"):
 
-Capture a known-good snapshot and test call after reboot. Enable Auto-Schutz and leave it active until the failure occurs. When possible, record the exact time of the failed call. Before rebooting, open the app and export the log.
+5. Do nothing on the phone. Note whether audio came back within a few seconds.
+6. When parked, open **Verlauf**. Expected outcomes are "Automatisch repariert", "Problem blieb bestehen" or "Bluetooth-Telefonie blockiert". Then share the diagnostic report (Einstellungen → Diagnosebericht teilen) before rebooting.
+7. If possible, also run `scripts/capture-call-audio-state.sh` before rebooting.
 
-For the first real-device validation of v0.4.0, verify separately:
+The `CALL …` lines in the report show the Telecom route, the SCO link, the voice route and the volume for every state change, and the repair command the engine chose.
 
-1. A healthy call through the car remains untouched.
-2. Selecting phone speaker intentionally is not immediately overridden by the watchdog.
-3. When the failure occurs and Android still exposes a SCO/HFP endpoint, the log shows `SUSPECT_ROUTING`, two consecutive observations, a route-repair attempt and a verification result.
-4. If Android exposes no SCO/HFP endpoint, the app reports `CALL_WITHOUT_SCO` and does not claim success.
-5. Stopping Auto-Schutz removes the persistent service behavior and clears any route requested by the app.
-
-### One-way audio protocol (v0.15.0)
-
-Everything must work without touching the phone, because while driving the call is only accepted via the car. Expect a short (≈1 s) gap right after accepting each Bluetooth call: that is the preventive SCO rebuild (`CALL-START REFRESH` in the log).
-
-When the other side hears you but you hear nothing (when parked or with a passenger):
-
-1. Look at the watchdog notification: if the app already detected `DOWNLINK_*`, it shows a repair in progress.
-2. Otherwise tap **"Ich höre nichts – reparieren"** in the notification (or **"Ich höre den Anrufer nicht"** in the app). Expect a short switch to the earpiece (≈1 s) and then audio over the car again.
-3. Export the log. The `USER REPORT one-way-audio` and `ROUTE BOUNCE` entries, plus `voiceRouteBt` / `voiceVolume` in the snapshots, show which variant occurred.
-4. If audio does not return, run `scripts/capture-call-audio-state.sh` before rebooting, if possible.
-
-See `docs/A52S_CALL_AUDIO_ISSUE.md` for the variant matrix.
-
-A passing CI build proves only that code-level invariants hold. It does **not** prove the Samsung/Qualcomm HFP/SCO defect is fixed. That requires reproduction on the affected Galaxy A52s 5G.
+A passing CI build proves the code-level invariants only. Whether the Telecom-level rebuild clears the vendor fault must be confirmed with real calls on the affected phone.

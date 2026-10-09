@@ -21,7 +21,7 @@ adb shell dumpsys media.audio_policy > "$OUT/audio-policy.txt" || true
 adb logcat -d -b main -b system -b radio \
   | grep -iE "sco|hfp|headset|bt_|bluetooth|AudioService|AS\.|audio_hw|Telecom|a52srepair" \
   > "$OUT/logcat-filtered.txt" || true
-adb exec-out run-as "$PKG" cat files/a52s-bt-repair.log > "$OUT/app-log.txt" 2>/dev/null \
+adb exec-out run-as "$PKG" cat files/diagnostics.log > "$OUT/app-log.txt" 2>/dev/null \
   || echo "App log needs a debug build (run-as); use the in-app share instead." > "$OUT/app-log.txt"
 
 # Most useful lines for the one-way audio question, extracted up front.

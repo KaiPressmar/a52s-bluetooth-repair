@@ -1,6 +1,6 @@
 # Galaxy A52s 5G – Bluetooth call-audio failure
 
-Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-09 (v0.15.0).
+Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-09 (v0.16.0).
 
 ## Symptom variants
 
@@ -50,19 +50,21 @@ The pattern behind all of these: the fault **builds up over runtime** and is cle
 
 The last row is the hard limit. If SCO is up, routing is correct and volume is audible, but the HAL still plays silence, **no public API can tell**.
 
-**Design constraint: everything must be hands-free.** The fault usually happens in the car, where the driver can only accept the call through the head unit and must not operate the phone. The app therefore must not depend on user input to repair. For the invisible case it rebuilds SCO **preventively once at the start of every Bluetooth call** (see step 3a below). The "Ich höre nichts" notification action is only an optional extra, for example for a passenger.
+**Design constraint: everything must be hands-free.** The fault usually happens in the car, where the driver can only accept the call through the head unit and must not operate the phone. The app therefore must not depend on user input to repair. For the invisible case it rebuilds SCO **preventively once at the start of every Bluetooth call** (step 4 below).
 
-## Repair ladder
+## Repair ladder (v0.16)
 
-From least to most invasive. Each step is verified before the next one runs.
+AOSP analysis showed that up to v0.15 the app's `setCommunicationDevice()` requests had **no effect during cellular calls**: on Android 14 only the audio-mode owner (Telecom) controls the communication route. Since v0.16 every route step goes through Telecom (`InCallService.setAudioRoute()`), which genuinely tears down and rebuilds the HFP SCO link, exactly like the audio button in the phone app. Details and sources: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-1. **Restore call volume** (`DOWNLINK_SILENCED`): unmute and set `STREAM_VOICE_CALL` to about 60 %. Harmless; no cooldown.
-2. **Reselect the SCO route** (variant A, C): `clearCommunicationDevice()` + `setCommunicationDevice(sco)`.
-3. **Bounce the SCO route** (variant D): `setCommunicationDevice(earpiece)`, wait 900 ms, then `setCommunicationDevice(sco)`. Re-selecting a device that is already selected is a no-op inside AudioService, so a stale downlink path is never rebuilt. Moving to the earpiece tears SCO down. Coming back forces a new SCO link and codec (CVSD/mSBC) negotiation with the car.
-3a. **Preventive SCO rebuild at call start** (A52s profile, on by default, can be switched off): 2–20 s after off-hook, when the call *looks* healthy (SCO selected, transport not down, no speakerphone), the app performs one bounce. Cost: about 1 s of silence right at call start, often during ringback or the greeting. It runs once per call and does not count toward the repair limit or cooldown. If its verification fails, the normal automatic repair path takes over.
-4. **Escalate** (variant B, or SCO missing on a user report): the app can't fix this without privileges, so it tells the user that a reboot is needed and keeps the diagnostics.
+From least to most invasive. Each step is verified before the next one runs:
 
-Safety rules are unchanged: never act without an active call, never override speakerphone, require two observations before automatic route changes, cool down for 60 s between route changes, allow at most two automatic attempts per call, and release app-owned routes when the call ends.
+1. **Restore call volume** (`VOICE_SILENCED`): unmute and set `STREAM_VOICE_CALL` to about 60 %.
+2. **Route the call to the car** (`CALL_NOT_ON_BLUETOOTH`, variant A): `setAudioRoute(ROUTE_BLUETOOTH)`.
+3. **Rebuild Bluetooth audio** (`SCO_DISCONNECTED`, `DOWNLINK_NOT_ON_BLUETOOTH`, variants C/D): `setAudioRoute(ROUTE_WIRED_OR_EARPIECE)`, wait until Telecom has left Bluetooth, then `setAudioRoute(ROUTE_BLUETOOTH)`. This forces a new SCO link and codec negotiation with the car.
+4. **Preventive rebuild at call start** (A52s: every car call; configurable): step 3 once, after 1 s of steady Bluetooth within the first 30 s. It covers the silent downlink that no API can observe. Cost: about 1 s of audio on the phone at call start.
+5. **Report** (`BLUETOOTH_ROUTE_MISSING`, variant B): no app can repair it, so the status screen recommends a reboot.
+
+Safety rules: confirmation windows, at most 3 route operations per call, speaker and wired routes untouched, and no fighting a user's or car's switch to the phone. See [TESTING.md](../TESTING.md).
 
 ## Debugging on a real device
 
