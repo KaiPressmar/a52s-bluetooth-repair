@@ -11,6 +11,8 @@ final class FailureSignature {
         IDLE,
         HEALTHY_CALL,
         RECOVERABLE_ROUTE_DRIFT,
+        DOWNLINK_ROUTE_MISMATCH,
+        DOWNLINK_SILENCED,
         HFP_CONNECTED_NO_SCO_MEDIA_ALIVE,
         HFP_CONNECTED_NO_SCO,
         CALL_WITHOUT_BLUETOOTH_TELEPHONY,
@@ -44,6 +46,13 @@ final class FailureSignature {
     static FailureSignature classify(
             BluetoothHealth health,
             boolean bluetoothMediaOutputAvailable) {
+        return classify(health, bluetoothMediaOutputAvailable, CallAudioSignals.UNKNOWN);
+    }
+
+    static FailureSignature classify(
+            BluetoothHealth health,
+            boolean bluetoothMediaOutputAvailable,
+            CallAudioSignals signals) {
         if (health == null || health.state == BluetoothHealth.State.ERROR) {
             return new FailureSignature(
                     Kind.ERROR,
@@ -70,6 +79,8 @@ final class FailureSignature {
         }
 
         if (health.state == BluetoothHealth.State.HEALTHY) {
+            FailureSignature downlink = classifyDownlink(health, signals);
+            if (downlink != null) return downlink;
             return new FailureSignature(
                     Kind.HEALTHY_CALL,
                     Confidence.HIGH,
@@ -117,8 +128,41 @@ final class FailureSignature {
                 "Unbekannter Telefonie-Audiozustand");
     }
 
+    /**
+     * One-way audio: SCO is the selected communication device, so the uplink (microphone) works,
+     * but the downlink is either played on another device or silenced.
+     */
+    private static FailureSignature classifyDownlink(
+            BluetoothHealth health,
+            CallAudioSignals signals) {
+        if (signals == null || health.speakerphoneOn || !health.scoSelected) return null;
+
+        if (Boolean.FALSE.equals(signals.voiceRouteOnBluetooth)) {
+            return new FailureSignature(
+                    Kind.DOWNLINK_ROUTE_MISMATCH,
+                    Confidence.HIGH,
+                    true,
+                    "Mikrofon läuft über Bluetooth, Gesprächspartner wird aber nicht auf Bluetooth ausgegeben");
+        }
+
+        if (signals.voiceSilenced()) {
+            return new FailureSignature(
+                    Kind.DOWNLINK_SILENCED,
+                    Confidence.HIGH,
+                    true,
+                    "Bluetooth-Telefonie aktiv, aber die Gesprächslautstärke ist stumm");
+        }
+
+        return null;
+    }
+
+    boolean isDownlinkFault() {
+        return kind == Kind.DOWNLINK_ROUTE_MISMATCH || kind == Kind.DOWNLINK_SILENCED;
+    }
+
     boolean matchesKnownSamsungFailure() {
         return kind == Kind.RECOVERABLE_ROUTE_DRIFT
-                || kind == Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE;
+                || kind == Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE
+                || isDownlinkFault();
     }
 }

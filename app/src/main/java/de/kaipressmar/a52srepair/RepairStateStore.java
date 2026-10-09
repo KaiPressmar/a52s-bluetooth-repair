@@ -17,6 +17,7 @@ final class RepairStateStore {
     private static final String KEY_CONSECUTIVE_DEGRADED = "consecutive_degraded";
     private static final String KEY_ROUTE_OWNED = "route_owned";
     private static final String KEY_PREFLIGHT_ENABLED = "preflight_enabled";
+    private static final String KEY_CALL_START_REFRESH = "call_start_refresh";
     private static final String KEY_LAST_HFP_READY = "last_hfp_ready";
     private static final String KEY_LAST_PREFLIGHT = "last_preflight";
     private static final String KEY_HFP_AUDIO_TRANSPORT = "hfp_audio_transport";
@@ -51,6 +52,16 @@ final class RepairStateStore {
 
     static void setPreflightEnabled(Context c, boolean enabled) {
         prefs(c).edit().putBoolean(KEY_PREFLIGHT_ENABLED, enabled).apply();
+    }
+
+    static boolean callStartRefreshEnabled(Context c) {
+        boolean defaultEnabled =
+                "a52s".equalsIgnoreCase(c.getString(R.string.device_profile_key));
+        return prefs(c).getBoolean(KEY_CALL_START_REFRESH, defaultEnabled);
+    }
+
+    static void setCallStartRefreshEnabled(Context c, boolean enabled) {
+        prefs(c).edit().putBoolean(KEY_CALL_START_REFRESH, enabled).apply();
     }
 
     static void markHfpReady(Context c, long now) {

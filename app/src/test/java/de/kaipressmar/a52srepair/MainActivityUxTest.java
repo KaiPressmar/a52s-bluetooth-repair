@@ -89,7 +89,7 @@ public class MainActivityUxTest {
         assertContains(text, "SCO/Telefonie");
         assertContains(text, "Fehlersignatur");
         assertContains(text, "Diagnose aktualisieren");
-        assertContains(text, "SCO/HFP neu auswählen");
+        assertContains(text, "Ich höre den Anrufer nicht");
         assertContains(text, "Samsung Bluetooth Agent");
         assertContains(text, "Technische Details anzeigen");
         assertContains(text, "Diagnoseprotokoll teilen");

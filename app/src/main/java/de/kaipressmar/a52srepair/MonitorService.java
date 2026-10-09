@@ -22,6 +22,9 @@ import android.content.pm.PackageManager;
 public class MonitorService extends Service {
     static final String CHANNEL_ID = "monitor";
     static final int NOTIFICATION_ID = 1;
+    static final String ACTION_REPORT_ONE_WAY_AUDIO =
+            "de.kaipressmar.a52srepair.action.REPORT_ONE_WAY_AUDIO";
+    private static final long USER_REPORT_DEBOUNCE_MS = 6_000L;
 
     private static final long EVENT_DEBOUNCE_MS = 1_200L;
     private static final long BLUETOOTH_ON_SETTLE_MS = 10_000L;
@@ -44,6 +47,12 @@ public class MonitorService extends Service {
     private boolean preflightInProgress;
     private boolean preflightConnectedSeen;
     private int preflightAttemptsThisConnection;
+    private boolean callActiveForNotification;
+    private long lastUserReportAt;
+    /** Route changes caused by our own repair must not trigger another repair before verify. */
+    private long repairInFlightUntil;
+    private long offhookAtMillis;
+    private boolean callStartRefreshDone;
 
     private final Runnable preflightTimeout =
             () -> finishScoPreflight(false, "timeout");
@@ -96,6 +105,10 @@ public class MonitorService extends Service {
         @Override
         public void onCallStateChanged(int state) {
             if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                if (!cellularCallActive) {
+                    offhookAtMillis = System.currentTimeMillis();
+                    callStartRefreshDone = false;
+                }
                 cellularCallActive = true;
                 repairAttemptsInIncident = 0;
                 scheduleAfter("telephony-offhook", 350L);
@@ -104,6 +117,8 @@ public class MonitorService extends Service {
                         2_000L);
             } else if (state == TelephonyManager.CALL_STATE_IDLE) {
                 cellularCallActive = false;
+                offhookAtMillis = 0L;
+                callStartRefreshDone = false;
                 repairAttemptsInIncident = 0;
                 consecutiveTransportMismatch = 0;
                 transportMismatchSinceMillis = 0L;
@@ -266,7 +281,7 @@ public class MonitorService extends Service {
         registerHeadsetProxy();
         ensureTelephonyCallStateListener();
 
-        Diag.log(this, "WATCHDOG START triggerMode=bluetooth+hfp+sco+telephony periodicOnlyWhenBtOn");
+        Diag.log(this, "WATCHDOG START triggerMode=bluetooth+hfp+sco+telephony+downlink periodicOnlyWhenBtOn");
         checkAppUpdates();
         handler.post(tick);
     }
@@ -365,6 +380,9 @@ public class MonitorService extends Service {
         if (!RepairStateStore.monitoringEnabled(this)) {
             stopSelf();
             return START_NOT_STICKY;
+        }
+        if (intent != null && ACTION_REPORT_ONE_WAY_AUDIO.equals(intent.getAction())) {
+            handler.post(this::handleUserReportedOneWayAudio);
         }
         return START_STICKY;
     }
@@ -473,12 +491,17 @@ public class MonitorService extends Service {
                         + (hfpAudioConnected == null ? "unknown" : hfpAudioConnected)
                         + " transportMismatch="
                         + transportMismatch
+                        + " "
+                        + probe.signals.describe()
                         + " attempts="
                         + repairAttemptsInIncident
                         + "\n"
                         + Diag.snapshot(this, probe));
 
-        boolean actionableSuspect = health.needsRepair() && !health.speakerphoneOn;
+        callActiveForNotification = health.inCommunication;
+        boolean actionableSuspect =
+                (health.needsRepair() || probe.signature.isDownlinkFault())
+                        && !health.speakerphoneOn;
         int suspectCount =
                 RepairStateStore.updateConsecutiveSuspect(this, actionableSuspect);
         boolean recentlyReady =
@@ -542,51 +565,33 @@ public class MonitorService extends Service {
                         + " recentlyReady="
                         + recentlyReady);
 
+        boolean repairInFlight = now < repairInFlightUntil;
         boolean repairAllowed =
-                RepairRetryPolicy.canAttempt(
-                        RepairStateStore.autoRepairEnabled(this),
-                        decision,
-                        repairAttemptsInIncident);
+                !repairInFlight
+                        && RepairRetryPolicy.canAttempt(
+                                RepairStateStore.autoRepairEnabled(this),
+                                decision,
+                                repairAttemptsInIncident);
+        if (repairInFlight && decision.isRepair()) {
+            Diag.log(this, "WATCHDOG REPAIR in-flight · waiting for verification");
+        }
 
         if (repairAllowed) {
-            BluetoothRepair.RepairResult result =
-                    BluetoothRepair.repairCommunicationRoute(
-                            this,
-                            transportMismatch,
-                            cellularCallActive || BluetoothRepair.currentCellularCallActive(this));
-            if (result.attempted) repairAttemptsInIncident++;
-
-            Diag.log(
+            markRepairInFlight(now);
+            repairAttemptsInIncident++;
+            int attempt = repairAttemptsInIncident;
+            RepairDecision.Action action = decision.action;
+            RepairExecutor.execute(
                     this,
-                    "WATCHDOG AUTO-REPAIR attempt="
-                            + repairAttemptsInIncident
-                            + "/"
-                            + RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT
-                            + " attempted="
-                            + result.attempted
-                            + " requestAccepted="
-                            + result.routeSelected
-                            + " message="
-                            + result.message);
-
-            if (result.routeSelected) {
-                updateNotification(
-                        "Routingfehler erkannt · Reparaturversuch "
-                                + repairAttemptsInIncident
-                                + " wird verifiziert");
-                handler.postDelayed(
-                        () -> verifyRepair("auto-repair-verify"),
-                        RepairVerificationPolicy.FIRST_VERIFY_MS);
-            } else if (result.attempted
-                    && !RepairRetryPolicy.exhausted(repairAttemptsInIncident)) {
-                updateNotification("Bluetooth-Route abgelehnt · zweiter Versuch folgt");
-                handler.postDelayed(
-                        () -> scheduleSoon("repair-request-retry"),
-                        RepairRetryPolicy.RETRY_AFTER_REJECT_MS);
-            } else {
-                updateNotification(result.message);
-            }
-        } else if (decision.action == RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE
+                    handler,
+                    decision,
+                    probe.signals,
+                    transportMismatch,
+                    cellularCallActive || BluetoothRepair.currentCellularCallActive(this),
+                    result -> onAutoRepairRequested(action, attempt, result));
+        } else if (repairInFlight) {
+            // Keep the "wird verifiziert" notification until verifyRepair() reports back.
+        } else if (decision.isRepair()
                 && RepairRetryPolicy.exhausted(repairAttemptsInIncident)) {
             updateNotification("Routingfehler bleibt bestehen · automatische Versuche beendet");
         } else if (decision.action == RepairDecision.Action.ESCALATE_VENDOR_STACK) {
@@ -595,11 +600,34 @@ public class MonitorService extends Service {
             updateNotification(health.summary);
         }
 
+        if (!repairAllowed
+                && !repairInFlight
+                && CallStartRefreshPolicy.shouldRefresh(
+                        RepairStateStore.callStartRefreshEnabled(this),
+                        getString(R.string.device_profile_key),
+                        health,
+                        probe.signature,
+                        hfpAudioConnected,
+                        callStartRefreshDone,
+                        offhookAtMillis,
+                        now)) {
+            runCallStartRefresh(probe, now);
+        } else if (health.inCommunication
+                && !callStartRefreshDone
+                && offhookAtMillis > 0L
+                && now - offhookAtMillis < CallStartRefreshPolicy.SETTLE_AFTER_OFFHOOK_MS) {
+            // Make sure a check lands right after the settle window even without route events.
+            handler.postDelayed(
+                    () -> scheduleSoon("call-start-refresh-window"),
+                    CallStartRefreshPolicy.SETTLE_AFTER_OFFHOOK_MS - (now - offhookAtMillis));
+        }
+
         maybeRunScoPreflight(probe, reason, now);
 
         long nextDelay =
                 WatchdogSchedule.nextDelayMillis(
                         health,
+                        probe.signature,
                         effectiveSuspectCount,
                         degradedCount);
         if (transportDecision.action
@@ -629,7 +657,146 @@ public class MonitorService extends Service {
                         + repairAttemptsInIncident);
     }
 
+    private void onAutoRepairRequested(
+            RepairDecision.Action action,
+            int attempt,
+            BluetoothRepair.RepairResult result) {
+        if (!result.attempted) repairAttemptsInIncident = Math.max(0, repairAttemptsInIncident - 1);
+
+        Diag.log(
+                this,
+                "WATCHDOG AUTO-REPAIR action="
+                        + action
+                        + " attempt="
+                        + attempt
+                        + "/"
+                        + RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT
+                        + " attempted="
+                        + result.attempted
+                        + " requestAccepted="
+                        + result.routeSelected
+                        + " message="
+                        + result.message);
+
+        if (!result.routeSelected) repairInFlightUntil = 0L;
+        if (result.routeSelected) {
+            updateNotification(
+                    (action == RepairDecision.Action.RESTORE_CALL_VOLUME
+                                    ? "Gesprächslautstärke war stumm · wird verifiziert"
+                                    : "Telefonie-Audio wird repariert · Versuch "
+                                            + attempt
+                                            + " wird verifiziert"));
+            handler.postDelayed(
+                    () -> verifyRepair("auto-repair-verify"),
+                    action == RepairDecision.Action.RESTORE_CALL_VOLUME
+                            ? 1_500L
+                            : RepairVerificationPolicy.FIRST_VERIFY_MS);
+        } else if (result.attempted
+                && !RepairRetryPolicy.exhausted(repairAttemptsInIncident)) {
+            updateNotification("Bluetooth-Route abgelehnt · zweiter Versuch folgt");
+            handler.postDelayed(
+                    () -> scheduleSoon("repair-request-retry"),
+                    RepairRetryPolicy.RETRY_AFTER_REJECT_MS);
+        } else {
+            updateNotification(result.message);
+        }
+    }
+
+    /**
+     * The downlink audio itself is not observable by apps. When the user taps "Ich höre nichts",
+     * that report is the confirmation the heuristics cannot provide, so it bypasses the
+     * confirmation window and cooldown but stays debounced.
+     */
+    private void handleUserReportedOneWayAudio() {
+        long now = System.currentTimeMillis();
+        if (now - lastUserReportAt < USER_REPORT_DEBOUNCE_MS || now < repairInFlightUntil) return;
+        lastUserReportAt = now;
+
+        boolean callActive =
+                cellularCallActive || BluetoothRepair.currentCellularCallActive(this);
+        BluetoothRepair.Probe probe = BluetoothRepair.probe(this, callActive);
+        RepairDecision decision =
+                RepairDecision.forUserReportedOneWayAudio(probe.health, probe.signals);
+        HealthHistoryStore.record(this, probe.health, "user-report");
+        Diag.log(
+                this,
+                "USER REPORT one-way-audio action="
+                        + decision.action
+                        + " reason="
+                        + decision.reason
+                        + "\n"
+                        + Diag.snapshot(this, probe));
+
+        if (decision.action == RepairDecision.Action.ESCALATE_VENDOR_STACK) {
+            updateNotification("Kein Bluetooth-Telefoniepfad · bitte Telefon neu starten");
+            return;
+        }
+        if (!decision.isRepair()) {
+            updateNotification(decision.reason);
+            return;
+        }
+
+        markRepairInFlight(now);
+        repairAttemptsInIncident++;
+        int attempt = repairAttemptsInIncident;
+        RepairDecision.Action action = decision.action;
+        updateNotification("Gemeldet: kein Ton · Telefonie-Audio wird neu aufgebaut …");
+        RepairExecutor.execute(
+                this,
+                handler,
+                decision,
+                probe.signals,
+                true,
+                callActive,
+                result -> onAutoRepairRequested(action, attempt, result));
+    }
+
+    /**
+     * Preventive SCO rebuild at call start: hands-free protection against a silent downlink that
+     * no public API can detect. Runs at most once per call and is not counted as a repair.
+     */
+    private void runCallStartRefresh(BluetoothRepair.Probe probe, long now) {
+        callStartRefreshDone = true;
+        markRepairInFlight(now);
+        Diag.log(
+                this,
+                "CALL-START REFRESH preventive SCO rebuild sinceOffhookMs="
+                        + (now - offhookAtMillis));
+        updateNotification("Anruf über Bluetooth · Telefonie-Audio wird vorsorglich neu aufgebaut");
+        RepairExecutor.execute(
+                this,
+                handler,
+                new RepairDecision(
+                        RepairDecision.Action.BOUNCE_COMMUNICATION_ROUTE,
+                        "Vorsorglicher SCO-Neuaufbau bei Anrufbeginn"),
+                probe.signals,
+                true,
+                true,
+                result -> {
+                    Diag.log(
+                            this,
+                            "CALL-START REFRESH requestAccepted="
+                                    + result.routeSelected
+                                    + " message="
+                                    + result.message);
+                    if (result.routeSelected) {
+                        handler.postDelayed(
+                                () -> verifyRepair("call-start-verify"),
+                                RepairVerificationPolicy.FIRST_VERIFY_MS);
+                    } else {
+                        repairInFlightUntil = 0L;
+                        scheduleSoon("call-start-refresh-rejected");
+                    }
+                });
+    }
+
+    private void markRepairInFlight(long now) {
+        repairInFlightUntil =
+                now + BluetoothRepair.BOUNCE_HOLD_MS + RepairVerificationPolicy.FIRST_VERIFY_MS + 1_000L;
+    }
+
     private void verifyRepair(String reason) {
+        repairInFlightUntil = 0L;
         if (!RepairStateStore.monitoringEnabled(this)) return;
 
         BluetoothRepair.Probe verified =
@@ -644,7 +811,8 @@ public class MonitorService extends Service {
         boolean success =
                 HfpAudioTransportPolicy.verificationSucceeded(
                         health,
-                        hfpAudioConnected);
+                        hfpAudioConnected)
+                        && !verified.signature.isDownlinkFault();
         HealthHistoryStore.record(this, health, success ? "repair" : "verify");
 
         Diag.log(
@@ -657,6 +825,12 @@ public class MonitorService extends Service {
                         + repairAttemptsInIncident
                         + "\n"
                         + Diag.snapshot(this, verified));
+
+        if (success && "call-start-verify".equals(reason)) {
+            // Preventive rebuild, not a repair: no repair count, no cooldown.
+            updateNotification("Telefonie-Audio über Bluetooth vorsorglich neu aufgebaut");
+            return;
+        }
 
         if (success) {
             RepairStateStore.markRepair(this);
@@ -676,9 +850,10 @@ public class MonitorService extends Service {
                                 health,
                                 RepairStateStore.routeOwned(this),
                                 repairAttemptsInIncident)
-                        || (HfpAudioTransportPolicy.isMismatch(
-                                        health,
-                                        hfpAudioConnected)
+                        || ((HfpAudioTransportPolicy.isMismatch(
+                                                health,
+                                                hfpAudioConnected)
+                                        || verified.signature.isDownlinkFault())
                                 && repairAttemptsInIncident
                                         < RepairRetryPolicy.MAX_ATTEMPTS_PER_INCIDENT);
 
@@ -874,14 +1049,32 @@ public class MonitorService extends Service {
                         launch,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        return new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.app_name) + " · Auto-Schutz")
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentIntent(pi)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .build();
+        Notification.Builder builder =
+                new Notification.Builder(this, CHANNEL_ID)
+                        .setContentTitle(getString(R.string.app_name) + " · Auto-Schutz")
+                        .setContentText(text)
+                        .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                        .setContentIntent(pi)
+                        .setOngoing(true)
+                        .setOnlyAlertOnce(true);
+        if (callActiveForNotification) {
+            Intent report =
+                    new Intent(this, MonitorService.class)
+                            .setAction(ACTION_REPORT_ONE_WAY_AUDIO);
+            PendingIntent reportPi =
+                    PendingIntent.getService(
+                            this,
+                            1,
+                            report,
+                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(
+                    new Notification.Action.Builder(
+                                    null,
+                                    "Ich höre nichts – reparieren",
+                                    reportPi)
+                            .build());
+        }
+        return builder.build();
     }
 
     @Override

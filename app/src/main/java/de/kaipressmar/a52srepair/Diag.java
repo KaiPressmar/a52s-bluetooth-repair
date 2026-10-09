@@ -124,6 +124,8 @@ final class Diag {
                         RepairStateStore.lastHfpAudioTransport(c) == null
                                 ? "unknown"
                                 : RepairStateStore.lastHfpAudioTransport(c))
+                .append(" ")
+                .append(probe.signals.describe())
                 .append(" routeOwned=")
                 .append(RepairStateStore.routeOwned(c))
                 .append(" summary=")

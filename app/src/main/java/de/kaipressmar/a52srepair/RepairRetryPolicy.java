@@ -20,7 +20,7 @@ final class RepairRetryPolicy {
             int attemptsInIncident) {
         return autoRepairEnabled
                 && decision != null
-                && decision.action == RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE
+                && decision.isRepair()
                 && attemptsInIncident < MAX_ATTEMPTS_PER_INCIDENT;
     }
 

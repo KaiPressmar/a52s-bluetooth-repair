@@ -6,6 +6,8 @@ final class RepairDecision {
         NONE,
         WAIT_FOR_CONFIRMATION,
         RESELECT_COMMUNICATION_ROUTE,
+        BOUNCE_COMMUNICATION_ROUTE,
+        RESTORE_CALL_VOLUME,
         ESCALATE_VENDOR_STACK
     }
 
@@ -50,6 +52,28 @@ final class RepairDecision {
                     "SCO/HFP ist routbar und kann gezielt neu ausgewählt werden");
         }
 
+        if (signature.isDownlinkFault()) {
+            if (consecutiveSuspect < 2) {
+                return new RepairDecision(
+                        Action.WAIT_FOR_CONFIRMATION,
+                        "Einseitiges Gesprächsaudio wird kurz bestätigt");
+            }
+            if (signature.kind == FailureSignature.Kind.DOWNLINK_SILENCED) {
+                // Restoring volume is harmless and not subject to the route-thrashing cooldown.
+                return new RepairDecision(
+                        Action.RESTORE_CALL_VOLUME,
+                        "Gesprächslautstärke ist stumm und wird wiederhergestellt");
+            }
+            if (nowMillis - lastRepairAtMillis < RepairPolicy.MIN_REPAIR_INTERVAL_MS) {
+                return new RepairDecision(
+                        Action.NONE,
+                        "Reparatur-Cooldown schützt vor Routing-Schleifen");
+            }
+            return new RepairDecision(
+                    Action.BOUNCE_COMMUNICATION_ROUTE,
+                    "Downlink läuft nicht über Bluetooth; SCO wird über Hörer neu aufgebaut");
+        }
+
         if (signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO_MEDIA_ALIVE
                 || signature.kind == FailureSignature.Kind.HFP_CONNECTED_NO_SCO) {
             if (consecutiveDegraded < 2) {
@@ -65,6 +89,42 @@ final class RepairDecision {
         return new RepairDecision(
                 Action.NONE,
                 "Kein sicher automatisch reparierbares Fehlerbild");
+    }
+
+    /** User pressed "Ich höre nichts": the only reliable signal for an inaudible downlink. */
+    static RepairDecision forUserReportedOneWayAudio(
+            BluetoothHealth health,
+            CallAudioSignals signals) {
+        if (health == null || !health.inCommunication) {
+            return new RepairDecision(Action.NONE, "Kein aktiver Anruf");
+        }
+        if (!health.scoAvailable && !health.scoSelected) {
+            return new RepairDecision(
+                    Action.ESCALATE_VENDOR_STACK,
+                    "Kein Bluetooth-Telefoniegerät verfügbar – nur ein Neustart hilft");
+        }
+        if (signals != null && signals.voiceSilenced()) {
+            return new RepairDecision(
+                    Action.RESTORE_CALL_VOLUME,
+                    "Gesprächslautstärke ist stumm und wird wiederhergestellt");
+        }
+        if (!health.scoSelected) {
+            return new RepairDecision(
+                    Action.RESELECT_COMMUNICATION_ROUTE,
+                    "Bluetooth-Telefonie ist nicht ausgewählt und wird neu angefordert");
+        }
+        return new RepairDecision(
+                Action.BOUNCE_COMMUNICATION_ROUTE,
+                "Gemeldetes einseitiges Audio: SCO wird über Hörer neu aufgebaut");
+    }
+
+    boolean changesRoute() {
+        return action == Action.RESELECT_COMMUNICATION_ROUTE
+                || action == Action.BOUNCE_COMMUNICATION_ROUTE;
+    }
+
+    boolean isRepair() {
+        return changesRoute() || action == Action.RESTORE_CALL_VOLUME;
     }
 
     private RepairDecision() {
