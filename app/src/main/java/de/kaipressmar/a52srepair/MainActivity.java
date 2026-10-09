@@ -56,6 +56,8 @@ public class MainActivity extends Activity {
     private Switch preflightSwitch;
     private TextView preflightSubtitle;
     private boolean updatingPreflightSwitch;
+    private Switch callStartRefreshSwitch;
+    private boolean updatingCallStartRefreshSwitch;
 
     private HealthHistoryChart historyChart;
     private TextView historySummary;
@@ -209,6 +211,7 @@ public class MainActivity extends Activity {
         autoRepairSubtitle = null;
         preflightSwitch = null;
         preflightSubtitle = null;
+        callStartRefreshSwitch = null;
 
         historyChart = null;
         historySummary = null;
@@ -491,8 +494,8 @@ public class MainActivity extends Activity {
         add(
                 actionCard(
                         R.drawable.ic_repair,
-                        "SCO/HFP neu auswählen",
-                        "Bluetooth-Kommunikationsgerät bewusst neu anfordern und anschließend verifizieren",
+                        "Ich höre den Anrufer nicht",
+                        "Im Anruf: Bluetooth-Telefonie über den Hörer neu aufbauen und verifizieren. Ohne Anruf: SCO/HFP neu auswählen",
                         false,
                         v -> forceRepair()),
                 9,
@@ -672,6 +675,49 @@ public class MainActivity extends Activity {
             preflightHintParams.topMargin = dp(10);
             preflightSetting.addView(preflightHint, preflightHintParams);
             add(preflightSetting, 9, -1);
+
+            LinearLayout refreshSetting = card();
+            refreshSetting.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout refreshTop = new LinearLayout(this);
+            refreshTop.setGravity(Gravity.CENTER_VERTICAL);
+            refreshTop.addView(
+                    iconBubble(R.drawable.ic_repair, AppPalette.TEAL, AppPalette.TEAL_SOFT),
+                    new LinearLayout.LayoutParams(dp(46), dp(46)));
+            LinearLayout refreshCopy = new LinearLayout(this);
+            refreshCopy.setOrientation(LinearLayout.VERTICAL);
+            refreshCopy.addView(label("Telefonie-Audio bei Anrufbeginn neu aufbauen", 15, Typeface.BOLD, INK));
+            refreshCopy.addView(
+                    label(
+                            "Freihändig: schützt vor „Gegenüber hört mich, ich höre nichts“",
+                            11,
+                            Typeface.NORMAL,
+                            MUTED));
+            LinearLayout.LayoutParams refreshCopyParams =
+                    new LinearLayout.LayoutParams(0, -2, 1);
+            refreshCopyParams.leftMargin = dp(12);
+            refreshTop.addView(refreshCopy, refreshCopyParams);
+            callStartRefreshSwitch = new Switch(this);
+            callStartRefreshSwitch.setShowText(false);
+            tintSwitch(callStartRefreshSwitch);
+            callStartRefreshSwitch.setOnCheckedChangeListener(
+                    (buttonView, checked) -> {
+                        if (updatingCallStartRefreshSwitch) return;
+                        RepairStateStore.setCallStartRefreshEnabled(this, checked);
+                        refresh(false);
+                    });
+            refreshTop.addView(callStartRefreshSwitch);
+            refreshSetting.addView(refreshTop);
+            TextView refreshHint =
+                    label(
+                            "Ein stummer Gesprächspartner ist für Apps nicht messbar. Deshalb baut Auto-Schutz bei jedem Bluetooth-Anruf einmal kurz nach Annahme den SCO-Kanal neu auf (ca. 1 Sekunde Pause). Erkennbare Fehler werden zusätzlich automatisch repariert – ohne Bedienung während der Fahrt.",
+                            11,
+                            Typeface.NORMAL,
+                            MUTED);
+            refreshHint.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams refreshHintParams = new LinearLayout.LayoutParams(-1, -2);
+            refreshHintParams.topMargin = dp(10);
+            refreshSetting.addView(refreshHint, refreshHintParams);
+            add(refreshSetting, 9, -1);
         }
 
         add(sectionHeader("App & Updates", "Signierte Builds direkt aus dem Projekt"), 21, -1);
@@ -1136,13 +1182,34 @@ public class MainActivity extends Activity {
     }
 
     private void forceRepair() {
-        BluetoothRepair.RepairResult result =
-                BluetoothRepair.repairCommunicationRoute(this, true);
-        Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
-        new Handler(Looper.getMainLooper())
-                .postDelayed(
-                        () -> verifyRepair("FORCED VERIFY"),
-                        RepairVerificationPolicy.FIRST_VERIFY_MS);
+        BluetoothRepair.Probe probe = BluetoothRepair.probe(this);
+        // During a call a forced repair means "I can't hear the other side": a selected SCO
+        // route must be bounced, because re-selecting the same device changes nothing.
+        RepairDecision decision =
+                probe.health.inCommunication
+                        ? RepairDecision.forUserReportedOneWayAudio(probe.health, probe.signals)
+                        : new RepairDecision(
+                                RepairDecision.Action.RESELECT_COMMUNICATION_ROUTE,
+                                "Manuell erzwungen");
+        Diag.log(this, "FORCED REPAIR action=" + decision.action + " reason=" + decision.reason);
+        if (!decision.isRepair()) {
+            Toast.makeText(this, decision.reason, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Handler handler = new Handler(Looper.getMainLooper());
+        RepairExecutor.execute(
+                this,
+                handler,
+                decision,
+                probe.signals,
+                true,
+                BluetoothRepair.currentCellularCallActive(this),
+                result -> {
+                    Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
+                    handler.postDelayed(
+                            () -> verifyRepair("FORCED VERIFY"),
+                            RepairVerificationPolicy.FIRST_VERIFY_MS);
+                });
     }
 
     private void verifyRepair(String logPrefix) {
@@ -1322,6 +1389,12 @@ public class MainActivity extends Activity {
                     autoRepair
                             ? "Bestätigte, öffentlich reparierbare Routingfehler automatisch beheben"
                             : "Nur erkennen, protokollieren und warnen");
+        }
+
+        if (callStartRefreshSwitch != null) {
+            updatingCallStartRefreshSwitch = true;
+            callStartRefreshSwitch.setChecked(RepairStateStore.callStartRefreshEnabled(this));
+            updatingCallStartRefreshSwitch = false;
         }
 
         if (preflightSwitch != null) {

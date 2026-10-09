@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.os.Build;
@@ -18,6 +19,7 @@ final class BluetoothRepair {
         final AudioDeviceInfo bluetoothCommunicationDevice;
         final boolean bluetoothMediaOutputAvailable;
         final boolean musicActive;
+        final CallAudioSignals signals;
         final FailureSignature signature;
 
         Probe(
@@ -26,13 +28,33 @@ final class BluetoothRepair {
                 AudioDeviceInfo bluetoothCommunicationDevice,
                 boolean bluetoothMediaOutputAvailable,
                 boolean musicActive) {
+            this(
+                    health,
+                    current,
+                    bluetoothCommunicationDevice,
+                    bluetoothMediaOutputAvailable,
+                    musicActive,
+                    CallAudioSignals.UNKNOWN);
+        }
+
+        Probe(
+                BluetoothHealth health,
+                AudioDeviceInfo current,
+                AudioDeviceInfo bluetoothCommunicationDevice,
+                boolean bluetoothMediaOutputAvailable,
+                boolean musicActive,
+                CallAudioSignals signals) {
             this.health = health;
             this.current = current;
             this.bluetoothCommunicationDevice = bluetoothCommunicationDevice;
             this.bluetoothMediaOutputAvailable = bluetoothMediaOutputAvailable;
             this.musicActive = musicActive;
+            this.signals = signals == null ? CallAudioSignals.UNKNOWN : signals;
             this.signature =
-                    FailureSignature.classify(health, bluetoothMediaOutputAvailable);
+                    FailureSignature.classify(
+                            health,
+                            bluetoothMediaOutputAvailable,
+                            this.signals);
         }
     }
 
@@ -93,7 +115,7 @@ final class BluetoothRepair {
                             false,
                             "AudioManager nicht verfügbar",
                             "Android stellt den Audio-Dienst momentan nicht bereit.");
-            return new Probe(health, null, null, false, false);
+            return new Probe(health, null, null, false, false, CallAudioSignals.UNKNOWN);
         }
 
         AudioDeviceInfo current = am.getCommunicationDevice();
@@ -138,17 +160,68 @@ final class BluetoothRepair {
             }
         }
 
+        int mode = am.getMode();
         BluetoothHealth health =
                 BluetoothHealth.assess(
                         permission,
                         bluetoothEnabled,
-                        am.getMode(),
+                        mode,
                         hfpProfileConnected,
                         available,
                         selected,
                         speakerphoneOn,
                         cellularCallActiveHint);
-        return new Probe(health, current, candidate, mediaAvailable, musicActive);
+        CallAudioSignals signals =
+                health.inCommunication
+                        ? readCallAudioSignals(am, mode, cellularCallActiveHint)
+                        : CallAudioSignals.UNKNOWN;
+        return new Probe(health, current, candidate, mediaAvailable, musicActive, signals);
+    }
+
+    static CallAudioSignals readCallAudioSignals(
+            AudioManager am,
+            int mode,
+            boolean cellularCallActive) {
+        Boolean voiceRouteOnBluetooth = null;
+        if (Build.VERSION.SDK_INT >= 33) {
+            try {
+                AudioAttributes voice =
+                        new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .build();
+                java.util.List<AudioDeviceInfo> devices = am.getAudioDevicesForAttributes(voice);
+                if (devices != null && !devices.isEmpty()) {
+                    boolean bluetooth = false;
+                    for (AudioDeviceInfo device : devices) {
+                        if (isBluetoothCommunicationDevice(device)) bluetooth = true;
+                    }
+                    voiceRouteOnBluetooth = bluetooth;
+                }
+            } catch (RuntimeException ignored) {
+                // Unknown is safer than a false mismatch.
+            }
+        }
+
+        int volume = -1;
+        int min = -1;
+        int max = -1;
+        boolean muted = false;
+        try {
+            volume = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
+            min = am.getStreamMinVolume(AudioManager.STREAM_VOICE_CALL);
+            max = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL);
+            muted = am.isStreamMute(AudioManager.STREAM_VOICE_CALL);
+        } catch (RuntimeException ignored) {
+            volume = -1;
+        }
+
+        return new CallAudioSignals(
+                voiceRouteOnBluetooth,
+                volume,
+                min,
+                max,
+                muted,
+                cellularCallActive && mode == AudioManager.MODE_NORMAL);
     }
 
     @SuppressWarnings("deprecation")
@@ -220,6 +293,121 @@ final class BluetoothRepair {
             RepairStateStore.setRouteOwned(c, false);
             Diag.log(c, "ROUTE REPAIR ERROR " + e);
             return new RepairResult(true, false, "Routing-Reparatur fehlgeschlagen: " + e.getClass().getSimpleName());
+        }
+    }
+
+    /** How long the earpiece hold lasts before SCO is requested again during a bounce. */
+    static final long BOUNCE_HOLD_MS = 900L;
+
+    /**
+     * First half of a route bounce. Clearing and re-selecting the same SCO device is a no-op in
+     * AudioService, so a stuck downlink keeps its stale HAL path. Moving the communication route
+     * briefly to the earpiece tears SCO down; {@link #completeRouteBounce} brings it back up and
+     * forces a fresh SCO/codec negotiation with the car or headset.
+     */
+    static RepairResult startRouteBounce(Context c) {
+        AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return new RepairResult(false, false, "AudioManager nicht verfügbar.");
+
+        AudioDeviceInfo earpiece = null;
+        AudioDeviceInfo bluetooth = null;
+        try {
+            for (AudioDeviceInfo device : am.getAvailableCommunicationDevices()) {
+                if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) earpiece = device;
+                if (bluetooth == null && isBluetoothCommunicationDevice(device)) bluetooth = device;
+            }
+        } catch (RuntimeException e) {
+            return new RepairResult(false, false, "Kommunikationsgeräte nicht lesbar.");
+        }
+        if (bluetooth == null) {
+            return new RepairResult(
+                    false,
+                    false,
+                    "Kein Bluetooth-SCO/HFP-Kommunikationsgerät verfügbar – Neustart nötig.");
+        }
+        try {
+            boolean held;
+            if (earpiece == null) {
+                // No earpiece (e.g. tablets): release our request so Telecom re-evaluates.
+                am.clearCommunicationDevice();
+                held = true;
+            } else {
+                held = am.setCommunicationDevice(earpiece);
+            }
+            RepairStateStore.setRouteOwned(c, true);
+            Diag.log(
+                    c,
+                    "ROUTE BOUNCE hold="
+                            + held
+                            + " via="
+                            + (earpiece == null ? "clear" : Diag.device(earpiece)));
+            return new RepairResult(true, held, held
+                    ? "Telefonie-Audio wird über Bluetooth neu aufgebaut …"
+                    : "Android hat den Zwischenschritt über den Hörer abgelehnt.");
+        } catch (RuntimeException e) {
+            Diag.log(c, "ROUTE BOUNCE ERROR " + e);
+            return new RepairResult(true, false, "Neuaufbau fehlgeschlagen: " + e.getClass().getSimpleName());
+        }
+    }
+
+    /** Second half of a route bounce: select the Bluetooth SCO device again. */
+    static RepairResult completeRouteBounce(Context c) {
+        AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return new RepairResult(true, false, "AudioManager nicht verfügbar.");
+        AudioDeviceInfo bluetooth = null;
+        try {
+            for (AudioDeviceInfo device : am.getAvailableCommunicationDevices()) {
+                if (isBluetoothCommunicationDevice(device)) {
+                    bluetooth = device;
+                    break;
+                }
+            }
+            if (bluetooth == null) {
+                am.clearCommunicationDevice();
+                RepairStateStore.setRouteOwned(c, false);
+                Diag.log(c, "ROUTE BOUNCE bluetooth-gone\n" + Diag.snapshot(c));
+                return new RepairResult(true, false, "Bluetooth-Telefoniegerät ist verschwunden.");
+            }
+            boolean selected = am.setCommunicationDevice(bluetooth);
+            RepairStateStore.setRouteOwned(c, true);
+            Diag.log(
+                    c,
+                    "ROUTE BOUNCE reselect="
+                            + selected
+                            + " target="
+                            + Diag.device(bluetooth)
+                            + "\n"
+                            + Diag.snapshot(c));
+            return new RepairResult(true, selected, selected
+                    ? "Bluetooth-Telefonie neu aufgebaut. Android bestätigt die Route asynchron."
+                    : "Android hat die erneute Bluetooth-Auswahl abgelehnt.");
+        } catch (RuntimeException e) {
+            Diag.log(c, "ROUTE BOUNCE ERROR " + e);
+            return new RepairResult(true, false, "Neuaufbau fehlgeschlagen: " + e.getClass().getSimpleName());
+        }
+    }
+
+    /** Restores an audible call volume when the voice stream was muted or set to zero. */
+    static RepairResult restoreCallVolume(Context c, CallAudioSignals signals) {
+        AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return new RepairResult(false, false, "AudioManager nicht verfügbar.");
+        try {
+            if (signals != null && signals.voiceMuted) {
+                am.adjustStreamVolume(
+                        AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.ADJUST_UNMUTE,
+                        0);
+            }
+            int target = signals == null ? -1 : signals.restoredVolumeIndex();
+            if (target < 0) {
+                target = Math.round(am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL) * 0.6f);
+            }
+            am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, target, AudioManager.FLAG_SHOW_UI);
+            Diag.log(c, "CALL VOLUME RESTORE target=" + target + "\n" + Diag.snapshot(c));
+            return new RepairResult(true, true, "Gesprächslautstärke wurde wiederhergestellt.");
+        } catch (RuntimeException e) {
+            Diag.log(c, "CALL VOLUME RESTORE ERROR " + e);
+            return new RepairResult(true, false, "Lautstärke konnte nicht gesetzt werden.");
         }
     }
 

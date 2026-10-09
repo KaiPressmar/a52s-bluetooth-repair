@@ -15,6 +15,9 @@ Experimental Android diagnostic and repair app for a Bluetooth phone-call audio 
 - **Speakerphone guard:** the watchdog does not automatically override an explicitly active speakerphone route.
 - **Manual diagnosis and repair:** run a non-invasive diagnosis, diagnose-and-repair flow, or force a SCO/HFP route reselection.
 - **Persistent state:** last check, last result and repair count survive app restarts. If Auto-Schutz was enabled, the app attempts to restore it after a reboot or app update.
+- **One-way audio detection (v0.15.0):** during a call the app also checks where Android plays the voice downlink and whether the voice-call volume is muted. "They hear me, I hear nothing" is detected as `DOWNLINK_ROUTE_MISMATCH` or `DOWNLINK_SILENCED` and repaired with a route bounce (earpiece → SCO) or a volume restore.
+- **Hands-free call-start protection (A52s):** while driving, a call can only be accepted via the car, so no repair depends on touching the phone. Silence inside the vendor audio HAL is invisible to apps, so Auto-Schutz rebuilds the SCO channel once, shortly after every Bluetooth call is accepted (≈1 s gap; can be switched off in the settings).
+- **Optional "Ich höre nichts – reparieren"** notification action during calls, for a passenger or when parked.
 - **Detailed diagnostics:** communication device, available communication devices, output devices, audio mode and health assessment are logged and can be shared.
 
 ## What the app can and cannot reset
@@ -28,6 +31,8 @@ A normal third-party app **cannot restart Samsung's Bluetooth system service, to
 When the fault is present, do **not** reboot first. Park the vehicle before interacting with the app. Start with **Nur Diagnose ausführen** and capture the state. Then use **Jetzt prüfen & bei Bedarf reparieren**. If the app reports that no Bluetooth-SCO/HFP device is available, save/share the diagnostic log before rebooting.
 
 For background protection, enable **Automatische Überwachung starten** while the app is in the foreground. Android keeps the watchdog visible as a foreground-service notification.
+
+Background research on the failure, its variants and the community workarounds is in [docs/A52S_CALL_AUDIO_ISSUE.md](docs/A52S_CALL_AUDIO_ISSUE.md). Field reports are in [docs/field-reports/](docs/field-reports/).
 
 See TESTING.md for the TDD strategy, safety invariants and real-device acceptance protocol.
 
@@ -47,13 +52,15 @@ Do not treat CI debug artifacts as official releases. See RELEASING.md for the r
 
 ## Development
 
-Requirements: JDK 17 and Android SDK 35. CI uses Gradle 8.9. Core repair decisions remain separated from Android side effects so safety behavior can be tested with fast JVM tests.
+Requirements: JDK 21, Gradle 8.13 and Android SDK platforms 34–36 (same as CI). `scripts/setup-dev-env.sh` installs all of them into `~/dev-tools` without root and writes `local.properties`. Then run `source ~/dev-tools/env.sh`.
+
+Device debugging from WSL works best over adb wireless debugging (`adb pair`, `adb connect`). `scripts/capture-call-audio-state.sh` captures audio, Bluetooth and Telecom state during a faulty call. Core repair decisions remain separated from Android side effects so safety behavior can be tested with fast JVM tests.
 
 Before a pull request, run the equivalent of:
 
-    gradle :app:testDebugUnitTest
-    gradle :app:lintDebug
-    gradle :app:assembleDebug
+    gradle :app:testA52sDebugUnitTest :app:testS22DebugUnitTest
+    gradle :app:lintA52sDebug :app:lintS22Debug
+    gradle :app:assembleA52sDebug
 
 Contributions should follow CONTRIBUTING.md. Security/privacy guidance is in SECURITY.md.
 

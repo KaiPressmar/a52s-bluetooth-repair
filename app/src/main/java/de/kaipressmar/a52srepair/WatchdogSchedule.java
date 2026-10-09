@@ -14,8 +14,21 @@ final class WatchdogSchedule {
     static final long SUSPECT_CONFIRM_MS = 4_000L;
     static final long MISSING_SCO_CONFIRM_MS = 8_000L;
     static final long DEGRADED_RECHECK_MS = 5L * 60L * 1000L;
+    /** One-way audio is noticed immediately by the user, so keep re-checking it closely. */
+    static final long DOWNLINK_RECHECK_MS = 15_000L;
 
     private WatchdogSchedule() {}
+
+    static long nextDelayMillis(
+            BluetoothHealth health,
+            FailureSignature signature,
+            int consecutiveSuspect,
+            int consecutiveDegraded) {
+        if (signature != null && signature.isDownlinkFault()) {
+            return consecutiveSuspect < 2 ? SUSPECT_CONFIRM_MS : DOWNLINK_RECHECK_MS;
+        }
+        return nextDelayMillis(health, consecutiveSuspect, consecutiveDegraded);
+    }
 
     static long nextDelayMillis(
             BluetoothHealth health,
