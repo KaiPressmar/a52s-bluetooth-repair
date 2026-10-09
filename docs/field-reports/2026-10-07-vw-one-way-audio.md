@@ -34,6 +34,10 @@
 - Optional **"Ich höre nichts – reparieren"** notification action (for a passenger) and a relabelled manual button.
 - Regression test: `OneWayAudioDetectionTest`.
 
+## Update v0.16.0
+
+The v0.15 route bounce used `AudioManager.setCommunicationDevice()`, which Android 14 ignores during cellular calls. v0.16 performs the same rebuild through Telecom, and the preventive rebuild at call start runs automatically for every car call. See [ARCHITECTURE.md](../ARCHITECTURE.md).
+
 ## What to capture next time
 
 During the faulty call, before rebooting:

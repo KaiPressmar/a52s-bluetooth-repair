@@ -2,6 +2,31 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
+## 0.16.0 - invisible, Telecom-based repair
+
+### Why
+
+AOSP analysis showed that Android 14 ignores `AudioManager.setCommunicationDevice()` from third-party apps during cellular calls: only the audio-mode owner (Telecom) controls the route. The route repairs of v0.4–v0.15 therefore could not change real calls. See `docs/ARCHITECTURE.md`.
+
+### Changed
+
+- The app runs only during calls, as a non-UI `InCallService` bound by Telecom. The permanent foreground service, boot receiver, periodic checks and **all notifications** are gone; legacy channels and state are cleaned up on update.
+- Repairs use `InCallService.setAudioRoute()`: move a stuck call to the car, or rebuild Bluetooth audio (car → phone → car) for SCO/downlink faults. Volume restore stays.
+- New per-call repair engine in a pure Java `:core` module: confirmation windows, attempt budget, verification, user-choice respect, observe-only mode.
+- Preventive rebuild at call start: A52s on every car call, S22 only after recent problems; configurable.
+- One-time setup: Bluetooth access plus car link via Companion Device Manager, or a single adb command.
+- New Material 3 UI (dynamic color, dark mode): status, call history with outcomes, preference-based settings. Diagnostic report shared as a file.
+- Updates are checked only while the app is open; no update notifications.
+
+### Removed
+
+- `MonitorService`, `BootReceiver`, SCO off-call preflight, notification actions, health chart and the per-sample health history.
+- Permissions: `READ_PHONE_STATE`, `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE*`, `RECEIVE_BOOT_COMPLETED`.
+
+### Project
+
+- Modules `:core` and `:app`, version catalog, Gradle wrapper, R8-minified release (≈2.4 MB), lint clean, CI runs core tests and uploads screenshots.
+
 ## 0.15.0 - one-way call audio
 
 ### Added

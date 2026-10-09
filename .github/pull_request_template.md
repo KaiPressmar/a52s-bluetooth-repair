@@ -9,11 +9,12 @@ Describe the smallest behavioral change made.
 ## Verification
 
 - [ ] Added/updated regression tests first where deterministic testing is possible
-- [ ] `:app:testDebugUnitTest` passes
-- [ ] `:app:lintDebug` passes
-- [ ] Debug APK builds
+- [ ] `./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest` passes
+- [ ] `./gradlew :app:lintA52sDebug :app:lintS22Debug` passes
+- [ ] Debug APKs build; screenshots in `app/build/screenshots/` reviewed for UI changes
 - [ ] Diagnostics remain read-only
-- [ ] Repair logic does not mutate routing during an active call
+- [ ] Route changes only through Telecom and covered by `CallRepairEngineTest` safety rules
+- [ ] Nothing runs or notifies outside calls
 - [ ] Real Galaxy A52s test documented when Bluetooth/HFP/SCO behavior changes
 - [ ] Logs/examples are sanitized and contain no personal identifiers
 

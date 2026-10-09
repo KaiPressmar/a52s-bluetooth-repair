@@ -70,13 +70,11 @@ jobs:
         run: sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
 
       - name: Test device-specific release candidates
         run: |
-          gradle :app:testA52sDebugUnitTest :app:testS22DebugUnitTest --stacktrace
-          gradle :app:lintA52sRelease :app:lintS22Release --stacktrace
+          ./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest --stacktrace
+          ./gradlew :app:lintA52sRelease :app:lintS22Release --stacktrace
 
       - name: Require signing secrets
         env:
@@ -103,7 +101,7 @@ jobs:
           ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
           ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
           ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
-        run: gradle :app:assembleA52sRelease :app:assembleS22Release --stacktrace
+        run: ./gradlew :app:assembleA52sRelease :app:assembleS22Release --stacktrace
 
       - name: Verify and package device-specific APKs
         shell: bash
