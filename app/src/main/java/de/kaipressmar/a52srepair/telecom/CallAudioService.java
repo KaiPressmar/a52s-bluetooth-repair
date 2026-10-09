@@ -3,8 +3,10 @@ package de.kaipressmar.a52srepair.telecom;
 import android.telecom.Call;
 import android.telecom.CallAudioState;
 import android.telecom.InCallService;
+import de.kaipressmar.a52srepair.core.report.CallReport;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +16,14 @@ import java.util.List;
  * and no notification. Route changes go through Telecom exactly like the dialer's audio button.
  */
 public final class CallAudioService extends InCallService implements CallSession.Host {
+    private static WeakReference<CallAudioService> activeService = new WeakReference<>(null);
     private CallSession session;
+
+    /** Read on the main thread, like the service callbacks and diagnostic export. */
+    public static CallReport activeReport() {
+        CallAudioService service = activeService.get();
+        return service == null || service.session == null ? null : service.session.report();
+    }
 
     private final Call.Callback callCallback =
             new Call.Callback() {
@@ -26,6 +35,7 @@ public final class CallAudioService extends InCallService implements CallSession
 
     @Override
     public void onCallAdded(Call call) {
+        activeService = new WeakReference<>(this);
         call.registerCallback(callCallback);
         if (session == null) {
             new AppSettings(this).markServiceBound(System.currentTimeMillis());
@@ -43,6 +53,7 @@ public final class CallAudioService extends InCallService implements CallSession
         if (getCalls().isEmpty()) {
             session.finish();
             session = null;
+            if (activeService.get() == this) activeService.clear();
         } else {
             session.onEvent();
         }
@@ -51,11 +62,12 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @SuppressWarnings("deprecation")
     public void onCallAudioStateChanged(CallAudioState audioState) {
-        if (session != null) session.onEvent();
+        if (session != null) session.onAudioStateChanged(audioState);
     }
 
     @Override
     public void onDestroy() {
+        if (activeService.get() == this) activeService.clear();
         if (session != null) {
             session.finish();
             session = null;

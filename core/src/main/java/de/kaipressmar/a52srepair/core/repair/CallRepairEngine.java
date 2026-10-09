@@ -21,8 +21,9 @@ import java.util.Set;
  * <ul>
  *   <li>Faults must persist for a confirmation window before any action.</li>
  *   <li>At most {@link #MAX_ROUTE_ATTEMPTS} route operations per call, each followed by verification.</li>
- *   <li>If the call leaves Bluetooth without our command (user or car chose the phone), the
- *       engine never fights that choice for the rest of the call. Exception: the first drop to
+ *   <li>Leaving an established Bluetooth audio connection is respected until Bluetooth is
+ *       selected again. Ringing and failed SCO connection attempts are not a user exit.
+ *       Exception: the first drop to
  *       the phone within {@link #REPAIR_GRACE_MS} after one of our route changes is our repair
  *       failing (Telecom falls back to the earpiece when a fresh SCO link collapses), so it is
  *       repaired once. A second drop is always respected.</li>
@@ -90,6 +91,7 @@ public final class CallRepairEngine {
     private long audioSince = -1L;
     private AudioRoute lastRoute = AudioRoute.UNKNOWN;
     private long bluetoothSince = -1L;
+    private boolean lastBluetoothUsable;
     private boolean everOnBluetooth;
     private boolean bluetoothEverAvailable;
     private boolean userLeftBluetooth;
@@ -216,7 +218,17 @@ public final class CallRepairEngine {
 
     private void trackRoute(CallAudioSnapshot s, long now) {
         if (s.route == AudioRoute.BLUETOOTH) {
-            if (lastRoute != AudioRoute.BLUETOOTH) bluetoothSince = now;
+            if (lastRoute != AudioRoute.BLUETOOTH) {
+                bluetoothSince = now;
+                // A fresh Bluetooth selection revokes the previous hands-off decision.
+                // Do not reset the per-call repair budget, even after repeated selections.
+                userLeftBluetooth = false;
+                currentFault = Fault.NONE;
+                faultSince = now;
+            }
+            lastBluetoothUsable = s.phase.carriesAudio()
+                    && !Boolean.FALSE.equals(s.scoAudioConnected)
+                    && now - bluetoothSince >= STEADY_BLUETOOTH_MS;
             everOnBluetooth = true;
         } else {
             boolean leftBluetooth = lastRoute == AudioRoute.BLUETOOTH;
@@ -225,15 +237,22 @@ public final class CallRepairEngine {
                             || now - lastCommandAt < COMMAND_ECHO_MS;
             // Telecom falls back to earpiece or wired headset; with an earpiece, speaker is a choice.
             boolean speakerChosen = s.route == AudioRoute.SPEAKER && s.earpieceAvailable;
-            if (speakerChosen && routeOperationActive()) {
-                // We only ever request earpiece or Bluetooth: never undo the user's speaker.
+            boolean explicitAlternative = speakerChosen
+                    || s.route == AudioRoute.WIRED_HEADSET
+                    || s.route == AudioRoute.STREAMING;
+            if (explicitAlternative) {
+                // These routes are explicit choices, including during our earpiece hop.
                 userLeftBluetooth = true;
                 endOperation();
             } else if (leftBluetooth
                     && !commanded
                     && s.bluetoothRouteAvailable
                     && s.route != AudioRoute.UNKNOWN) {
-                if (!speakerChosen
+                if (!s.phase.carriesAudio() || !lastBluetoothUsable) {
+                    // A Telecom route label is not proof that SCO connected. The dialer may
+                    // show Bluetooth for only a few hundred ms before falling back to phone.
+                    // Keep diagnosis active so CALL_NOT_ON_BLUETOOTH can be confirmed.
+                } else if (!speakerChosen
                         && !dropForgiven
                         && now - lastRouteChangeAt < REPAIR_GRACE_MS) {
                     // The SCO link we just rebuilt collapsed; repair it instead of giving up.
@@ -246,10 +265,6 @@ public final class CallRepairEngine {
             bluetoothSince = -1L;
         }
         lastRoute = s.route;
-    }
-
-    private boolean routeOperationActive() {
-        return operation != Operation.NONE && operation != Operation.VERIFYING_VOLUME;
     }
 
     private Step advanceOperation(CallAudioSnapshot s, long now) {

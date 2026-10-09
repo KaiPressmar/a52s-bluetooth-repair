@@ -65,6 +65,80 @@ public class CallRepairEngineTest {
         }
     }
 
+    @Test public void ringingFallbackDoesNotDisableRepairAfterAnswer() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().phase(CallPhase.RINGING)
+                        .scoAudioConnected(false).voiceOnBluetooth(false).build());
+        h.tick();
+        h.now += 748L;
+        h.state = h.state.toBuilder().route(AudioRoute.EARPIECE).build();
+        h.tick();
+        h.now += 3_909L;
+        h.state = h.state.toBuilder().phase(CallPhase.ACTIVE).build();
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertFalse(h.end().userLeftBluetooth);
+    }
+
+    @Test public void failedBluetoothSelectionIsRepairedAfterScoFallback() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().scoAudioConnected(false)
+                        .voiceOnBluetooth(false).build());
+        h.tick();
+        h.now += 177L;
+        h.state = droppedToPhone();
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertEquals(CallOutcome.REPAIRED, h.end().outcome);
+    }
+
+    @Test public void selectingBluetoothAgainResumesRepairAfterChoosingPhone() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, FaultClassifierTest.carCall().build());
+        h.runFor(10_000L);
+        h.state = droppedToPhone();
+        h.runFor(5_000L);
+        assertTrue(h.engine.report(h.now).userLeftBluetooth);
+        h.state = FaultClassifierTest.carCall().scoAudioConnected(false)
+                .voiceOnBluetooth(false).build();
+        h.tick();
+        h.now += 198L;
+        h.state = droppedToPhone();
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertFalse(h.end().userLeftBluetooth);
+    }
+
+    @Test public void repeatedFailedSelectionsCannotResetTheRepairBudget() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, droppedToPhone()) {
+            @Override void react(RepairCommand command) {
+                // Vendor stack ignores all route requests.
+            }
+        };
+        h.runFor(60_000L);
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
+        for (long selectionDuration : new long[] {198L, 253L, 483L}) {
+            h.state = FaultClassifierTest.carCall().scoAudioConnected(false)
+                    .voiceOnBluetooth(false).build();
+            h.tick();
+            h.now += selectionDuration;
+            h.state = droppedToPhone();
+            h.runFor(10_000L);
+        }
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
+        assertEquals(CallOutcome.UNRESOLVED, h.end().outcome);
+    }
+
+    @Test public void wiredChosenDuringRebuildIsNeverOverridden() {
+        Harness h = new Harness(PreventiveRebuildMode.ALWAYS, FaultClassifierTest.carCall().build()) {
+            @Override void react(RepairCommand command) {
+                state = state.toBuilder().route(AudioRoute.WIRED_HEADSET).build();
+            }
+        };
+        h.runFor(30_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), h.executed);
+        assertTrue(h.end().userLeftBluetooth);
+    }
+
     @Test public void healthyCallWithoutPreventiveModeIsLeftAlone() {
         Harness h = new Harness(PreventiveRebuildMode.OFF, FaultClassifierTest.carCall().build());
         h.runFor(60_000L);

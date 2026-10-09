@@ -1,6 +1,7 @@
 package de.kaipressmar.a52srepair.telecom;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -98,6 +99,39 @@ public class CallSessionTest {
         telecom.session.finish();
         assertEquals(CallOutcome.REPAIRED,
                 new CallReportRepository(context).history().latestBluetoothCall().outcome);
+    }
+
+    @Test public void shortBluetoothSelectionsAreLoggedWithoutDebounce() {
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.audio = new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, ALL_ROUTES);
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(1L);
+        DiagnosticLog.clear(context);
+        // Two route callbacks in the same handler turn: a debounce would lose Bluetooth.
+        telecom.session.onAudioStateChanged(
+                new CallAudioState(false, CallAudioState.ROUTE_BLUETOOTH, ALL_ROUTES));
+        telecom.session.onAudioStateChanged(telecom.audio);
+        String log = DiagnosticLog.readAll(context);
+        assertTrue(log.contains("route=BLUETOOTH"));
+        assertTrue(log.contains("route=EARPIECE"));
+        assertTrue(telecom.requests.isEmpty());
+        telecom.session.finish();
+    }
+
+    @Test public void activeReportDoesNotFinishOrPersistTheCall() {
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(100L);
+        CallReport active = telecom.session.report();
+        assertTrue(active.startedAt > 0L);
+        assertTrue(active.durationMs >= 100L);
+        assertTrue(new CallReportRepository(context).history().all().isEmpty());
+        advance(20_000L);
+        assertFalse(telecom.requests.isEmpty());
+        telecom.session.finish();
+        assertEquals(1, new CallReportRepository(context).history().all().size());
     }
 
     @Test public void finishIsIdempotent() {
