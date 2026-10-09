@@ -12,4 +12,8 @@ Android release keystores, passwords and signing keys must never be committed. T
 
 ## Reporting a vulnerability
 
-Do not publish secrets or personally identifying diagnostic data in a public issue. For ordinary non-sensitive bugs, open a GitHub issue with a minimal reproduction and sanitized logs. For a security issue, use GitHub's private vulnerability reporting feature if enabled for this repository; otherwise contact the repository owner privately before disclosing details.
+Do not publish secrets or personally identifying diagnostic data in a public issue. For ordinary non-sensitive bugs, open a GitHub issue with a minimal reproduction and sanitized logs. For a security issue, use [private vulnerability reporting](https://github.com/KaiPressmar/a52s-bluetooth-repair/security/advisories/new) instead of a public issue.
+
+## Supported versions
+
+Only the latest release receives fixes. The app updates itself from GitHub Releases and verifies the source, SHA-256 checksum, package name and version of every update before handing it to Android.

@@ -1,0 +1,61 @@
+name: Field report (it worked / it didn't)
+description: Share how the app behaves in your car over days or weeks – successes are just as valuable.
+title: "[Field report] "
+labels: ["field-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Field reports show which cars and firmware versions the Telecom-based repair works with.
+        Short reports are welcome. Please don't post personal data.
+  - type: input
+    id: firmware
+    attributes:
+      label: Phone and firmware
+      placeholder: Galaxy A52s 5G, A528BXXSBGYI3
+    validations:
+      required: true
+  - type: input
+    id: car
+    attributes:
+      label: Car or headset
+      placeholder: Skoda Octavia 4 (2022)
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: "0.17.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Overall result
+      options:
+        - The fault no longer occurs / is repaired automatically
+        - Better, but it still occurs sometimes
+        - No change
+        - Worse (please explain)
+    validations:
+      required: true
+  - type: input
+    id: period
+    attributes:
+      label: Observation period and number of car calls
+      placeholder: 2 weeks, ~30 calls
+  - type: dropdown
+    id: preventive
+    attributes:
+      label: Is the short switch to the phone at call start acceptable?
+      options:
+        - Yes, barely noticeable
+        - Noticeable but acceptable
+        - Annoying
+        - I switched the preventive rebuild off
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else – outcomes shown in "Verlauf", situations where it failed, etc.

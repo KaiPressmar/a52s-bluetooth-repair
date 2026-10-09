@@ -41,6 +41,42 @@ public class IconRenderTest {
         save(render(144, false, false), "icon-squircle-144");
     }
 
+    /** 1280x640 repository social preview (GitHub → Settings → Social preview). */
+    @Test public void renderSocialPreview() throws IOException {
+        Bitmap bitmap = Bitmap.createBitmap(1280, 640, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.drawColor(Color.rgb(0xF4, 0xF6, 0xFE));
+
+        Bitmap icon = render(300, false, false);
+        canvas.drawBitmap(icon, 110, 170, null);
+
+        Paint title = new Paint(Paint.ANTI_ALIAS_FLAG);
+        title.setColor(Color.rgb(0x10, 0x18, 0x3A));
+        title.setTextSize(68);
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        canvas.drawText("Bluetooth Call Repair", 480, 270, title);
+
+        Paint body = new Paint(Paint.ANTI_ALIAS_FLAG);
+        body.setColor(Color.rgb(0x3F, 0x46, 0x5C));
+        body.setTextSize(34);
+        canvas.drawText("Galaxy A52s 5G: car connected,", 480, 345, body);
+        canvas.drawText("but you can't hear the caller? Hands-free repair.", 480, 392, body);
+
+        Paint chip = new Paint(Paint.ANTI_ALIAS_FLAG);
+        chip.setColor(ContextCompat.getColor(context, R.color.ic_launcher_background));
+        Paint chipText = new Paint(Paint.ANTI_ALIAS_FLAG);
+        chipText.setColor(Color.WHITE);
+        chipText.setTextSize(26);
+        float x = 480;
+        for (String label : new String[] {"Android 12–16", "No root", "No notifications"}) {
+            float w = chipText.measureText(label) + 44;
+            canvas.drawRoundRect(new RectF(x, 440, x + w, 490), 25, 25, chip);
+            canvas.drawText(label, x + 22, 474, chipText);
+            x += w + 14;
+        }
+        save(bitmap, "social-preview");
+    }
+
     /** Adaptive icons draw a 108dp canvas and show the inner 72dp through the mask. */
     private Bitmap render(int size, boolean circle, boolean themed) {
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);

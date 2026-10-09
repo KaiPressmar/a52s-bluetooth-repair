@@ -5,9 +5,16 @@
 <h1 align="center">Bluetooth Call Repair</h1>
 
 <p align="center">
+  <b>Fix for the Samsung Galaxy A52s 5G Bluetooth call bug:<br>
+  the car or headset is connected, the other person hears you, but you can't hear them.</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/latest"><img src="https://img.shields.io/github/v/release/KaiPressmar/a52s-bluetooth-repair?label=download&color=1D4ED8" alt="Latest release"></a>
   <a href="https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml"><img src="https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/KaiPressmar/a52s-bluetooth-repair/releases"><img src="https://img.shields.io/github/v/release/KaiPressmar/a52s-bluetooth-repair?include_prereleases&label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Android-12%E2%80%9316-3DDC84" alt="Android 12–16">
+  <img src="https://img.shields.io/badge/root-not%20required-555" alt="No root required">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/KaiPressmar/a52s-bluetooth-repair" alt="MIT license"></a>
 </p>
 
 <p align="center">
@@ -18,41 +25,85 @@
   <img src="docs/assets/screenshot-settings.png" width="230" alt="Settings">
 </p>
 
-Hands-free repair for the Bluetooth call-audio failure on the **Samsung Galaxy A52s 5G (SM-A528, Android 14 / One UI 6.1)**. Bluetooth stays connected and music plays, but call audio in the car or headset fails until the phone is rebooted. In the most common variant, the other side hears you and you hear nothing.
+## Is this my problem?
 
-> **Status:** experimental. Passing tests do not prove that every Samsung/Qualcomm HFP failure can be repaired without a reboot. See [TESTING.md](TESTING.md) for the real-device protocol.
+You probably have the known **Galaxy A52s 5G (SM-A528B / SM-A528N) Bluetooth call-audio bug** if, since One UI 6.1 / Android 14:
+
+- ✅ Bluetooth to the car or headset stays connected and **music works**,
+- ❌ but during **phone calls** you hear nothing, the other side hears nothing, or the call stays on the phone,
+- 🔁 and only **restarting the phone** fixes it – until it happens again hours or days later.
+
+Many owners report it since the January 2025 update. Samsung has reportedly ended updates for the A52s, so a vendor fix is unlikely. Background, affected firmware and community workarounds: [docs/A52S_CALL_AUDIO_ISSUE.md](docs/A52S_CALL_AUDIO_ISSUE.md).
+
+> 🇩🇪 **Deutsch:** Galaxy A52s 5G – Bluetooth-Anruf im Auto oder mit Headset: Der Gesprächspartner hört mich, aber ich höre ihn nicht (kein Ton, einseitiges Audio, Freisprecheinrichtung stumm). Musik geht, nur ein Neustart hilft. Genau dafür ist diese App. Die App-Oberfläche ist auf Deutsch.
+
+## Download and setup
+
+1. **Download** [`bluetooth-repair.apk`](https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/latest/download/bluetooth-repair.apk) on your phone (latest version, signed, with [SHA-256 checksum](https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/latest)).
+2. **Install** it. Android asks once to allow installing from your browser or file manager.
+3. **Open the app** and complete the two one-time steps:
+   - allow **Bluetooth access**;
+   - tap **Fahrzeug verknüpfen** (link car), pick your car and confirm the Android dialog. The dialog calls the car a "watch"; that is the only device type through which Android lets apps control call audio.
+4. Done when the app shows **Schutz aktiv**. You never need to open it again; it updates itself from this repository.
+
+*Alternative to step 3 with a computer:* `adb shell appops set de.kaipressmar.a52srepair MANAGE_ONGOING_CALLS allow`
 
 ## How it works
 
-- **Invisible.** Android starts the app only while a call is in progress (as a non-UI `InCallService`). Between calls nothing runs: no background service, no notifications, no polling, no battery use.
-- **Fully automatic.** While driving you only accept the call through the car. The app checks the call audio and repairs it on its own:
-  - call stuck on the phone → moved to the car,
-  - Bluetooth audio link down or voice played elsewhere → Bluetooth audio rebuilt (car → phone → car, about 1 s),
-  - call volume muted → restored.
-- **Preventive rebuild on the A52s.** A silent downlink inside the vendor audio stack is invisible to every app, so the app rebuilds the Bluetooth audio once at the start of each car call (can be switched off).
-- **Honest about limits.** If Android no longer offers a Bluetooth call route at all, no app can fix it. The app records it and recommends a reboot.
+- **Invisible:** Android starts the app only while a call is in progress. Between calls nothing runs: no background service, no notifications, no battery use.
+- **Hands-free:** while driving you only accept the call through the car. The app checks the call audio and repairs it on its own:
+  - moves a call stuck on the phone to the car,
+  - rebuilds the Bluetooth audio link (car → phone → car, about 1 second),
+  - restores a muted call volume.
+- **Preventive on the A52s:** a silent downlink inside Samsung's audio stack can't be detected by any app, so the app rebuilds the Bluetooth audio once at the start of every car call. You can switch this off.
+- **Honest:** if Android offers no Bluetooth call route at all, no app can fix it. The app records it and tells you a restart is needed.
 
-Repairs go through Telecom, the system component that owns call routing, exactly like the audio button in the phone app. Earlier versions used `AudioManager.setCommunicationDevice()`, which Android 14 silently ignores during cellular calls. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the AOSP evidence.
+Repairs go through Android's call system (Telecom), exactly like the audio button in the phone app. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains why earlier approaches could not work and shows the Android source evidence.
 
-## One app for every device
+## FAQ
 
-There is a single APK. The device model and Android version are detected at runtime, so a wrong build can't be installed. On the Galaxy A52s 5G the preventive rebuild is on for every car call. On other phones (e.g. Galaxy S22) it runs only after a problem was seen in the last 7 days. Releases also carry the APK under the former per-device names, so installs of 0.16.x of either variant update to the universal build.
+<details><summary><b>Does it need root?</b></summary>
 
-## Setup (once)
+No. It only uses public Android APIs and a one-time system confirmation.
+</details>
 
-1. **Allow Bluetooth access.**
-2. **Link the car:** choose your car in the app and confirm the Android dialog. The dialog calls the car a "watch"; that profile is the only one that allows apps to control call audio. After linking, Android starts the app during calls.
-   *Alternative with a computer:* `adb shell appops set de.kaipressmar.a52srepair MANAGE_ONGOING_CALLS allow`
+<details><summary><b>Does it drain the battery or show notifications?</b></summary>
 
-Afterwards the status screen shows **Schutz aktiv**, and you don't need to open the app again.
+No. Android binds the app only during calls; otherwise it doesn't run at all and never posts notifications.
+</details>
 
-## Screens
+<details><summary><b>Why does the call briefly switch to the phone at the start?</b></summary>
 
-- **Übersicht:** protection status, one-time setup, 30-day summary, last car call.
-- **Verlauf:** every accompanied call with its result (OK, repaired, problem, switched to phone).
-- **Einstellungen:** automatic repair on/off, preventive rebuild mode, linked devices, diagnostic report, updates.
+That is the preventive rebuild of the Bluetooth audio link on the A52s. It takes about one second and prevents the "I can't hear them" fault. In the settings you can change it to "only after problems" or switch it off.
+</details>
 
-## Project structure
+<details><summary><b>Why does the setup dialog mention a watch and permissions?</b></summary>
+
+Android's companion-device "watch" profile is the only one that allows apps to control ongoing calls. The app requests no further permissions and sends no data. If you prefer, use the one-line adb alternative instead.
+</details>
+
+<details><summary><b>Does it work on other phones?</b></summary>
+
+It runs on any phone with Android 12–16 and adapts at runtime. It was built for the Galaxy A52s 5G and is also used on a Galaxy S22. Reports from other phones are welcome.
+</details>
+
+<details><summary><b>What data does it collect?</b></summary>
+
+Nothing leaves your phone except the update check against GitHub. The call history keeps times, durations and results only, never numbers or names, and is excluded from backups.
+</details>
+
+## Help improve it
+
+This project depends on reports from real cars and firmware versions. You can help by:
+
+- **Reporting a failed call:** [open a call-audio report](https://github.com/KaiPressmar/a52s-bluetooth-repair/issues/new?template=1-call-audio-problem.yml). Before rebooting, share the diagnostic report from the app (*Einstellungen → Diagnosebericht teilen*).
+- **Sharing a field report**, even if everything works: [which car, which firmware, what happened](https://github.com/KaiPressmar/a52s-bluetooth-repair/issues/new?template=2-field-report.yml).
+- **Asking questions** in [Discussions](https://github.com/KaiPressmar/a52s-bluetooth-repair/discussions).
+- **Starring the repository**, so other A52s owners find it.
+
+Code contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## For developers
 
 ```
 core/      Pure Java domain logic: fault classification, per-call repair state machine, reports
@@ -61,22 +112,12 @@ docs/      Issue research, architecture, field reports
 scripts/   Toolchain setup and on-device state capture
 ```
 
-## Development
+Requirements: JDK 17+ and Android SDK platforms 34–36. `scripts/setup-dev-env.sh` installs everything without root; the Gradle wrapper pins Gradle 8.13.
 
-Requirements: JDK 17+ (CI uses 21) and Android SDK platforms 34–36. `scripts/setup-dev-env.sh` installs everything into `~/dev-tools` without root; then run `source ~/dev-tools/env.sh`. The Gradle wrapper pins Gradle 8.13.
+    ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
-    ./gradlew :core:test :app:testDebugUnitTest
-    ./gradlew :app:lintDebug
-    ./gradlew :app:assembleDebug
+The tests also render every screen and the launcher icon to `app/build/screenshots/`. Releases are signed, checksummed and attested by CI when `RELEASE_VERSION` changes on `main` ([RELEASING.md](RELEASING.md)). Testing strategy and the real-device protocol: [TESTING.md](TESTING.md).
 
-The unit tests also render every screen (light and dark) to `app/build/screenshots/`. For on-device debugging use adb wireless debugging. `scripts/capture-call-audio-state.sh` captures audio, Bluetooth and Telecom state during a faulty call.
+## License and disclaimer
 
-## Releases
-
-One signed universal APK (`bluetooth-repair-vX.Y.Z.apk`, Android 12–16) is published as [GitHub Releases](https://github.com/KaiPressmar/a52s-bluetooth-repair/releases) with SHA-256 checksums and build-provenance attestation. Changing `RELEASE_VERSION` on `main` triggers a release. The app can update itself from these releases (checked only while the app is open). See [RELEASING.md](RELEASING.md).
-
-## Privacy and safety
-
-No data leaves the phone except the optional update check against GitHub. Call history stores times, durations and results only, never phone numbers, and it is excluded from backups. Review a diagnostic report before sharing it publicly. Do not operate the app while driving; it is designed so that you never need to.
-
-Further reading: [issue research](docs/A52S_CALL_AUDIO_ISSUE.md) · [architecture](docs/ARCHITECTURE.md) · [testing](TESTING.md) · [contributing](CONTRIBUTING.md) · [security](SECURITY.md)
+[MIT](LICENSE) © Kai Preßmar. Independent project, not affiliated with Samsung or Google. Experimental software: use at your own risk, and never operate your phone while driving (the app is designed so you don't have to).
