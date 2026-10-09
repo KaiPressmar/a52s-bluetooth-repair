@@ -123,7 +123,7 @@ Without containers: JDK 17+ (CI uses 21), Android SDK platform 37 and build-tool
 
     ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
-The tests also render every screen and the launcher icon to `app/build/screenshots/`. Releases are signed, checksummed and attested by CI when `RELEASE_VERSION` changes on `main` ([RELEASING.md](RELEASING.md)). Testing strategy and the real-device protocol: [TESTING.md](TESTING.md).
+The tests also render every screen and the launcher icon to `app/build/screenshots/`. Releases are cut on `release/X.Y` branches and signed, checksummed and attested by CI ([RELEASING.md](RELEASING.md)). Testing strategy and the real-device protocol: [TESTING.md](TESTING.md).
 
 ## License and disclaimer
 

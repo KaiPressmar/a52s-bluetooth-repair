@@ -2,7 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.18.1")
+// RELEASE_VERSION (repository root) is the single source of the version name; CI may override it.
+val releaseVersion = providers.environmentVariable("RELEASE_VERSION")
+    .orElse(providers.fileContents(rootProject.layout.projectDirectory.file("RELEASE_VERSION")).asText.map { it.trim() })
 val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("21")
 val signingStoreFile = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE")
 val signingStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD")

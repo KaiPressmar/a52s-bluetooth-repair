@@ -2,6 +2,12 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
+## Unreleased
+
+### Project
+
+- Releases are published only from `release/X.Y` branches: cut from `main` for every minor version, patches cherry-picked from `main` (`scripts/release.sh`). Release notes come from this changelog, *Latest* stays on the highest version, and pre-release versions are refused because the in-app updater would offer them to everyone. `RELEASE_VERSION` is now the only place the version name is set.
+
 ## 0.18.1 - don't give up when a repair's Bluetooth link collapses
 
 ### Fixed

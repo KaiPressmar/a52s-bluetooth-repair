@@ -1,60 +1,98 @@
 name: Release APK
 
+# Releases are published only from release branches (release/X.Y), never from main.
+# A push to release/X.Y whose RELEASE_VERSION has no tag yet publishes that version; any other
+# push to a release branch is a no-op. Run manually on a release branch to retry a failed release.
+# Process and branch model: RELEASING.md.
+
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Semantic version without v prefix, e.g. 0.5.0'
-        required: true
-        type: string
-      prerelease:
-        description: 'Publish as a GitHub prerelease (not shown as "Latest")'
-        required: true
-        default: false
-        type: boolean
   push:
-    branches: [ main ]
-    paths:
-      - RELEASE_VERSION
+    branches: [ 'release/**' ]
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
-    if: github.ref == 'refs/heads/main'
+  prepare:
+    name: Check release branch
+    if: startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      RELEASE_VERSION: ${{ inputs.version }}
-      RELEASE_VERSION_CODE: ${{ github.run_number }}
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      previous_tag: ${{ steps.check.outputs.previous_tag }}
+      latest: ${{ steps.check.outputs.latest }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Resolve version
+      - name: Validate version, branch, changelog and tag
+        id: check
+        env:
+          BRANCH: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${RELEASE_VERSION:-}" ]; then
-            RELEASE_VERSION="$(tr -d '[:space:]' < RELEASE_VERSION)"
-          fi
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
-          echo "RELEASE_TAG=v$RELEASE_VERSION" >> "$GITHUB_ENV"
+          VERSION="$(tr -d '[:space:]' < RELEASE_VERSION)"
+          TAG="v$VERSION"
 
-      - name: Validate version and tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid semantic version: $RELEASE_VERSION"; exit 1; }
-          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then echo "Tag $RELEASE_TAG already exists"; exit 1; fi
+          # Stable versions only: the in-app updater offers every non-draft release to all users.
+          [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]] \
+            || { echo "::error::RELEASE_VERSION '$VERSION' is not a stable MAJOR.MINOR.PATCH version"; exit 1; }
+          LINE="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+          [ "$BRANCH" = "release/$LINE" ] \
+            || { echo "::error::Version $VERSION belongs on release/$LINE, not $BRANCH"; exit 1; }
+
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::notice::$TAG is already released; nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          grep -Eq "^## $(printf '%s' "$VERSION" | sed 's/\./\\./g')( |$)" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no '## $VERSION' section"; exit 1; }
+
+          # Latest only if this is the highest stable version; a patch on an older line is not.
+          STABLE_TAGS="$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
+          HIGHEST="$(printf '%s\n%s\n' "$STABLE_TAGS" "$TAG" | sed '/^$/d' | sort -V | tail -n1)"
+          LATEST=false
+          [ "$HIGHEST" = "$TAG" ] && LATEST=true
+          PREVIOUS="$(printf '%s\n%s\n' "$STABLE_TAGS" "$TAG" | sed '/^$/d' | sort -V | grep -B1 -x "$TAG" | head -n1)"
+          [ "$PREVIOUS" = "$TAG" ] && PREVIOUS=""
+
+          {
+            echo "publish=true"
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "previous_tag=$PREVIOUS"
+            echo "latest=$LATEST"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice::Publishing $TAG from $BRANCH (latest=$LATEST, previous=${PREVIOUS:-none})"
+
+  release:
+    name: Build, sign and publish
+    needs: prepare
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
         with:
@@ -125,10 +163,12 @@ jobs:
             sha256sum "$name" > "$name.sha256"
           done
 
-          echo "APK=$OUT" >> "$GITHUB_ENV"
-          echo "APK_LEGACY_A52S=$LEGACY_A52S" >> "$GITHUB_ENV"
-          echo "APK_LEGACY_S22=$LEGACY_S22" >> "$GITHUB_ENV"
-          echo "APK_STABLE=$STABLE" >> "$GITHUB_ENV"
+          {
+            echo "APK=$OUT"
+            echo "APK_LEGACY_A52S=$LEGACY_A52S"
+            echo "APK_LEGACY_S22=$LEGACY_S22"
+            echo "APK_STABLE=$STABLE"
+          } >> "$GITHUB_ENV"
 
       - name: Attest APK provenance
         uses: actions/attest-build-provenance@v4
@@ -145,28 +185,38 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub release
+      - name: Write release notes from CHANGELOG.md
         env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          PRERELEASE_INPUT: ${{ inputs.prerelease }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          args=(
-            "$RELEASE_TAG"
-            "$APK" "$APK.sha256"
-            "$APK_LEGACY_A52S" "$APK_LEGACY_A52S.sha256"
-            "$APK_LEGACY_S22" "$APK_LEGACY_S22.sha256"
-            "$APK_STABLE" "$APK_STABLE.sha256"
-            --target "$GITHUB_SHA"
-            --title "$RELEASE_TAG"
-            --generate-notes
-          )
-          # Releases from RELEASE_VERSION on main are full releases; manual runs may opt into prerelease.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$PRERELEASE_INPUT" = "true" ]; then
-            args+=(--prerelease)
-          else
-            args+=(--latest)
+          # The '## X.Y.Z - title' section, without its heading, up to the next '## ' heading.
+          awk -v v="$RELEASE_VERSION" '
+            /^##? / { if (found) exit; if ($1 == "##" && $2 == v) { found = 1; next } }
+            found { print }
+            END { if (!found) exit 1 }
+          ' CHANGELOG.md > notes.md
+          if [ -n "$PREVIOUS_TAG" ]; then
+            printf '\n**Full changelog:** https://github.com/%s/compare/%s...%s\n' \
+              "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$RELEASE_TAG" >> notes.md
           fi
-          gh release create "${args[@]}"
+          cat notes.md
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ needs.prepare.outputs.latest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TITLE="$(grep -E "^## $RELEASE_VERSION( |$)" CHANGELOG.md | head -n1 | sed -E 's/^## [^ ]+( - )?//')"
+          gh release create "$RELEASE_TAG" \
+            "$APK" "$APK.sha256" \
+            "$APK_LEGACY_A52S" "$APK_LEGACY_A52S.sha256" \
+            "$APK_LEGACY_S22" "$APK_LEGACY_S22.sha256" \
+            "$APK_STABLE" "$APK_STABLE.sha256" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG${TITLE:+ – $TITLE}" \
+            --notes-file notes.md \
+            --latest="$LATEST"

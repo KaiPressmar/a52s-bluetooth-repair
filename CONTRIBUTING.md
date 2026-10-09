@@ -34,4 +34,4 @@ A PR should explain the observed problem, hypothesis, behavioral change, safety 
 
 ## Commit and release discipline
 
-Use descriptive commits. Do not commit generated APKs, keystores, credentials, personal bugreports or logs containing identifiers. Releases are produced only from `main` through the release workflow described in `RELEASING.md`.
+Use descriptive commits. Do not commit generated APKs, keystores, credentials, personal bugreports or logs containing identifiers. Open pull requests against `main`, even for fixes to a released version: maintainers cherry-pick them onto the `release/X.Y` branch, from which releases are published (`RELEASING.md`).
