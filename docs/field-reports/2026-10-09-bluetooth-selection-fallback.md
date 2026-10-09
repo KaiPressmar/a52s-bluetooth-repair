@@ -31,6 +31,12 @@ it was absent from that history at export time.
 - A ringing fallback or failed Bluetooth audio connection no longer latches the
   hands-off decision. Fault confirmation still precedes repair.
 - Selecting Bluetooth again resumes diagnosis without resetting repair budgets.
+- Rapid failed selections share the same connection-fault confirmation window.
+  A Bluetooth route label with SCO still disconnected does not complete verification.
+- Switching Bluetooth off or suspending call audio cancels an in-progress route
+  operation; reconnection is diagnosed afresh. Disappearance of Bluetooth after a
+  confirmed fault is not counted as successful recovery.
+- Each rebuild retries its Bluetooth return request at most once.
 - Leaving established Bluetooth audio for the phone remains respected, including
   the existing one-time grace after a repair. Speaker, wired and streaming
   choices cancel route operations.
