@@ -3,6 +3,20 @@
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
+        app:title="@string/pref_category_general">
+        <!-- Not persisted here: the source of truth is AppCompatDelegate's app locale. -->
+        <ListPreference
+            app:entries="@array/language_entries"
+            app:entryValues="@array/language_values"
+            app:iconSpaceReserved="false"
+            app:key="app_language"
+            app:persistent="false"
+            app:title="@string/pref_language_title"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
         app:title="@string/pref_category_protection">
         <SwitchPreferenceCompat
             app:defaultValue="true"

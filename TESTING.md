@@ -12,7 +12,8 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
    - activity and navigation smoke tests;
    - runtime device detection and defaults (A52s, S22, other phones);
    - the launcher icon rendered as squircle, circle and themed icon;
-   - rendered screenshots of every screen in light and dark (`app/build/screenshots/`, uploaded by CI).
+   - localization: every `values-xx/` translation covers all keys with identical placeholders; English is the fallback;
+   - rendered screenshots of every screen in light and dark, in English and German (`app/build/screenshots/`, uploaded by CI).
 3. **Instrumentation** (`androidTest`): read-only smoke checks on a real device.
 4. **Real A52s calls:** the only layer that can prove the HFP/SCO fault is repaired.
 

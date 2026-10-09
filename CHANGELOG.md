@@ -4,6 +4,11 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+### Added
+
+- Full English and German UI: English is the default and fallback, German is a complete translation. In-app language setting (System default / Deutsch / English) and the Android 13+ per-app language setting (`localeConfig`). Update and setup error messages are now translatable too.
+- Dev container (`.devcontainer/`): JDK 21 and the Android SDK as in CI, Docker host access, GitHub CLI, persistent Gradle cache, and recommended extensions including Claude Code and Codex. The same recommendations are in `.vscode/extensions.json`.
+
 ### Project
 
 - MIT license, issue forms (call-audio problem, field report, feature request), SUPPORT, CODE_OF_CONDUCT, CODEOWNERS and Dependabot.

@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for reporting! Every report helps narrow down the Samsung/Qualcomm fault.
         **Please do not post phone numbers, contact names or Bluetooth MAC addresses.**
-        If you have the app installed: open *Einstellungen → Diagnosebericht teilen* **before rebooting** and attach the file.
+        If you have the app installed: open *Settings → Share diagnostic report* (*Einstellungen → Diagnosebericht teilen*) **before rebooting** and attach the file.
   - type: dropdown
     id: symptom
     attributes:
@@ -67,15 +67,15 @@ body:
   - type: dropdown
     id: outcome
     attributes:
-      label: What does the app show under "Verlauf" for that call?
+      label: What does the app show under "History" (Verlauf) for that call?
       options:
         - App not installed / no entry
-        - Alles in Ordnung
-        - Automatisch repariert
-        - Problem blieb bestehen
-        - Bluetooth-Telefonie blockiert
-        - Auf Telefon umgeschaltet
-        - Ohne Fahrzeug oder Headset
+        - All good (Alles in Ordnung)
+        - Repaired automatically (Automatisch repariert)
+        - Problem persisted (Problem blieb bestehen)
+        - Bluetooth calling blocked (Bluetooth-Telefonie blockiert)
+        - Switched to phone (Auf Telefon umgeschaltet)
+        - Without car or headset (Ohne Fahrzeug oder Headset)
   - type: dropdown
     id: reboot
     attributes:

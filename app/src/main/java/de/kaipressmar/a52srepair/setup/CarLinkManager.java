@@ -14,6 +14,7 @@ import android.content.IntentSender;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import de.kaipressmar.a52srepair.R;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -84,7 +85,7 @@ public final class CarLinkManager {
     @SuppressWarnings("deprecation")
     public void link(PairedDevice device, Callback callback) {
         if (cdm == null) {
-            callback.onFailed("Companion-Geräte werden nicht unterstützt");
+            callback.onFailed(context.getString(R.string.setup_link_unsupported));
             return;
         }
         AssociationRequest request =

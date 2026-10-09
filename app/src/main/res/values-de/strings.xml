@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German translation. Keys must match values/strings.xml (enforced by LocalizationTest and lint). -->
+<resources>
+    <!-- Navigation -->
+    <string name="nav_status">Übersicht</string>
+    <string name="nav_history">Verlauf</string>
+    <string name="nav_settings">Einstellungen</string>
+
+    <!-- Status hero -->
+    <string name="status_active_title">Schutz aktiv</string>
+    <string name="status_active_body">Die App arbeitet unsichtbar während deiner Anrufe und behebt Audiofehler automatisch. Du musst nichts tun – auch nicht während der Fahrt.</string>
+    <string name="status_bluetooth_off_body">Bluetooth ist gerade aus. Sobald du über Fahrzeug oder Headset telefonierst, ist der Schutz automatisch dabei.</string>
+    <string name="status_setup_title">Einrichtung abschließen</string>
+    <string name="status_setup_body">Noch ein oder zwei einmalige Schritte, dann arbeitet der Schutz vollautomatisch.</string>
+    <string name="status_paused_title">Schutz pausiert</string>
+    <string name="status_paused_body">Die automatische Reparatur ist in den Einstellungen ausgeschaltet. Anrufe werden nur protokolliert.</string>
+    <string name="status_reboot_title">Neustart empfohlen</string>
+    <string name="status_reboot_body">Beim letzten Anruf war die Bluetooth-Telefonie im System blockiert. Das kann keine App beheben – ein Neustart des Telefons stellt sie wieder her.</string>
+    <string name="status_last_active">Zuletzt aktiv: %1$s</string>
+    <string name="status_never_active">Noch kein Anruf seit der Einrichtung</string>
+
+    <!-- Setup -->
+    <string name="setup_title">Einrichtung</string>
+    <string name="setup_bluetooth_title">Bluetooth-Zugriff</string>
+    <string name="setup_bluetooth_body">Damit die App erkennt, ob Fahrzeug oder Headset verbunden sind.</string>
+    <string name="setup_bluetooth_action">Erlauben</string>
+    <string name="setup_call_title">Anruf-Audio steuern</string>
+    <string name="setup_call_body">Verknüpfe einmalig dein Fahrzeug. Dann startet Android die App nur während Anrufen und sie darf die Audio-Ausgabe umschalten – wie die Audio-Taste in der Telefon-App.</string>
+    <string name="setup_call_action">Fahrzeug verknüpfen</string>
+    <string name="setup_call_adb">Alternative per ADB</string>
+    <string name="setup_done">Erledigt</string>
+    <string name="setup_choose_device">Fahrzeug oder Headset wählen</string>
+    <string name="setup_no_devices">Keine gekoppelten Bluetooth-Geräte gefunden. Kopple zuerst dein Fahrzeug in den Bluetooth-Einstellungen.</string>
+    <string name="setup_link_hint_title">Hinweis zum Systemdialog</string>
+    <string name="setup_link_hint_body">Android zeigt gleich einen Bestätigungsdialog an. Er bezeichnet das Fahrzeug als „Uhr“ und listet mögliche Berechtigungen auf. Das ist technisch bedingt: Nur diese Geräteart erlaubt Apps, das Anruf-Audio zu steuern. Die App fordert keine weiteren Berechtigungen an und sendet keine Daten.</string>
+    <string name="setup_link_continue">Weiter</string>
+    <string name="setup_linked">%1$s verknüpft</string>
+    <string name="setup_link_failed">Verknüpfung fehlgeschlagen: %1$s</string>
+    <string name="setup_adb_title">Einrichtung per ADB</string>
+    <string name="setup_adb_body">Falls der Systemdialog auf deinem Gerät nicht funktioniert: USB- oder WLAN-Debugging aktivieren und am Computer einmalig diesen Befehl ausführen. Die Freigabe bleibt auch nach Neustarts bestehen.</string>
+    <string name="setup_adb_copy">Befehl kopieren</string>
+    <string name="setup_adb_copied">Befehl kopiert</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_close">Schließen</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Bluetooth-Anrufe der letzten 30 Tage</string>
+    <string name="stats_calls">Anrufe</string>
+    <string name="stats_repaired">Repariert</string>
+    <string name="stats_problems">Probleme</string>
+    <string name="last_call_title">Letzter Bluetooth-Anruf</string>
+    <string name="last_call_none">Noch kein Anruf über Fahrzeug oder Headset aufgezeichnet.</string>
+    <string name="how_title">So funktioniert es</string>
+    <string name="how_body">Android startet die App nur, solange ein Anruf läuft. Sie prüft dann, ob das Gesprächs-Audio wirklich über Fahrzeug oder Headset läuft, und baut die Bluetooth-Verbindung bei Bedarf automatisch neu auf. Zwischen den Anrufen läuft nichts im Hintergrund – keine Benachrichtigungen, kein Akkuverbrauch.</string>
+
+    <!-- Update -->
+    <string name="update_title">Update verfügbar</string>
+    <string name="update_body">Version %1$s ist verfügbar.</string>
+    <string name="update_install">Installieren</string>
+    <string name="update_none">Die App ist aktuell.</string>
+    <string name="update_failed">Prüfung fehlgeschlagen (%1$s)</string>
+    <string name="update_checking">Suche nach Updates …</string>
+
+    <!-- History -->
+    <string name="history_empty">Hier erscheinen deine Anrufe, sobald die App sie begleitet hat.</string>
+    <string name="history_meta">%1$s · %2$s</string>
+    <string name="history_preventive">Vorsorglich neu aufgebaut</string>
+    <plurals name="history_actions">
+        <item quantity="one">%1$d Reparaturschritt</item>
+        <item quantity="other">%1$d Reparaturschritte</item>
+    </plurals>
+
+    <!-- Outcomes -->
+    <string name="outcome_healthy">Alles in Ordnung</string>
+    <string name="outcome_repaired">Automatisch repariert</string>
+    <string name="outcome_unresolved">Problem blieb bestehen</string>
+    <string name="outcome_bluetooth_unavailable">Bluetooth-Telefonie blockiert</string>
+    <string name="outcome_left_bluetooth">Auf Telefon umgeschaltet</string>
+    <string name="outcome_not_bluetooth">Ohne Fahrzeug oder Headset</string>
+
+    <!-- Faults -->
+    <string name="fault_call_not_on_bluetooth">Anruf lief nicht über Bluetooth</string>
+    <string name="fault_sco_disconnected">Bluetooth-Audioverbindung unterbrochen</string>
+    <string name="fault_downlink">Gesprächspartner nicht über Bluetooth hörbar</string>
+    <string name="fault_voice_silenced">Gesprächslautstärke war stumm</string>
+    <string name="fault_route_missing">Bluetooth-Telefonie im System nicht verfügbar</string>
+
+    <!-- Settings -->
+    <string name="pref_category_general">Allgemein</string>
+    <string name="pref_category_protection">Schutz</string>
+    <string name="pref_protection_title">Automatische Reparatur</string>
+    <string name="pref_protection_summary">Erkennt Audiofehler während Anrufen und behebt sie selbstständig</string>
+    <string name="pref_preventive_title">Vorsorglicher Neuaufbau bei Anrufbeginn</string>
+    <string name="pref_car_link_title">Verknüpfte Geräte</string>
+    <string name="pref_car_link_none">Kein Gerät verknüpft – tippen zum Verknüpfen</string>
+    <string name="pref_car_unlink_title">Verknüpfung entfernen?</string>
+    <string name="pref_car_unlink_body">Ohne Verknüpfung startet Android die App bei Anrufen nicht mehr (außer die Freigabe wurde per ADB erteilt).</string>
+    <string name="pref_car_unlink">Entfernen</string>
+    <string name="pref_car_add">Weiteres Gerät</string>
+    <string name="pref_category_diagnostics">Diagnose</string>
+    <string name="pref_share_title">Diagnosebericht teilen</string>
+    <string name="pref_share_summary">Verlauf und technisches Protokoll. Vor dem Veröffentlichen prüfen.</string>
+    <string name="pref_clear_title">Verlauf und Protokoll löschen</string>
+    <string name="pref_clear_done">Verlauf gelöscht</string>
+    <string name="pref_category_updates">Updates</string>
+    <string name="pref_auto_update_title">Beim Öffnen nach Updates suchen</string>
+    <string name="pref_check_update_title">Jetzt nach Updates suchen</string>
+    <string name="pref_category_about">Info</string>
+    <string name="pref_version_title">Version</string>
+    <string name="pref_device_title">Gerät</string>
+    <string name="pref_device_summary">%1$s · %2$s</string>
+    <string name="pref_project_title">Projekt auf GitHub</string>
+
+    <string-array name="preventive_mode_entries">
+        <item>Bei jedem Bluetooth-Anruf</item>
+        <item>Nur nach erkannten Problemen</item>
+        <item>Aus</item>
+    </string-array>
+
+    <string name="share_chooser">Diagnosebericht teilen</string>
+    <string name="share_subject">Bluetooth Call Repair – Diagnosebericht</string>
+
+    <!-- Language -->
+    <string name="pref_language_title">Sprache</string>
+    <string-array name="language_entries">
+        <item>Systemsprache</item>
+        <item>Deutsch</item>
+        <item>English</item>
+    </string-array>
+
+    <!-- Car link and update errors -->
+    <string name="setup_link_unsupported">Dieses Gerät unterstützt keine Companion-Verknüpfung. Nutze die ADB-Alternative.</string>
+    <string name="update_unavailable">Kein Update verfügbar.</string>
+    <string name="update_allow_install">Bitte Installation aus dieser App einmalig erlauben.</string>
+    <string name="update_untrusted">Update-Quelle ist nicht vertrauenswürdig.</string>
+    <string name="update_downloading">Update wird heruntergeladen …</string>
+    <string name="update_verified">Prüfsumme verifiziert – Installation wird geöffnet.</string>
+    <string name="update_installer_failed">Installer konnte nicht geöffnet werden.</string>
+    <string name="update_error">Update fehlgeschlagen: %1$s</string>
+    <string name="update_error_checksum">Prüfsumme stimmt nicht oder ist ungültig</string>
+    <string name="update_error_package">Die heruntergeladene Datei passt nicht zu dieser App oder Version</string>
+    <string name="update_error_network">Download fehlgeschlagen – bitte Internetverbindung prüfen</string>
+</resources>

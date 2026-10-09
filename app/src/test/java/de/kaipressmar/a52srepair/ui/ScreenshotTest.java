@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode;
 /** Renders every screen with sample data to app/build/screenshots for visual review. */
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = 34, qualifiers = "de-rDE-w393dp-h852dp-xxhdpi")
+@Config(sdk = 34, qualifiers = "en-rUS-w393dp-h852dp-xxhdpi")
 public class ScreenshotTest {
     private static final long HOUR = 60L * 60L * 1000L;
 
@@ -58,6 +58,10 @@ public class ScreenshotTest {
 
     @Test @Config(qualifiers = "+night") public void darkTheme() throws IOException {
         capture("dark");
+    }
+
+    @Test @Config(qualifiers = "de-rDE-w393dp-h852dp-xxhdpi") public void germanLightTheme() throws IOException {
+        capture("light-de");
     }
 
     private void capture(String variant) throws IOException {

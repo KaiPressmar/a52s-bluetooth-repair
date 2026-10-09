@@ -58,4 +58,4 @@ body:
     id: notes
     attributes:
       label: Notes
-      description: Anything else – outcomes shown in "Verlauf", situations where it failed, etc.
+      description: Anything else – outcomes shown under "History", situations where it failed, etc.

@@ -68,7 +68,7 @@ public final class DiagnosticReport {
                 new Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
                         .putExtra(Intent.EXTRA_STREAM, uri)
-                        .putExtra(Intent.EXTRA_SUBJECT, "A52s Bluetooth Repair – Diagnose")
+                        .putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return Intent.createChooser(send, context.getString(R.string.share_chooser));
     }
