@@ -42,6 +42,7 @@ extras. No background service or new permission is introduced.
 | Bluetooth requests ignored while HFP stays connected | Escalate once the direct request times out, using the existing teardown/return sequence and shared per-call budget. |
 | Brief healthy pulse after a fault | Keep the fault unresolved until healthy routing/evidence stays present for 2.5 seconds. |
 | Both SCO and voice-route evidence unknown | Do not count a confirmed fault as repaired; keep observing. |
+| Unknown audio before a fallback to phone | Do not infer a manual departure from working Bluetooth solely from its route label. |
 | Call waiting or multiple calls | Defer disruptive repair without spending another attempt. Resume diagnosis for a single call. |
 | No current Telecom route yet | Wait for a route observation. |
 | Endpoint-only updates or stale legacy Bluetooth | Use the selected modern endpoint and available endpoint list, including an empty list. |

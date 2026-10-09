@@ -63,6 +63,7 @@ public final class CallAudioService extends InCallService implements CallSession
         if (getCalls().isEmpty()) {
             session.finish();
             session = null;
+            endpoints = null;
             if (activeService.get() == this) activeService.clear();
         } else {
             session.onEvent();

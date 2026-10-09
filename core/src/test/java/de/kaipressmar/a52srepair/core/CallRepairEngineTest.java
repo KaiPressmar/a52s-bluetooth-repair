@@ -80,6 +80,18 @@ public class CallRepairEngineTest {
         assertFalse(h.end().userLeftBluetooth);
     }
 
+    @Test public void unknownAudioBeforeFallbackCannotLatchHandsOff() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().scoAudioConnected(null).voiceOnBluetooth(null).build());
+        h.tick();
+        h.now += 2_000L;
+        h.tick();
+        h.state = droppedToPhone();
+        h.runFor(15_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), h.executed);
+        assertFalse(h.end().userLeftBluetooth);
+    }
+
     @Test public void failedBluetoothSelectionIsRepairedAfterScoFallback() {
         Harness h = new Harness(PreventiveRebuildMode.OFF,
                 FaultClassifierTest.carCall().scoAudioConnected(false)

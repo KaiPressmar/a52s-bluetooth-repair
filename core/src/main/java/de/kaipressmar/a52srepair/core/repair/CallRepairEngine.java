@@ -264,6 +264,7 @@ public final class CallRepairEngine {
             lastBluetoothUsable = s.phase.carriesAudio()
                     && !Boolean.FALSE.equals(s.scoAudioConnected)
                     && !Boolean.FALSE.equals(s.voiceOnBluetooth)
+                    && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth))
                     && now - bluetoothSince >= STEADY_BLUETOOTH_MS;
             everOnBluetooth = true;
         } else {
