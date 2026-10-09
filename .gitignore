@@ -6,6 +6,13 @@ local.properties
 .idea/
 *.iml
 
+# VS Code Java (Buildship/JDT) compiler output
+bin/
+.classpath
+.project
+.settings/
+.factorypath
+
 # Signing material — never commit
 *.jks
 *.keystore

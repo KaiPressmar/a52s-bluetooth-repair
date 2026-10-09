@@ -11,9 +11,15 @@
   "remoteUser": "vscode",
   "mounts": [
     // Gradle caches survive container rebuilds.
-    "source=bt-call-repair-gradle,target=/home/vscode/.gradle,type=volume"
+    "source=bt-call-repair-gradle,target=/home/vscode/.gradle,type=volume",
+    // Claude Code and Codex logins/settings survive container rebuilds.
+    "source=bt-call-repair-claude,target=/home/vscode/.claude,type=volume",
+    "source=bt-call-repair-codex,target=/home/vscode/.codex,type=volume"
   ],
   "containerEnv": {
+    // Keeps ~/.claude.json inside the persisted ~/.claude volume.
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "CODEX_HOME": "/home/vscode/.codex",
     "GRADLE_OPTS": "-Dorg.gradle.daemon=true"
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
@@ -43,7 +49,7 @@
       "settings": {
         "java.configuration.updateBuildConfiguration": "automatic",
         "java.import.gradle.wrapper.enabled": true,
-        "java.jdt.ls.java.home": "/usr/local/sdkman/candidates/java/current",
+        "java.jdt.ls.java.home": "/usr/lib/jvm/msopenjdk-current",
         "redhat.telemetry.enabled": false,
         "cSpell.language": "en,de",
         "files.exclude": {

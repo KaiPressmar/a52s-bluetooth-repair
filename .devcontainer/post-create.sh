@@ -2,8 +2,8 @@
 # Runs once after the dev container is created.
 set -euo pipefail
 
-# The Gradle cache volume is created root-owned on first use.
-sudo chown -R vscode:vscode /home/vscode/.gradle
+# The Gradle, Claude Code and Codex volumes are created root-owned on first use.
+sudo chown -R vscode:vscode /home/vscode/.gradle /home/vscode/.claude /home/vscode/.codex
 
 # Never write local.properties: the workspace may be shared with the host. Gradle finds the SDK
 # through ANDROID_HOME. If a host local.properties points to a host-only SDK path, link that
