@@ -1,19 +1,82 @@
+# Dependency updates are reviewed like any other change (CI must pass, CODEOWNERS reviews).
+#
+# Policy:
+# - Monthly, grouped by area; a cooldown lets brand-new releases settle (7 days, majors 30).
+# - Minor and patch updates are grouped; major updates arrive as individual PRs.
+# - The Android build toolchain (Android Gradle Plugin + Gradle wrapper) only moves together,
+#   and its major versions are migrated deliberately: AGP 9 needed Gradle 9.6+, compileSdk 37
+#   and build-tools 36 at once, which isolated bumps cannot express.
 version: 2
+
 updates:
   - package-ecosystem: gradle
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels: [dependencies, gradle]
+    commit-message:
+      prefix: deps
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
     groups:
+      android-toolchain:
+        patterns: ["com.android.application", "com.android.tools.build:*", "gradle-wrapper"]
+        update-types: [minor, patch]
       androidx-and-material:
         patterns: ["androidx.*", "com.google.android.material*"]
+        exclude-patterns: ["androidx.test*"]
+        update-types: [minor, patch]
       test-libraries:
         patterns: ["junit*", "org.robolectric*", "androidx.test*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.tools.build:gradle"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+      time: "06:00"
+      timezone: Europe/Berlin
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: ci
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
+
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: monthly
+      time: "06:00"
+      timezone: Europe/Berlin
+    labels: [dependencies, devcontainer]
+    commit-message:
+      prefix: devcontainer
+    groups:
+      devcontainer-features:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /.devcontainer
+    schedule:
+      interval: monthly
+      time: "06:00"
+      timezone: Europe/Berlin
+    labels: [dependencies, devcontainer]
+    commit-message:
+      prefix: devcontainer
+    cooldown:
+      default-days: 7

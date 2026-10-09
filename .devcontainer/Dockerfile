@@ -1,4 +1,4 @@
-# Android build environment matching CI: JDK 21, Android SDK platforms 34-36, build-tools 35.
+# Android build environment matching CI: JDK 21, Android SDK platform 37, build-tools 36.
 FROM mcr.microsoft.com/devcontainers/java:1-21-bookworm
 
 ARG CMDLINE_TOOLS_VERSION=13114758
@@ -21,8 +21,6 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
     && (yes | sdkmanager --licenses > /dev/null) \
     && sdkmanager --install \
         "platform-tools" \
-        "platforms;android-34" \
-        "platforms;android-35" \
-        "platforms;android-36" \
-        "build-tools;35.0.0" \
+        "platforms;android-37.0" \
+        "build-tools;36.0.0" \
     && chown -R vscode:vscode "${ANDROID_HOME}"

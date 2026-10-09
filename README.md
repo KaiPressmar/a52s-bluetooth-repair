@@ -119,7 +119,7 @@ scripts/   Toolchain setup and on-device state capture
 
 The quickest start is the **dev container** (`.devcontainer/`): JDK 21 and the Android SDK exactly as in CI, recommended VS Code extensions (Java/Gradle, Claude Code, Codex, GitHub, Container Tools …), access to the host's Docker daemon and a persistent Gradle cache. Open it in GitHub Codespaces or with *Dev Containers: Reopen in Container* in VS Code.
 
-Without containers: JDK 17+ and Android SDK platforms 34–36; `scripts/setup-dev-env.sh` installs everything without root. The Gradle wrapper pins Gradle 8.13.
+Without containers: JDK 17+ (CI uses 21), Android SDK platform 37 and build-tools 36; `scripts/setup-dev-env.sh` installs everything without root. The Gradle wrapper pins Gradle 9.8.
 
     ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 

@@ -4,4 +4,7 @@
     <issue id="ObsoleteSdkInt">
         <ignore path="src/main/res/mipmap-anydpi-v26" />
     </issue>
+    <!-- targetSdk stays at 36 on purpose while compileSdk is 37: Android 17 behavior changes
+         are adopted in their own reviewed change, not as a side effect of a toolchain update. -->
+    <issue id="OldTargetApi" severity="ignore" />
 </lint>
