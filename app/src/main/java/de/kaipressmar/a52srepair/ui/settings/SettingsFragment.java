@@ -2,17 +2,18 @@ package de.kaipressmar.a52srepair.ui.settings;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
+import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.kaipressmar.a52srepair.BuildConfig;
 import de.kaipressmar.a52srepair.R;
-import de.kaipressmar.a52srepair.core.device.DeviceFamily;
+import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
+import de.kaipressmar.a52srepair.data.DeviceInfo;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticReport;
 import de.kaipressmar.a52srepair.setup.CarLinkManager;
@@ -46,18 +47,13 @@ public final class SettingsFragment extends PreferenceFragmentCompat implements 
         }
         Preference device = findPreference("about_device");
         if (device != null) {
-            String key = getString(R.string.device_profile_key);
-            String summary = getString(
-                    R.string.pref_device_summary,
-                    getString(R.string.device_profile_name),
-                    getString(R.string.device_runtime_name),
-                    getString(R.string.device_reference_firmware),
-                    Build.MODEL);
-            if (!DeviceFamily.matchesProfile(key, Build.MODEL, Build.DEVICE)) {
-                summary += "\n" + getString(R.string.pref_device_mismatch,
-                        getString(R.string.device_profile_name), Build.MODEL);
-            }
-            device.setSummary(summary);
+            device.setSummary(getString(
+                    R.string.pref_device_summary, DeviceInfo.deviceName(), DeviceInfo.androidVersion()));
+        }
+        // Show the device-specific default instead of "not set".
+        ListPreference preventive = findPreference(AppSettings.KEY_PREVENTIVE_MODE);
+        if (preventive != null && preventive.getValue() == null) {
+            preventive.setValue(DeviceInfo.defaultPreventiveMode().name());
         }
     }
 

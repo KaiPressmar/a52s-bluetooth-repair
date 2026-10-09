@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Bluetooth Call Repair</string>
     <!-- Navigation -->
     <string name="nav_status">Übersicht</string>
     <string name="nav_history">Verlauf</string>
@@ -105,9 +106,8 @@
     <string name="pref_check_update_title">Jetzt nach Updates suchen</string>
     <string name="pref_category_about">Info</string>
     <string name="pref_version_title">Version</string>
-    <string name="pref_device_title">Geräteprofil</string>
-    <string name="pref_device_summary">%1$s · %2$s · Referenz-Firmware %3$s · Gerät %4$s</string>
-    <string name="pref_device_mismatch">Achtung: Dieses Build ist für %1$s, das Gerät ist %2$s.</string>
+    <string name="pref_device_title">Gerät</string>
+    <string name="pref_device_summary">%1$s · %2$s</string>
     <string name="pref_project_title">Projekt auf GitHub</string>
     <string name="project_url" translatable="false">https://github.com/KaiPressmar/a52s-bluetooth-repair</string>
 

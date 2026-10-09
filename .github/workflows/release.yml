@@ -71,10 +71,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Test device-specific release candidates
+      - name: Test release candidate
         run: |
-          ./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest --stacktrace
-          ./gradlew :app:lintA52sRelease :app:lintS22Release --stacktrace
+          ./gradlew :core:test :app:testDebugUnitTest --stacktrace
+          ./gradlew :app:lintRelease --stacktrace
 
       - name: Require signing secrets
         env:
@@ -95,59 +95,54 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
           chmod 600 "$RUNNER_TEMP/release.keystore"
 
-      - name: Build signed A52s and S22 release APKs
+      - name: Build signed universal release APK
         env:
           ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/release.keystore
           ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
           ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
           ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleA52sRelease :app:assembleS22Release --stacktrace
+        run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Verify and package device-specific APKs
+      - name: Verify and package APKs
         shell: bash
         run: |
           set -euo pipefail
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          SRC="app/build/outputs/apk/release/app-release.apk"
           test -x "$APKSIGNER"
+          test -f "$SRC"
+          "$APKSIGNER" verify --verbose --print-certs "$SRC"
 
-          SRC_A52S="app/build/outputs/apk/a52s/release/app-a52s-release.apk"
-          SRC_S22="app/build/outputs/apk/s22/release/app-s22-release.apk"
-          OUT_A52S="bluetooth-repair-a52s-5g-${RELEASE_TAG}.apk"
-          OUT_S22="bluetooth-repair-galaxy-s22-${RELEASE_TAG}.apk"
-
-          for src in "$SRC_A52S" "$SRC_S22"; do
-            test -f "$src"
-            "$APKSIGNER" verify --verbose --print-certs "$src"
+          # One universal APK. The former per-device names are byte-identical copies so that
+          # installed 0.16.x builds of either variant find their update and converge.
+          OUT="bluetooth-repair-${RELEASE_TAG}.apk"
+          LEGACY_A52S="bluetooth-repair-a52s-5g-${RELEASE_TAG}.apk"
+          LEGACY_S22="bluetooth-repair-galaxy-s22-${RELEASE_TAG}.apk"
+          for name in "$OUT" "$LEGACY_A52S" "$LEGACY_S22"; do
+            cp "$SRC" "$name"
+            sha256sum "$name" > "$name.sha256"
           done
 
-          cp "$SRC_A52S" "$OUT_A52S"
-          cp "$SRC_S22" "$OUT_S22"
-          sha256sum "$OUT_A52S" > "$OUT_A52S.sha256"
-          sha256sum "$OUT_S22" > "$OUT_S22.sha256"
-
-          echo "APK_A52S=$OUT_A52S" >> "$GITHUB_ENV"
-          echo "APK_S22=$OUT_S22" >> "$GITHUB_ENV"
+          echo "APK=$OUT" >> "$GITHUB_ENV"
+          echo "APK_LEGACY_A52S=$LEGACY_A52S" >> "$GITHUB_ENV"
+          echo "APK_LEGACY_S22=$LEGACY_S22" >> "$GITHUB_ENV"
 
       - name: Attest APK provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: |
-            ${{ env.APK_A52S }}
-            ${{ env.APK_S22 }}
+          subject-path: ${{ env.APK }}
 
-      - name: Upload signed device builds
+      - name: Upload signed build
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.RELEASE_TAG }}-signed-device-apks
+          name: ${{ env.RELEASE_TAG }}-signed-apk
           path: |
-            ${{ env.APK_A52S }}
-            ${{ env.APK_A52S }}.sha256
-            ${{ env.APK_S22 }}
-            ${{ env.APK_S22 }}.sha256
+            ${{ env.APK }}
+            ${{ env.APK }}.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub release with both device builds
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
@@ -157,8 +152,9 @@ jobs:
           set -euo pipefail
           args=(
             "$RELEASE_TAG"
-            "$APK_A52S" "$APK_A52S.sha256"
-            "$APK_S22" "$APK_S22.sha256"
+            "$APK" "$APK.sha256"
+            "$APK_LEGACY_A52S" "$APK_LEGACY_A52S.sha256"
+            "$APK_LEGACY_S22" "$APK_LEGACY_S22.sha256"
             --target "$GITHUB_SHA"
             --title "$RELEASE_TAG"
             --generate-notes

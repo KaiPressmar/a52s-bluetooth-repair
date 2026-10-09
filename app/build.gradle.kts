@@ -2,8 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.16.0")
-val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("17")
+val releaseVersion = providers.environmentVariable("RELEASE_VERSION").orElse("0.17.0")
+val releaseVersionCode = providers.environmentVariable("RELEASE_VERSION_CODE").orElse("19")
 val signingStoreFile = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE")
 val signingStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD")
 val signingKeyAlias = providers.environmentVariable("ANDROID_SIGNING_KEY_ALIAS")
@@ -25,18 +25,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    flavorDimensions += "device"
-    productFlavors {
-        create("a52s") {
-            dimension = "device"
-            // Samsung's final official A52s runtime is Android 14 / One UI 6.1.
-            targetSdk = 34
-        }
-        create("s22") {
-            dimension = "device"
-            targetSdk = 36
-        }
-    }
+    // One universal APK for Android 12-16. Device- and Android-version-specific behavior is
+    // decided at runtime (DeviceFamily, Build.VERSION.SDK_INT), so no wrong build can be installed.
 
     signingConfigs {
         if (hasReleaseSigning) {

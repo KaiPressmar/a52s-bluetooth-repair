@@ -28,8 +28,7 @@ public class DiagnosticLogTest {
 
     @Test public void reportContainsEnvironmentAndCalls() {
         String report = DiagnosticReport.build(context);
-        assertTrue(report.contains(
-                "profile=" + context.getString(de.kaipressmar.a52srepair.R.string.device_profile_key)));
+        assertTrue(report.contains("family="));
         assertTrue(report.contains("== Calls"));
     }
 }

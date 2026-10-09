@@ -2,6 +2,20 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
+## 0.17.0 - universal APK and app icon
+
+### Changed
+
+- One universal APK for all devices and Android 12–16 instead of the `a52s`/`s22` builds. The code was already identical; the device model and Android version are now detected at runtime (preventive rebuild default: A52s every car call, other phones after recent problems).
+- App renamed to **Bluetooth Call Repair**.
+- Updater uses `bluetooth-repair-vX.Y.Z.apk`. Releases also publish identical copies under the former per-device names, so 0.16.x installs of either variant (even a "wrong" one) update to the universal build.
+- CI runs one job; runtime-relevant Robolectric tests run on Android 14 and 16.
+
+### Added
+
+- New adaptive launcher icon (handset with sound waves plus a Bluetooth badge; flat, keyline-aligned) with a themed monochrome layer.
+- README header with icon, badges and screenshots.
+
 ## 0.16.0 - invisible, Telecom-based repair
 
 ### Why

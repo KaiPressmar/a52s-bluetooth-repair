@@ -3,7 +3,6 @@ package de.kaipressmar.a52srepair.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 import androidx.preference.PreferenceManager;
-import de.kaipressmar.a52srepair.R;
 import de.kaipressmar.a52srepair.core.repair.PreventiveRebuildMode;
 
 /** User settings (shared with the preference screen) plus small internal app state. */
@@ -35,11 +34,8 @@ public final class AppSettings {
     }
 
     public PreventiveRebuildMode preventiveMode() {
-        PreventiveRebuildMode fallback =
-                PreventiveRebuildMode.parse(
-                        context.getString(R.string.default_preventive_mode),
-                        PreventiveRebuildMode.AFTER_PROBLEMS);
-        return PreventiveRebuildMode.parse(settings.getString(KEY_PREVENTIVE_MODE, null), fallback);
+        return PreventiveRebuildMode.parse(
+                settings.getString(KEY_PREVENTIVE_MODE, null), DeviceInfo.defaultPreventiveMode());
     }
 
     public boolean autoUpdateCheck() {

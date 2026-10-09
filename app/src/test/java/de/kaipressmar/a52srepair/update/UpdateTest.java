@@ -28,22 +28,27 @@ public class UpdateTest {
     }
 
     @Test public void selectsNewestCompleteReleaseForFlavor() throws Exception {
-        String json = "[" + release("v0.17.0", false, "bluetooth-repair-a52s-5g-v0.17.0.apk")
-                + "," + release("v0.16.1", false,
-                        "bluetooth-repair-a52s-5g-v0.16.1.apk", "bluetooth-repair-a52s-5g-v0.16.1.apk.sha256")
-                + "," + release("v0.18.0", true,
+        String json = "[" + release("v0.19.0", false, "bluetooth-repair-v0.19.0.apk")
+                + "," + release("v0.18.0", false,
+                        "bluetooth-repair-v0.18.0.apk", "bluetooth-repair-v0.18.0.apk.sha256",
                         "bluetooth-repair-a52s-5g-v0.18.0.apk", "bluetooth-repair-a52s-5g-v0.18.0.apk.sha256")
+                + "," + release("v0.20.0", true,
+                        "bluetooth-repair-v0.20.0.apk", "bluetooth-repair-v0.20.0.apk.sha256")
                 + "]";
-        UpdateRelease best = UpdateRelease.selectNewest(json, "a52s", "0.16.0");
-        assertEquals("0.16.1", best.version);
-        assertNull(UpdateRelease.selectNewest(json, "s22", "0.16.0"));
-        assertNull(UpdateRelease.selectNewest(json, "a52s", "0.16.1"));
+        UpdateRelease best = UpdateRelease.selectNewest(json, "0.17.0");
+        assertEquals("0.18.0", best.version);
+        assertEquals("bluetooth-repair-v0.18.0.apk", best.apkName);
+        assertNull(UpdateRelease.selectNewest(json, "0.18.0"));
     }
 
-    @Test public void apkNamesMatchReleaseWorkflow() {
-        assertEquals("bluetooth-repair-a52s-5g-v1.0.0.apk", UpdateRelease.expectedApkName("a52s", "1.0.0"));
-        assertEquals("bluetooth-repair-galaxy-s22-v1.0.0.apk", UpdateRelease.expectedApkName("s22", "1.0.0"));
-        assertNull(UpdateRelease.expectedApkName("pixel", "1.0.0"));
+    @Test public void apkNameMatchesReleaseWorkflow() {
+        assertEquals("bluetooth-repair-v1.0.0.apk", UpdateRelease.expectedApkName("1.0.0"));
+    }
+
+    @Test public void legacyPerDeviceAssetsAloneAreIgnored() throws Exception {
+        String json = "[" + release("v0.18.0", false,
+                "bluetooth-repair-galaxy-s22-v0.18.0.apk", "bluetooth-repair-galaxy-s22-v0.18.0.apk.sha256") + "]";
+        assertNull(UpdateRelease.selectNewest(json, "0.17.0"));
     }
 
     @Test public void checksumParsing() {

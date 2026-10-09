@@ -1,6 +1,22 @@
-# A52s Bluetooth Repair
+<p align="center">
+  <img src="docs/assets/app-icon.png" width="112" alt="Bluetooth Call Repair app icon">
+</p>
 
-[![CI](https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml/badge.svg)](https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml)
+<h1 align="center">Bluetooth Call Repair</h1>
+
+<p align="center">
+  <a href="https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml"><img src="https://github.com/KaiPressmar/a52s-bluetooth-repair/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/KaiPressmar/a52s-bluetooth-repair/releases"><img src="https://img.shields.io/github/v/release/KaiPressmar/a52s-bluetooth-repair?include_prereleases&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/Android-12%E2%80%9316-3DDC84" alt="Android 12–16">
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshot-status.png" width="230" alt="Status screen">
+  &nbsp;
+  <img src="docs/assets/screenshot-history.png" width="230" alt="Call history">
+  &nbsp;
+  <img src="docs/assets/screenshot-settings.png" width="230" alt="Settings">
+</p>
 
 Hands-free repair for the Bluetooth call-audio failure on the **Samsung Galaxy A52s 5G (SM-A528, Android 14 / One UI 6.1)**. Bluetooth stays connected and music plays, but call audio in the car or headset fails until the phone is rebooted. In the most common variant, the other side hears you and you hear nothing.
 
@@ -17,6 +33,10 @@ Hands-free repair for the Bluetooth call-audio failure on the **Samsung Galaxy A
 - **Honest about limits.** If Android no longer offers a Bluetooth call route at all, no app can fix it. The app records it and recommends a reboot.
 
 Repairs go through Telecom, the system component that owns call routing, exactly like the audio button in the phone app. Earlier versions used `AudioManager.setCommunicationDevice()`, which Android 14 silently ignores during cellular calls. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the AOSP evidence.
+
+## One app for every device
+
+There is a single APK. The device model and Android version are detected at runtime, so a wrong build can't be installed. On the Galaxy A52s 5G the preventive rebuild is on for every car call. On other phones (e.g. Galaxy S22) it runs only after a problem was seen in the last 7 days. Releases also carry the APK under the former per-device names, so installs of 0.16.x of either variant update to the universal build.
 
 ## Setup (once)
 
@@ -36,7 +56,7 @@ Afterwards the status screen shows **Schutz aktiv**, and you don't need to open 
 
 ```
 core/      Pure Java domain logic: fault classification, per-call repair state machine, reports
-app/       Android app (flavors a52s, s22): Telecom service, audio probes, setup, UI, updates
+app/       Android app (one universal APK): Telecom service, audio probes, setup, UI, updates
 docs/      Issue research, architecture, field reports
 scripts/   Toolchain setup and on-device state capture
 ```
@@ -45,15 +65,15 @@ scripts/   Toolchain setup and on-device state capture
 
 Requirements: JDK 17+ (CI uses 21) and Android SDK platforms 34–36. `scripts/setup-dev-env.sh` installs everything into `~/dev-tools` without root; then run `source ~/dev-tools/env.sh`. The Gradle wrapper pins Gradle 8.13.
 
-    ./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest
-    ./gradlew :app:lintA52sDebug :app:lintS22Debug
-    ./gradlew :app:assembleA52sDebug
+    ./gradlew :core:test :app:testDebugUnitTest
+    ./gradlew :app:lintDebug
+    ./gradlew :app:assembleDebug
 
 The unit tests also render every screen (light and dark) to `app/build/screenshots/`. For on-device debugging use adb wireless debugging. `scripts/capture-call-audio-state.sh` captures audio, Bluetooth and Telecom state during a faulty call.
 
 ## Releases
 
-Signed APKs for both phones are published as [GitHub Releases](https://github.com/KaiPressmar/a52s-bluetooth-repair/releases) with SHA-256 checksums and build-provenance attestation. Changing `RELEASE_VERSION` on `main` triggers a release. The app can update itself from these releases (checked only while the app is open). See [RELEASING.md](RELEASING.md).
+One signed universal APK (`bluetooth-repair-vX.Y.Z.apk`, Android 12–16) is published as [GitHub Releases](https://github.com/KaiPressmar/a52s-bluetooth-repair/releases) with SHA-256 checksums and build-provenance attestation. Changing `RELEASE_VERSION` on `main` triggers a release. The app can update itself from these releases (checked only while the app is open). See [RELEASING.md](RELEASING.md).
 
 ## Privacy and safety
 

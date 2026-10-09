@@ -5,12 +5,13 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 ## Test layers
 
 1. **`:core` JVM tests** (`./gradlew :core:test`): fault classification, the per-call repair state machine with a simulated clock and a simulated Telecom, call-report encoding and statistics, version and device helpers. Every safety rule lives here.
-2. **Robolectric tests** (`:app:test<Flavor>DebugUnitTest`):
+2. **Robolectric tests** (`:app:testDebugUnitTest`, runtime-relevant tests run on Android 14 and 16):
    - Telecom constant mapping;
    - an end-to-end `CallSession` with a fake Telecom host (preventive rebuild, stuck-on-phone repair, persistence);
    - repository, log rotation, update parsing and verification;
    - activity and navigation smoke tests;
-   - per-flavor defaults (`testA52s`, `testS22`);
+   - runtime device detection and defaults (A52s, S22, other phones);
+   - the launcher icon rendered as squircle, circle and themed icon;
    - rendered screenshots of every screen in light and dark (`app/build/screenshots/`, uploaded by CI).
 3. **Instrumentation** (`androidTest`): read-only smoke checks on a real device.
 4. **Real A52s calls:** the only layer that can prove the HFP/SCO fault is repaired.

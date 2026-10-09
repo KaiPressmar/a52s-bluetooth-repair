@@ -1,7 +1,6 @@
 package de.kaipressmar.a52srepair.core;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -16,8 +15,10 @@ public class DeviceAndVersionTest {
         assertEquals(DeviceFamily.A52S, DeviceFamily.detect(null, "a52sxq"));
         assertEquals(DeviceFamily.S22, DeviceFamily.detect("SM-S901B", "r0s"));
         assertEquals(DeviceFamily.OTHER, DeviceFamily.detect("Pixel 8", "shiba"));
-        assertTrue(DeviceFamily.matchesProfile("a52s", "SM-A528B", "a52sxq"));
-        assertFalse(DeviceFamily.matchesProfile("s22", "SM-A528B", "a52sxq"));
+        assertEquals("Galaxy A52s 5G", DeviceFamily.A52S.displayName);
+        assertEquals(PreventiveRebuildMode.ALWAYS, PreventiveRebuildMode.defaultFor(DeviceFamily.A52S));
+        assertEquals(PreventiveRebuildMode.AFTER_PROBLEMS, PreventiveRebuildMode.defaultFor(DeviceFamily.S22));
+        assertEquals(PreventiveRebuildMode.AFTER_PROBLEMS, PreventiveRebuildMode.defaultFor(DeviceFamily.OTHER));
     }
 
     @Test public void versionsCompareSemantically() {
