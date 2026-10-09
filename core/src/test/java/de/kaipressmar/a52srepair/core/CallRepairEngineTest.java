@@ -193,6 +193,89 @@ public class CallRepairEngineTest {
         assertTrue(report.userLeftBluetooth);
     }
 
+    /** Runs the preventive rebuild until Telecom reports Bluetooth again. */
+    private static Harness afterPreventiveRebuild() {
+        Harness h = new Harness(PreventiveRebuildMode.ALWAYS, FaultClassifierTest.carCall().build());
+        while (h.executed.size() < 2) {
+            h.tick();
+            h.now += 250L;
+        }
+        return h;
+    }
+
+    private static CallAudioSnapshot droppedToPhone() {
+        // Android 14 Telecom: BT-initiated SCO disconnect in ActiveBluetoothRoute -> earpiece.
+        return FaultClassifierTest.carCall()
+                .route(AudioRoute.EARPIECE)
+                .scoAudioConnected(false)
+                .build();
+    }
+
+    @Test public void dropToPhoneRightAfterOurRebuildIsRepairedNotTreatedAsUserChoice() {
+        Harness h = afterPreventiveRebuild();
+        h.runFor(4_000L); // past verification: Bluetooth looked fine
+        h.state = droppedToPhone(); // the fresh SCO link collapses, Telecom falls back
+        h.runFor(20_000L);
+
+        assertEquals(
+                List.of(
+                        RepairCommand.ROUTE_TO_EARPIECE,
+                        RepairCommand.ROUTE_TO_BLUETOOTH,
+                        RepairCommand.ROUTE_TO_BLUETOOTH),
+                h.executed);
+        CallReport report = h.end();
+        assertFalse("our failed repair is not a user choice", report.userLeftBluetooth);
+        assertEquals(CallOutcome.REPAIRED, report.outcome);
+        assertTrue(report.faults.contains(Fault.CALL_NOT_ON_BLUETOOTH));
+    }
+
+    @Test public void secondSwitchToPhoneAfterOurRepairIsRespected() {
+        Harness h = afterPreventiveRebuild();
+        h.runFor(4_000L);
+        h.state = droppedToPhone();
+        h.runFor(10_000L); // moved back to the car once
+        int commands = h.executed.size();
+
+        h.state = droppedToPhone(); // driver insists on the phone
+        h.runFor(60_000L);
+        assertEquals("never fight a repeated choice", commands, h.executed.size());
+        assertTrue(h.end().userLeftBluetooth);
+    }
+
+    @Test public void switchToPhoneLongAfterOurRebuildIsRespected() {
+        Harness h = afterPreventiveRebuild();
+        h.runFor(CallRepairEngine.REPAIR_GRACE_MS + 5_000L);
+        h.state = droppedToPhone();
+        h.runFor(60_000L);
+        assertEquals(2, h.executed.size());
+        assertEquals(CallOutcome.LEFT_BLUETOOTH, h.end().outcome);
+    }
+
+    @Test public void speakerRightAfterOurRebuildIsAUserChoice() {
+        Harness h = afterPreventiveRebuild();
+        h.runFor(4_000L);
+        h.state = h.state.toBuilder().route(AudioRoute.SPEAKER).scoAudioConnected(false).build();
+        h.runFor(30_000L);
+        assertEquals(2, h.executed.size());
+        assertEquals(CallOutcome.LEFT_BLUETOOTH, h.end().outcome);
+    }
+
+    @Test public void speakerChosenDuringRebuildIsNeverOverridden() {
+        Harness h = new Harness(PreventiveRebuildMode.ALWAYS, FaultClassifierTest.carCall().build()) {
+            @Override void react(RepairCommand command) {
+                if (command == RepairCommand.ROUTE_TO_EARPIECE) {
+                    // While SCO tears down, the user taps "Speaker" in the dialer.
+                    state = state.toBuilder().route(AudioRoute.SPEAKER).scoAudioConnected(false).build();
+                } else {
+                    super.react(command);
+                }
+            }
+        };
+        h.runFor(60_000L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), h.executed);
+        assertTrue(h.end().userLeftBluetooth);
+    }
+
     @Test public void speakerIsNeverOverridden() {
         Harness h = new Harness(
                 PreventiveRebuildMode.ALWAYS,

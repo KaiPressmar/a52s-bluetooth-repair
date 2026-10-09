@@ -79,8 +79,9 @@ Ticks are 1 s during the first 30 s of a call and 5–15 s afterwards. Every Tel
 | SCO link down, or voice played off Bluetooth (≥ 2 s) | Rebuild |
 | Voice stream muted / 0 (≥ 1.5 s) | Restore volume |
 | HFP connected, but Telecom offers no Bluetooth route | Report only. A reboot is needed, and the status screen says so. |
-| Speaker or wired headset | Never touched |
+| Speaker or wired headset | Never touched, also when chosen in the middle of a rebuild |
 | Call left Bluetooth without our command (user or car chose the phone) | Hands off for the rest of the call; outcome `LEFT_BLUETOOTH` |
+| Call drops to the phone within 8 s after one of our route changes (the rebuilt SCO link collapsed; Telecom falls back to the earpiece) | Treated as a failed repair and routed back to the car once; a second drop is respected as a user choice |
 | Conference / waiting call | No preventive rebuild |
 
 Budget: three route operations and two volume restores per call, and every operation is verified. "Automatic repair" off means observe-only: faults are still classified and reported.

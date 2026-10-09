@@ -2,6 +2,17 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
+## 0.18.1 - don't give up when a repair's Bluetooth link collapses
+
+### Fixed
+
+- A call that dropped back to the phone shortly after the app rebuilt the Bluetooth audio was treated as "the user chose the phone", so the app stopped helping for the rest of the call. In the worst case the preventive rebuild at call start left a car call on the earpiece. Android 14's Telecom moves the call to the earpiece whenever a fresh SCO link collapses, which looks exactly like a user choice. A drop within 8 s of one of the app's own route changes is now treated as a failed repair and the call is moved back to the car once; a second drop is still respected as a deliberate choice.
+- If the speaker was selected while the app was rebuilding the Bluetooth audio, the rebuild could still move the call back to the car. The app now stops and leaves the speaker alone.
+
+### Changed
+
+- The dev container keeps Claude Code and Codex logins in volumes and points the Java extension at the image's JDK.
+
 ## 0.18.0 - English UI, dev container and modern toolchain
 
 ### Changed

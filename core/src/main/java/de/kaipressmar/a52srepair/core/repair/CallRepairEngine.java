@@ -22,8 +22,11 @@ import java.util.Set;
  *   <li>Faults must persist for a confirmation window before any action.</li>
  *   <li>At most {@link #MAX_ROUTE_ATTEMPTS} route operations per call, each followed by verification.</li>
  *   <li>If the call leaves Bluetooth without our command (user or car chose the phone), the
- *       engine never fights that choice for the rest of the call.</li>
- *   <li>Speaker and wired routes are never overridden.</li>
+ *       engine never fights that choice for the rest of the call. Exception: the first drop to
+ *       the phone within {@link #REPAIR_GRACE_MS} after one of our route changes is our repair
+ *       failing (Telecom falls back to the earpiece when a fresh SCO link collapses), so it is
+ *       repaired once. A second drop is always respected.</li>
+ *   <li>Speaker and wired routes are never overridden, not even in the middle of a rebuild.</li>
  * </ul>
  */
 public final class CallRepairEngine {
@@ -38,6 +41,12 @@ public final class CallRepairEngine {
     public static final long STEADY_BLUETOOTH_MS = 1_000L;
     public static final long PREVENTIVE_WINDOW_MS = 30_000L;
     public static final long COMMAND_ECHO_MS = 2_000L;
+    /**
+     * A drop from Bluetooth to the phone this soon after one of our route changes is our repair
+     * failing, not a user choice. Android 14 Telecom moves the call to the earpiece when SCO
+     * disconnects without a request ({@code ActiveBluetoothRoute.handleBtInitiatedDisconnect}).
+     */
+    public static final long REPAIR_GRACE_MS = 8_000L;
     public static final long FAST_TICK_MS = 1_000L;
     public static final long SLOW_TICK_MS = 5_000L;
     public static final long IDLE_TICK_MS = 15_000L;
@@ -62,7 +71,8 @@ public final class CallRepairEngine {
         REBUILD_LEAVING,
         REBUILD_RETURNING,
         ROUTE_REQUEST,
-        VERIFYING
+        VERIFYING_ROUTE,
+        VERIFYING_VOLUME
     }
 
     private final boolean repairEnabled;
@@ -74,6 +84,8 @@ public final class CallRepairEngine {
     private long operationSince;
     private boolean operationPreventive;
     private long lastCommandAt = Long.MIN_VALUE / 2;
+    private long lastRouteChangeAt = Long.MIN_VALUE / 2;
+    private boolean dropForgiven;
 
     private long audioSince = -1L;
     private AudioRoute lastRoute = AudioRoute.UNKNOWN;
@@ -151,7 +163,7 @@ public final class CallRepairEngine {
                     return step(IDLE_TICK_MS, "volume restore budget exhausted");
                 }
                 volumeRestores++;
-                begin(Operation.VERIFYING, now, false);
+                begin(Operation.VERIFYING_VOLUME, now, false);
                 return step(VERIFY_MS, "restore voice volume", RepairCommand.RESTORE_VOICE_VOLUME);
             case CALL_NOT_ON_BLUETOOTH:
                 if (!takeRouteAttempt()) return exhausted();
@@ -211,15 +223,33 @@ public final class CallRepairEngine {
             boolean commanded =
                     operation == Operation.REBUILD_LEAVING
                             || now - lastCommandAt < COMMAND_ECHO_MS;
-            if (leftBluetooth
+            // Telecom falls back to earpiece or wired headset; with an earpiece, speaker is a choice.
+            boolean speakerChosen = s.route == AudioRoute.SPEAKER && s.earpieceAvailable;
+            if (speakerChosen && routeOperationActive()) {
+                // We only ever request earpiece or Bluetooth: never undo the user's speaker.
+                userLeftBluetooth = true;
+                endOperation();
+            } else if (leftBluetooth
                     && !commanded
                     && s.bluetoothRouteAvailable
                     && s.route != AudioRoute.UNKNOWN) {
-                userLeftBluetooth = true;
+                if (!speakerChosen
+                        && !dropForgiven
+                        && now - lastRouteChangeAt < REPAIR_GRACE_MS) {
+                    // The SCO link we just rebuilt collapsed; repair it instead of giving up.
+                    dropForgiven = true;
+                    endOperation();
+                } else {
+                    userLeftBluetooth = true;
+                }
             }
             bluetoothSince = -1L;
         }
         lastRoute = s.route;
+    }
+
+    private boolean routeOperationActive() {
+        return operation != Operation.NONE && operation != Operation.VERIFYING_VOLUME;
     }
 
     private Step advanceOperation(CallAudioSnapshot s, long now) {
@@ -234,7 +264,7 @@ public final class CallRepairEngine {
             case REBUILD_RETURNING:
                 if (s.route == AudioRoute.BLUETOOTH
                         && !Boolean.FALSE.equals(s.scoAudioConnected)) {
-                    begin(Operation.VERIFYING, now, operationPreventive);
+                    begin(Operation.VERIFYING_ROUTE, now, operationPreventive);
                     return step(VERIFY_MS, "Bluetooth back, verifying");
                 }
                 if (age >= RETURN_TIMEOUT_MS) {
@@ -244,12 +274,13 @@ public final class CallRepairEngine {
                 if (age >= RETURN_TIMEOUT_MS / 2 && s.route != AudioRoute.BLUETOOTH) {
                     // Telecom may drop the first request while SCO is still tearing down.
                     lastCommandAt = now;
+                    lastRouteChangeAt = now;
                     return step(500L, "repeat Bluetooth request", RepairCommand.ROUTE_TO_BLUETOOTH);
                 }
                 return step(500L, "waiting for Bluetooth audio");
             case ROUTE_REQUEST:
                 if (s.route == AudioRoute.BLUETOOTH) {
-                    begin(Operation.VERIFYING, now, false);
+                    begin(Operation.VERIFYING_ROUTE, now, false);
                     return step(VERIFY_MS, "on Bluetooth, verifying");
                 }
                 if (age >= ROUTE_REQUEST_TIMEOUT_MS) {
@@ -257,7 +288,8 @@ public final class CallRepairEngine {
                     return null;
                 }
                 return step(500L, "waiting for Bluetooth route");
-            case VERIFYING:
+            case VERIFYING_ROUTE:
+            case VERIFYING_VOLUME:
                 if (age < VERIFY_MS) return step(VERIFY_MS - age, "verifying");
                 endOperation();
                 return null;
@@ -325,6 +357,7 @@ public final class CallRepairEngine {
         operationSince = now;
         operationPreventive = preventive;
         lastCommandAt = now;
+        if (next != Operation.VERIFYING_VOLUME) lastRouteChangeAt = now;
     }
 
     private void endOperation() {

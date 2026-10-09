@@ -21,8 +21,8 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 
 - No action without a confirmed fault: 3 s for "call not on Bluetooth", 2 s for SCO/downlink faults, 1.5 s for muted volume. Transient faults are ignored.
 - At most 3 route operations and 2 volume restores per call; every operation is verified before the next one.
-- Speaker and wired headsets are never overridden.
-- When the call leaves Bluetooth without our command (user or car chose the phone), the engine stops acting for that call.
+- Speaker and wired headsets are never overridden, not even in the middle of a rebuild.
+- When the call leaves Bluetooth without our command (user or car chose the phone), the engine stops acting for that call. Exception: the first drop to the phone within 8 s of one of our own route changes is our repair failing (Telecom falls back to the earpiece when a fresh SCO link collapses) and is repaired once; any further drop is respected.
 - The preventive rebuild runs at most once, only within the first 30 s, only on a single call, and only after 1 s of steady Bluetooth.
 - "HFP connected but no Bluetooth route" is reported, never "repaired".
 - With automatic repair switched off, the engine observes and reports only.
