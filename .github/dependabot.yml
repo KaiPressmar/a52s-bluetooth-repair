@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      androidx-and-material:
+        patterns: ["androidx.*", "com.google.android.material*"]
+      test-libraries:
+        patterns: ["junit*", "org.robolectric*", "androidx.test*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

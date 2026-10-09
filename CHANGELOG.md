@@ -2,6 +2,14 @@
 
 Notable project changes are recorded here. Published GitHub Releases also use automatically generated notes from merged pull requests.
 
+## Unreleased
+
+### Project
+
+- MIT license, issue forms (call-audio problem, field report, feature request), SUPPORT, CODE_OF_CONDUCT, CODEOWNERS and Dependabot.
+- README rewritten for people searching for the A52s bug: symptom check, German summary, direct download link, FAQ and a "help improve it" section. Social-preview image.
+- Releases from `main` are full releases ("Latest") and include a stable `bluetooth-repair.apk` asset for a permanent download link.
+
 ## 0.17.0 - universal APK and app icon
 
 ### Changed

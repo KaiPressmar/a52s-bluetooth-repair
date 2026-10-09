@@ -1,0 +1,104 @@
+name: Call-audio problem
+description: Bluetooth call audio failed (with or without the app) – help us understand your case.
+title: "[Call audio] "
+labels: ["triage", "call-audio"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Every report helps narrow down the Samsung/Qualcomm fault.
+        **Please do not post phone numbers, contact names or Bluetooth MAC addresses.**
+        If you have the app installed: open *Einstellungen → Diagnosebericht teilen* **before rebooting** and attach the file.
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What happened during the call?
+      options:
+        - They hear me, but I can't hear them (one-way audio)
+        - Nobody hears anything over the car/headset
+        - The call stays on the phone although the car/headset is connected
+        - Call audio drops in the middle of a call
+        - Other (describe below)
+    validations:
+      required: true
+  - type: dropdown
+    id: phone
+    attributes:
+      label: Phone
+      options:
+        - Galaxy A52s 5G (SM-A528B / SM-A528N)
+        - Galaxy A52 / A52 5G
+        - Other Samsung phone
+        - Other phone
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware / build number
+      description: Settings → About phone → Software information → Build number (e.g. A528BXXSBGYI3)
+      placeholder: A528BXXSBGYI3
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android / One UI version
+      placeholder: Android 14 / One UI 6.1
+  - type: input
+    id: car
+    attributes:
+      label: Car or headset
+      description: Make, model and year of the car / head unit or headset.
+      placeholder: VW Golf 8 (2021), Composition Media
+    validations:
+      required: true
+  - type: dropdown
+    id: app-version
+    attributes:
+      label: App version
+      options:
+        - App not installed
+        - 0.17.x or newer
+        - 0.16.x
+        - Older than 0.16
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: What does the app show under "Verlauf" for that call?
+      options:
+        - App not installed / no entry
+        - Alles in Ordnung
+        - Automatisch repariert
+        - Problem blieb bestehen
+        - Bluetooth-Telefonie blockiert
+        - Auf Telefon umgeschaltet
+        - Ohne Fahrzeug oder Headset
+  - type: dropdown
+    id: reboot
+    attributes:
+      label: Did a reboot fix it?
+      options:
+        - "Yes"
+        - "No"
+        - Not tried
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: How often does it happen? After how long since the last reboot? Anything that helps temporarily?
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report (optional)
+      description: Paste the relevant part or attach the file. Remove anything personal.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed phone numbers, names and Bluetooth addresses from everything I posted.
+          required: true

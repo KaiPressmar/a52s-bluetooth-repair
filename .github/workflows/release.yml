@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       prerelease:
-        description: 'Publish as a GitHub prerelease'
+        description: 'Publish as a GitHub prerelease (not shown as "Latest")'
         required: true
-        default: true
+        default: false
         type: boolean
   push:
     branches: [ main ]
@@ -118,7 +118,9 @@ jobs:
           OUT="bluetooth-repair-${RELEASE_TAG}.apk"
           LEGACY_A52S="bluetooth-repair-a52s-5g-${RELEASE_TAG}.apk"
           LEGACY_S22="bluetooth-repair-galaxy-s22-${RELEASE_TAG}.apk"
-          for name in "$OUT" "$LEGACY_A52S" "$LEGACY_S22"; do
+          # Stable name for https://github.com/<repo>/releases/latest/download/bluetooth-repair.apk
+          STABLE="bluetooth-repair.apk"
+          for name in "$OUT" "$LEGACY_A52S" "$LEGACY_S22" "$STABLE"; do
             cp "$SRC" "$name"
             sha256sum "$name" > "$name.sha256"
           done
@@ -126,6 +128,7 @@ jobs:
           echo "APK=$OUT" >> "$GITHUB_ENV"
           echo "APK_LEGACY_A52S=$LEGACY_A52S" >> "$GITHUB_ENV"
           echo "APK_LEGACY_S22=$LEGACY_S22" >> "$GITHUB_ENV"
+          echo "APK_STABLE=$STABLE" >> "$GITHUB_ENV"
 
       - name: Attest APK provenance
         uses: actions/attest-build-provenance@v2
@@ -155,11 +158,15 @@ jobs:
             "$APK" "$APK.sha256"
             "$APK_LEGACY_A52S" "$APK_LEGACY_A52S.sha256"
             "$APK_LEGACY_S22" "$APK_LEGACY_S22.sha256"
+            "$APK_STABLE" "$APK_STABLE.sha256"
             --target "$GITHUB_SHA"
             --title "$RELEASE_TAG"
             --generate-notes
           )
-          if [ "$EVENT_NAME" = "push" ] || [ "$PRERELEASE_INPUT" = "true" ]; then
+          # Releases from RELEASE_VERSION on main are full releases; manual runs may opt into prerelease.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$PRERELEASE_INPUT" = "true" ]; then
             args+=(--prerelease)
+          else
+            args+=(--latest)
           fi
           gh release create "${args[@]}"
