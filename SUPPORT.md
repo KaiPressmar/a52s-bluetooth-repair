@@ -15,7 +15,7 @@ Read [docs/A52S_CALL_AUDIO_ISSUE.md](docs/A52S_CALL_AUDIO_ISSUE.md). It lists ev
 
 ## Before you report
 
-1. When the fault happens, **don't reboot yet**. Open the app → *Einstellungen* → *Diagnosebericht teilen* and save the file.
+1. When the fault happens, **don't reboot yet**. Open the app → *Settings* → *Share diagnostic report* (German: *Einstellungen → Diagnosebericht teilen*) and save the file.
 2. Note the firmware (*Settings → About phone → Software information → Build number*) and your car or headset model.
 3. Remove phone numbers, names and Bluetooth addresses before posting.
 

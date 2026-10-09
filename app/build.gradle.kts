@@ -53,6 +53,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    androidResources {
+        // English default + German; generates android:localeConfig for the per-app language
+        // setting (Android 13+). The default locale is declared in res/resources.properties.
+        generateLocaleConfig = true
+    }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true

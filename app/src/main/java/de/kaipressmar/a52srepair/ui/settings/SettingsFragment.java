@@ -5,6 +5,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
@@ -22,10 +24,13 @@ import de.kaipressmar.a52srepair.ui.common.SetupActions;
 import java.util.List;
 
 public final class SettingsFragment extends PreferenceFragmentCompat implements MainActivity.Refreshable {
+    static final String KEY_APP_LANGUAGE = "app_language";
+
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
         setPreferencesFromResource(R.xml.preferences, rootKey);
 
+        bindLanguage();
         onClick("car_link", this::manageCarLink);
         onClick("share_report", () -> {
             Intent share = DiagnosticReport.shareIntent(requireContext());
@@ -71,6 +76,21 @@ public final class SettingsFragment extends PreferenceFragmentCompat implements 
         link.setSummary(linked.isEmpty()
                 ? getString(R.string.pref_car_link_none)
                 : String.join(", ", linked));
+    }
+
+    /** Per-app language via AppCompat: Android 13+ system setting, stored by AppCompat on 12. */
+    private void bindLanguage() {
+        ListPreference language = findPreference(KEY_APP_LANGUAGE);
+        if (language == null) return;
+        LocaleListCompat current = AppCompatDelegate.getApplicationLocales();
+        language.setValue(current.isEmpty() ? "" : current.get(0).getLanguage());
+        language.setOnPreferenceChangeListener((preference, value) -> {
+            String tag = String.valueOf(value);
+            AppCompatDelegate.setApplicationLocales(tag.isEmpty()
+                    ? LocaleListCompat.getEmptyLocaleList()
+                    : LocaleListCompat.forLanguageTags(tag));
+            return true;
+        });
     }
 
     private void manageCarLink() {

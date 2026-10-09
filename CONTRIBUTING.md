@@ -17,12 +17,14 @@ You don't need to write code to help:
 
 - **Field reports** are the most valuable contribution: which phone, firmware, car or headset, and whether the repair worked. Use the [field report form](https://github.com/KaiPressmar/a52s-bluetooth-repair/issues/new?template=2-field-report.yml).
 - **Failed calls** with a diagnostic report: use the [call-audio problem form](https://github.com/KaiPressmar/a52s-bluetooth-repair/issues/new?template=1-call-audio-problem.yml).
-- **Translations**: the UI is German; an English `values-en/strings.xml` would help international users.
+- **Translations**: the UI is English (`values/`) and German (`values-de/`). A new language is a single `values-xx/strings.xml`; `LocalizationTest` checks that it covers every key with the same placeholders.
 - **Documentation**: corrections to the research notes, workarounds you verified, other affected models.
 
 Issues labeled [`good first issue`](https://github.com/KaiPressmar/a52s-bluetooth-repair/labels/good%20first%20issue) are a good starting point for code.
 
 ## Development flow
+
+The easiest environment is the dev container in `.devcontainer/` (GitHub Codespaces or VS Code *Reopen in Container*). It matches CI exactly.
 
 Create a focused branch and pull request. Add or update a failing test first for deterministic behavior. Make the smallest implementation change that passes it. Run `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`. Check the rendered screenshots in `app/build/screenshots/` for UI changes. For Bluetooth/HFP/SCO behavior, document the real-device scenario separately because emulator/JVM success cannot prove the Samsung/Qualcomm path is fixed.
 

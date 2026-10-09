@@ -1,0 +1,59 @@
+{
+  "name": "Bluetooth Call Repair (Android)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    // Docker host access: the container talks to the host's Docker daemon.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "remoteUser": "vscode",
+  "mounts": [
+    // Gradle caches survive container rebuilds.
+    "source=bt-call-repair-gradle,target=/home/vscode/.gradle,type=volume"
+  ],
+  "containerEnv": {
+    "GRADLE_OPTS": "-Dorg.gradle.daemon=true"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "redhat.vscode-xml",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "ms-azuretools.vscode-containers",
+        "editorconfig.editorconfig",
+        "davidanson.vscode-markdownlint",
+        "streetsidesoftware.code-spell-checker",
+        "streetsidesoftware.code-spell-checker-german",
+        "eamodio.gitlens",
+        "anthropic.claude-code",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.import.gradle.wrapper.enabled": true,
+        "java.jdt.ls.java.home": "/usr/local/sdkman/candidates/java/current",
+        "redhat.telemetry.enabled": false,
+        "cSpell.language": "en,de",
+        "files.exclude": {
+          "**/build": true,
+          "**/.gradle": true
+        }
+      }
+    },
+    "codespaces": {
+      "openFiles": ["README.md", "CONTRIBUTING.md"]
+    }
+  }
+}

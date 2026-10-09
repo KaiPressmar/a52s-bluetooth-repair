@@ -8,7 +8,9 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import androidx.annotation.StringRes;
 import androidx.core.content.FileProvider;
+import de.kaipressmar.a52srepair.R;
 import de.kaipressmar.a52srepair.core.version.SemanticVersion;
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,6 +27,16 @@ public final class UpdateInstaller {
         void onStatus(String message, boolean error);
     }
 
+    /** Verification failure with a user-facing, localized reason. */
+    static final class UpdateException extends Exception {
+        @StringRes final int reason;
+
+        UpdateException(@StringRes int reason) {
+            super(null, null, false, false);
+            this.reason = reason;
+        }
+    }
+
     static final String TRUSTED_PREFIX =
             "https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/download/";
 
@@ -35,11 +47,11 @@ public final class UpdateInstaller {
     public static void install(Activity activity, UpdateRelease release, Listener listener) {
         Handler main = new Handler(Looper.getMainLooper());
         if (release == null) {
-            listener.onStatus("Kein Update verfügbar.", true);
+            listener.onStatus(activity.getString(R.string.update_unavailable), true);
             return;
         }
         if (!activity.getPackageManager().canRequestPackageInstalls()) {
-            listener.onStatus("Bitte Installation aus dieser App einmalig erlauben.", false);
+            listener.onStatus(activity.getString(R.string.update_allow_install), false);
             activity.startActivity(
                     new Intent(
                             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -47,45 +59,66 @@ public final class UpdateInstaller {
             return;
         }
         if (!isTrustedDownloadUrl(release.apkUrl) || !isTrustedDownloadUrl(release.checksumUrl)) {
-            listener.onStatus("Update-Quelle ist nicht vertrauenswürdig.", true);
+            listener.onStatus(activity.getString(R.string.update_untrusted), true);
             return;
         }
 
         Context app = activity.getApplicationContext();
-        listener.onStatus("Update wird heruntergeladen …", false);
+        listener.onStatus(activity.getString(R.string.update_downloading), false);
         EXECUTOR.execute(
                 () -> {
+                    int reason;
                     try {
-                        File dir = new File(app.getCacheDir(), "updates");
-                        if (!dir.exists() && !dir.mkdirs()) {
-                            throw new IOException("Update-Verzeichnis nicht verfügbar");
-                        }
-                        deleteOthers(dir, release.apkName);
-                        String expected = parseSha256(HttpClient.fetchText(release.checksumUrl));
-                        File apk = new File(dir, release.apkName);
-                        HttpClient.downloadTo(release.apkUrl, apk);
-                        if (!sha256(apk).equalsIgnoreCase(expected)) {
-                            //noinspection ResultOfMethodCallIgnored
-                            apk.delete();
-                            throw new SecurityException("Prüfsumme stimmt nicht");
-                        }
-                        verifyPackage(app, apk, release.version);
+                        File apk = downloadAndVerify(app, release);
                         main.post(() -> launchInstaller(activity, apk, listener));
+                        return;
+                    } catch (UpdateException e) {
+                        reason = e.reason;
+                    } catch (IOException e) {
+                        reason = R.string.update_error_network;
                     } catch (Exception e) {
-                        String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-                        main.post(() -> listener.onStatus("Update fehlgeschlagen: " + reason, true));
+                        reason = R.string.update_error_package;
                     }
+                    String message = activity.getString(R.string.update_error, activity.getString(reason));
+                    main.post(() -> listener.onStatus(message, true));
                 });
+    }
+
+    private static File downloadAndVerify(Context app, UpdateRelease release) throws Exception {
+        File dir = new File(app.getCacheDir(), "updates");
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("update directory unavailable");
+        deleteOthers(dir, release.apkName);
+
+        String expected;
+        try {
+            expected = parseSha256(HttpClient.fetchText(release.checksumUrl));
+        } catch (IllegalArgumentException e) {
+            throw new UpdateException(R.string.update_error_checksum);
+        }
+        File apk = new File(dir, release.apkName);
+        HttpClient.downloadTo(release.apkUrl, apk);
+        if (!sha256(apk).equalsIgnoreCase(expected)) {
+            //noinspection ResultOfMethodCallIgnored
+            apk.delete();
+            throw new UpdateException(R.string.update_error_checksum);
+        }
+        if (!packageMatches(app, apk, release.version)) {
+            //noinspection ResultOfMethodCallIgnored
+            apk.delete();
+            throw new UpdateException(R.string.update_error_package);
+        }
+        return apk;
     }
 
     static boolean isTrustedDownloadUrl(String url) {
         return url != null && url.startsWith(TRUSTED_PREFIX);
     }
 
+    /** First token of a {@code sha256sum} sidecar; throws for anything but 64 hex digits. */
     static String parseSha256(String text) {
-        if (text == null || text.trim().isEmpty()) throw new IllegalArgumentException("Leere Prüfsumme");
+        if (text == null || text.trim().isEmpty()) throw new IllegalArgumentException("empty checksum");
         String token = text.trim().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
-        if (!token.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Ungültige Prüfsumme");
+        if (!token.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid checksum");
         return token;
     }
 
@@ -97,21 +130,18 @@ public final class UpdateInstaller {
                     new Intent(Intent.ACTION_VIEW)
                             .setDataAndType(uri, "application/vnd.android.package-archive")
                             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
-            listener.onStatus("Prüfsumme verifiziert – Installation wird geöffnet.", false);
+            listener.onStatus(activity.getString(R.string.update_verified), false);
         } catch (RuntimeException e) {
-            listener.onStatus("Installer konnte nicht geöffnet werden.", true);
+            listener.onStatus(activity.getString(R.string.update_installer_failed), true);
         }
     }
 
-    private static void verifyPackage(Context context, File apk, String expectedVersion) {
+    private static boolean packageMatches(Context context, File apk, String expectedVersion) {
         PackageInfo info = context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
-        if (info == null) throw new SecurityException("APK nicht lesbar");
-        if (!context.getPackageName().equals(info.packageName)) {
-            throw new SecurityException("APK gehört zu einer anderen App");
-        }
-        if (info.versionName == null || SemanticVersion.compare(info.versionName, expectedVersion) != 0) {
-            throw new SecurityException("APK-Version passt nicht zum Release");
-        }
+        return info != null
+                && context.getPackageName().equals(info.packageName)
+                && info.versionName != null
+                && SemanticVersion.compare(info.versionName, expectedVersion) == 0;
     }
 
     private static String sha256(File file) throws Exception {
