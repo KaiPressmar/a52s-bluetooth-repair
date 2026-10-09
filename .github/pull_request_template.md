@@ -9,8 +9,8 @@ Describe the smallest behavioral change made.
 ## Verification
 
 - [ ] Added/updated regression tests first where deterministic testing is possible
-- [ ] `./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest` passes
-- [ ] `./gradlew :app:lintA52sDebug :app:lintS22Debug` passes
+- [ ] `./gradlew :core:test :app:testDebugUnitTest` passes
+- [ ] `./gradlew :app:lintDebug` passes
 - [ ] Debug APKs build; screenshots in `app/build/screenshots/` reviewed for UI changes
 - [ ] Diagnostics remain read-only
 - [ ] Route changes only through Telecom and covered by `CallRepairEngineTest` safety rules

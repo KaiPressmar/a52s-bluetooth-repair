@@ -30,13 +30,15 @@ import org.robolectric.annotation.GraphicsMode;
 /** Renders every screen with sample data to app/build/screenshots for visual review. */
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = 34, qualifiers = "w393dp-h852dp-xxhdpi")
+@Config(sdk = 34, qualifiers = "de-rDE-w393dp-h852dp-xxhdpi")
 public class ScreenshotTest {
     private static final long HOUR = 60L * 60L * 1000L;
 
     @Before public void sampleData() {
         Application app = ApplicationProvider.getApplicationContext();
         Shadows.shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        Shadows.shadowOf(app.getSystemService(android.bluetooth.BluetoothManager.class).getAdapter())
+                .setEnabled(true);
         CallReportRepository repo = new CallReportRepository(app);
         repo.clear();
         long now = System.currentTimeMillis();

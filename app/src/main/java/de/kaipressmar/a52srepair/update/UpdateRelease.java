@@ -5,7 +5,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** A GitHub release that contains the signed APK (and checksum) for this device flavor. */
+/** A GitHub release that contains the signed universal APK and its checksum. */
 public final class UpdateRelease {
     public final String version;
     public final String tag;
@@ -33,8 +33,8 @@ public final class UpdateRelease {
     }
 
     /** Newest release newer than {@code currentVersion} with a complete APK + checksum pair. */
-    public static UpdateRelease selectNewest(
-            String releasesJson, String deviceKey, String currentVersion) throws JSONException {
+    public static UpdateRelease selectNewest(String releasesJson, String currentVersion)
+            throws JSONException {
         JSONArray releases = new JSONArray(releasesJson);
         UpdateRelease best = null;
 
@@ -46,9 +46,9 @@ public final class UpdateRelease {
             String version = SemanticVersion.normalize(tag);
             if (version == null || SemanticVersion.compare(version, currentVersion) <= 0) continue;
 
-            String expectedApk = expectedApkName(deviceKey, version);
+            String expectedApk = expectedApkName(version);
             JSONArray assets = release.optJSONArray("assets");
-            if (expectedApk == null || assets == null) continue;
+            if (assets == null) continue;
 
             String apkUrl = null;
             String checksumUrl = null;
@@ -77,9 +77,11 @@ public final class UpdateRelease {
         return best;
     }
 
-    public static String expectedApkName(String deviceKey, String version) {
-        if ("a52s".equalsIgnoreCase(deviceKey)) return "bluetooth-repair-a52s-5g-v" + version + ".apk";
-        if ("s22".equalsIgnoreCase(deviceKey)) return "bluetooth-repair-galaxy-s22-v" + version + ".apk";
-        return null;
+    /**
+     * Universal APK name (since 0.17.0). Releases also carry copies under the former per-device
+     * names so that 0.16.x installs of either variant update to the universal build.
+     */
+    public static String expectedApkName(String version) {
+        return "bluetooth-repair-v" + version + ".apk";
     }
 }

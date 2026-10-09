@@ -7,10 +7,10 @@ import android.os.Build;
 import androidx.core.content.FileProvider;
 import de.kaipressmar.a52srepair.BuildConfig;
 import de.kaipressmar.a52srepair.R;
-import de.kaipressmar.a52srepair.core.device.DeviceFamily;
 import de.kaipressmar.a52srepair.core.report.CallReport;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
+import de.kaipressmar.a52srepair.data.DeviceInfo;
 import de.kaipressmar.a52srepair.setup.CarLinkManager;
 import de.kaipressmar.a52srepair.setup.ProtectionStatus;
 import java.io.File;
@@ -25,19 +25,16 @@ public final class DiagnosticReport {
 
     public static String build(Context context) {
         AppSettings settings = new AppSettings(context);
-        String profileKey = context.getString(R.string.device_profile_key);
         StringBuilder out = new StringBuilder();
         out.append("== A52s Bluetooth Repair diagnostic report ==\n")
                 .append("app=").append(BuildConfig.VERSION_NAME)
-                .append(" (").append(BuildConfig.VERSION_CODE).append(") flavor=")
-                .append(BuildConfig.FLAVOR).append('\n')
+                .append(" (").append(BuildConfig.VERSION_CODE).append(")\n")
                 .append("device=").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
                 .append(" codename=").append(Build.DEVICE)
                 .append(" sdk=").append(Build.VERSION.SDK_INT)
                 .append(" build=").append(Build.DISPLAY).append('\n')
-                .append("profile=").append(profileKey)
-                .append(" family=").append(DeviceFamily.detect(Build.MODEL, Build.DEVICE))
-                .append(" match=").append(DeviceFamily.matchesProfile(profileKey, Build.MODEL, Build.DEVICE))
+                .append("family=").append(DeviceInfo.family())
+                .append(" defaultPreventive=").append(DeviceInfo.defaultPreventiveMode())
                 .append('\n')
                 .append("status=").append(ProtectionStatus.evaluate(context))
                 .append(" callAccess=").append(ProtectionStatus.hasCallAccess(context))

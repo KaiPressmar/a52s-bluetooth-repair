@@ -13,7 +13,7 @@ This project investigates a device-specific Bluetooth call-audio failure. Treat 
 
 ## Development flow
 
-Create a focused branch and pull request. Add or update a failing test first for deterministic behavior. Make the smallest implementation change that passes it. Run `./gradlew :core:test :app:testA52sDebugUnitTest :app:testS22DebugUnitTest`, lint for both flavors and a debug build. Check the rendered screenshots in `app/build/screenshots/` for UI changes. For Bluetooth/HFP/SCO behavior, document the real-device scenario separately because emulator/JVM success cannot prove the Samsung/Qualcomm path is fixed.
+Create a focused branch and pull request. Add or update a failing test first for deterministic behavior. Make the smallest implementation change that passes it. Run `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`. Check the rendered screenshots in `app/build/screenshots/` for UI changes. For Bluetooth/HFP/SCO behavior, document the real-device scenario separately because emulator/JVM success cannot prove the Samsung/Qualcomm path is fixed.
 
 ## Pull requests
 

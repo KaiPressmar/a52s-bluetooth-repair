@@ -40,7 +40,7 @@ core/   Pure Java 17 library, no Android dependency. All decisions live here.
   device/     DeviceFamily
   version/    SemanticVersion
 
-app/    Android application (flavors a52s / s22)
+app/    Android application: one universal APK (minSdk 31, targetSdk 36), device detected at runtime
   telecom/      CallAudioService (InCallService), CallSession, TelecomMapping
   audio/        HeadsetMonitor (HFP/SCO state), VoiceStream (downlink route + volume)
   setup/        ProtectionStatus, CarLinkManager (Companion Device Manager)
@@ -74,7 +74,7 @@ Ticks are 1 s during the first 30 s of a call and 5–15 s afterwards. Every Tel
 
 | Situation | Action |
 |---|---|
-| Healthy Bluetooth call, A52s profile | One **preventive rebuild** (earpiece → Bluetooth) after 1 s of steady Bluetooth, within the first 30 s. This covers the silent-downlink fault that no API can see. |
+| Healthy Bluetooth call, Galaxy A52s 5G | One **preventive rebuild** (earpiece → Bluetooth) after 1 s of steady Bluetooth, within the first 30 s. This covers the silent-downlink fault that no API can see. |
 | Call on the phone although the car is a usable route (≥ 3 s) | `ROUTE_TO_BLUETOOTH` |
 | SCO link down, or voice played off Bluetooth (≥ 2 s) | Rebuild |
 | Voice stream muted / 0 (≥ 1.5 s) | Restore volume |
@@ -88,7 +88,7 @@ Budget: three route operations and two volume restores per call, and every opera
 ## Settings
 
 - **Automatische Reparatur** (on): switches the engine between repair and observe-only.
-- **Vorsorglicher Neuaufbau** (A52s: every call; S22: only after a problem in the last 7 days; or off).
+- **Vorsorglicher Neuaufbau**: the default comes from the detected device (A52s: every call; other phones: only after a problem in the last 7 days); can also be switched off.
 
 ## Sources
 

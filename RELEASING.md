@@ -30,18 +30,17 @@ Back up the keystore and credentials offline. Losing the signing key prevents fu
 4. Preferred automated path: update the repository-level `RELEASE_VERSION` file in the release PR. When that change lands on `main`, the signed release workflow runs automatically and publishes the version as a prerelease.
 5. Manual path: open **Actions → Release APK → Run workflow** on `main`, enter the version without the `v` prefix, and select whether it should be a prerelease.
 6. The workflow validates the version, runs unit tests and release lint, restores the signing key from secrets, builds the release APK, verifies its signature, generates SHA-256, creates a provenance attestation, and publishes a GitHub Release with generated notes.
-7. Install the published APK on the target A52s and perform the smoke/real-device checks in `TESTING.md`.
+7. Install the published APK on the affected phone and perform the smoke/real-device checks in `TESTING.md`.
 
 ## Release artifacts
 
-Each release should contain:
+Each release contains:
 
-- `a52s-bluetooth-repair-vX.Y.Z.apk`
-- matching `.sha256` checksum
-- GitHub-generated release notes
-- GitHub artifact provenance attestation
+- `bluetooth-repair-vX.Y.Z.apk`: the universal APK (Android 12–16, all devices) and its `.sha256`
+- `bluetooth-repair-a52s-5g-vX.Y.Z.apk` and `bluetooth-repair-galaxy-s22-vX.Y.Z.apk`: byte-identical copies under the former per-device names (with `.sha256`), so 0.16.x installs of either variant find their update
+- GitHub-generated release notes and a provenance attestation
 
-The CI debug APK is for development only and is not a release artifact.
+The in-app updater (0.17.0+) only uses the universal APK.
 
 ## Hotfixes
 

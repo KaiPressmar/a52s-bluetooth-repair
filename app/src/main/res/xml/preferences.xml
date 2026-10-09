@@ -14,7 +14,6 @@
             app:entries="@array/preventive_mode_entries"
             app:entryValues="@array/preventive_mode_values"
             app:iconSpaceReserved="false"
-            app:defaultValue="@string/default_preventive_mode"
             app:key="preventive_mode"
             app:title="@string/pref_preventive_title"
             app:useSimpleSummaryProvider="true" />

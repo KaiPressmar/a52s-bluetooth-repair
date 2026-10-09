@@ -5,7 +5,6 @@ import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import de.kaipressmar.a52srepair.BuildConfig;
-import de.kaipressmar.a52srepair.R;
 import de.kaipressmar.a52srepair.core.version.SemanticVersion;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,11 +73,7 @@ public final class UpdateRepository {
                     String error = "";
                     try {
                         String json = HttpClient.fetchText(RELEASES_URL);
-                        save(UpdateRelease.selectNewest(
-                                        json,
-                                        context.getString(R.string.device_profile_key),
-                                        BuildConfig.VERSION_NAME),
-                                "");
+                        save(UpdateRelease.selectNewest(json, BuildConfig.VERSION_NAME), "");
                     } catch (Exception e) {
                         error = e.getClass().getSimpleName();
                         prefs.edit().putLong("last_check", System.currentTimeMillis())
