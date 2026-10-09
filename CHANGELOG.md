@@ -8,6 +8,25 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 - Releases are published only from `release/X.Y` branches: cut from `main` for every minor version, patches cherry-picked from `main` (`scripts/release.sh`). Release notes come from this changelog, *Latest* stays on the highest version, and pre-release versions are refused because the in-app updater would offer them to everyone. `RELEASE_VERSION` is now the only place the version name is set.
 
+## 0.18.2 - recognize failed Bluetooth call-audio selections
+
+### Fixed
+
+- Ringing fallbacks and short, unsuccessful Bluetooth/SCO selections no longer disable repair as an assumed user exit. Selecting Bluetooth again resumes diagnosis without resetting repair limits.
+- Repeated Bluetooth/earpiece transitions share a fault-confirmation window instead of postponing detection indefinitely. A Bluetooth route label alone does not complete SCO verification.
+- Route repairs pause when Bluetooth is switched off or call audio is suspended. Reconnection is diagnosed afresh; losing Bluetooth after a confirmed fault is not reported as a successful repair.
+- Each Bluetooth rebuild repeats its return request at most once. Speaker, wired and streaming choices cancel route operations, including devices without an earpiece.
+
+### Diagnostics
+
+- Short Telecom audio callbacks are logged directly. Diagnosis changes and periodic status remain visible during the call.
+- Exports include the currently observed call with a provisional result, rather than only completed calls.
+
+### Validation
+
+- Regression tests cover the October 9 A52s report, repeated failed selections, Bluetooth off/on during repair, repair limits and user route choices. The observed pre-update device scenario is documented in `docs/field-reports/2026-10-09-bluetooth-selection-fallback.md`.
+- Actual A52s/car audio recovery after this update still needs a real-device test. This release fixes detection and bounded Telecom repair attempts; it does not establish that the vendor SCO fault is eliminated.
+
 ## 0.18.1 - don't give up when a repair's Bluetooth link collapses
 
 ### Fixed

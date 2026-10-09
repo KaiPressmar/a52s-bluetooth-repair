@@ -13,6 +13,7 @@ import de.kaipressmar.a52srepair.data.CallReportRepository;
 import de.kaipressmar.a52srepair.data.DeviceInfo;
 import de.kaipressmar.a52srepair.setup.CarLinkManager;
 import de.kaipressmar.a52srepair.setup.ProtectionStatus;
+import de.kaipressmar.a52srepair.telecom.CallAudioService;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,7 +43,15 @@ public final class DiagnosticReport {
                 .append(" protection=").append(settings.protectionEnabled())
                 .append(" preventive=").append(settings.preventiveMode())
                 .append(" lastServiceBind=").append(settings.lastServiceBindAt())
-                .append("\n\n== Calls (newest first) ==\n");
+                .append("\n\n== Active call (provisional) ==\n");
+
+        CallReport active = CallAudioService.activeReport();
+        if (active == null) {
+            out.append("none observed by InCallService\n");
+        } else {
+            out.append(DiagnosticLog.timestamp(active.startedAt)).append(' ').append(active).append('\n');
+        }
+        out.append("\n== Calls (newest first) ==\n");
 
         List<CallReport> calls = new CallReportRepository(context).history().all();
         for (int i = 0; i < Math.min(50, calls.size()); i++) {

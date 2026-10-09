@@ -33,6 +33,7 @@ final class CallSession {
     }
 
     private static final long EVENT_DEBOUNCE_MS = 150L;
+    private static final long LOG_HEARTBEAT_MS = 30_000L;
 
     private final Context context;
     private final Host host;
@@ -44,6 +45,8 @@ final class CallSession {
     private final long startedAtWall;
     private final long startedAtElapsed;
     private String lastLoggedSnapshot = "";
+    private String lastLoggedNote = "";
+    private long lastLoggedAt;
     private boolean finished;
 
     private final Runnable tick = this::tick;
@@ -78,6 +81,22 @@ final class CallSession {
         if (!finished) schedule(EVENT_DEBOUNCE_MS);
     }
 
+    /** Keep short Bluetooth selections: debouncing can otherwise hide a failed SCO attempt. */
+    void onAudioStateChanged(CallAudioState audio) {
+        if (!finished) tick(snapshot(audio));
+    }
+
+    /** Current call is exportable before it is added to the completed-call history. */
+    CallReport report() {
+        return report(elapsed());
+    }
+
+    private CallReport report(long now) {
+        CallReport r = engine.report(now);
+        return new CallReport(startedAtWall, r.durationMs, r.outcome, r.faults,
+                r.routeAttempts, r.volumeRestores, r.preventiveRebuild, r.userLeftBluetooth);
+    }
+
     void finish() {
         if (finished) return;
         long now = elapsed();
@@ -86,29 +105,26 @@ final class CallSession {
         handler.removeCallbacks(tick);
         headset.close();
 
-        CallReport engineReport = engine.report(now);
-        CallReport report =
-                new CallReport(
-                        startedAtWall,
-                        engineReport.durationMs,
-                        engineReport.outcome,
-                        engineReport.faults,
-                        engineReport.routeAttempts,
-                        engineReport.volumeRestores,
-                        engineReport.preventiveRebuild,
-                        engineReport.userLeftBluetooth);
+        CallReport report = report(now);
         reports.add(report);
         DiagnosticLog.log(context, "CALL END " + report);
     }
 
     private void tick() {
         if (finished) return;
-        CallAudioSnapshot snapshot = snapshot();
-        CallRepairEngine.Step step = engine.onSnapshot(snapshot, elapsed());
+        tick(snapshot());
+    }
+
+    private void tick(CallAudioSnapshot snapshot) {
+        long now = elapsed();
+        CallRepairEngine.Step step = engine.onSnapshot(snapshot, now);
 
         String state = snapshot.toString();
-        if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)) {
+        if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
+                || !step.note.equals(lastLoggedNote) || now - lastLoggedAt >= LOG_HEARTBEAT_MS) {
             lastLoggedSnapshot = state;
+            lastLoggedNote = step.note;
+            lastLoggedAt = now;
             DiagnosticLog.log(
                     context,
                     "CALL " + state + " -> " + step.note
@@ -136,7 +152,11 @@ final class CallSession {
 
     @SuppressWarnings("deprecation") // CallAudioState still reflects Telecom routing on API 34-36.
     private CallAudioSnapshot snapshot() {
-        CallAudioState audio = host.audioState();
+        return snapshot(host.audioState());
+    }
+
+    @SuppressWarnings("deprecation")
+    private CallAudioSnapshot snapshot(CallAudioState audio) {
         List<Integer> states = host.callStates();
         CallAudioSnapshot.Builder builder =
                 CallAudioSnapshot.builder()
