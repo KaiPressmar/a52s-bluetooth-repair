@@ -74,6 +74,10 @@ public class IdleAudioPortTest {
         assertFalse(port.supports(Method.DUPLEX));assertFalse(port.start(Method.DUPLEX));assertEquals(AudioManager.MODE_NORMAL,audio.getMode());
         shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.RECORD_AUDIO);
         assertTrue(port.supports(Method.DUPLEX));audio.setMicrophoneMute(true);assertFalse(port.supports(Method.DUPLEX));
+        audio.setMicrophoneMute(false);
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(shadowOf(audio).createActiveRecordingConfiguration(42,1,"other.private")),false);
+        assertFalse(port.supports(Method.DUPLEX));assertFalse(port.start(Method.DUPLEX));
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(),false);
         audio.setMicrophoneMute(false);shadowOf(audio).setInputDevices(List.of());assertFalse(port.supports(Method.DUPLEX));
         shadowOf(audio).setInputDevices(List.of(input,input));assertFalse(port.supports(Method.DUPLEX));
         ReflectionHelpers.setField(ReflectionHelpers.getField(input,"mPort"),"mAddress","");

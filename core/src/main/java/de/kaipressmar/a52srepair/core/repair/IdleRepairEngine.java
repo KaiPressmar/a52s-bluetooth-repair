@@ -27,6 +27,7 @@ public final class IdleRepairEngine {
     private final Port port;
     private final boolean voiceEnabled;
     private final boolean duplexEnabled;
+    private final Method[] methods;
     private final long started;
     private long deadline, stableSince = -1L, offSince = -1L;
     private int attempt = -1;
@@ -39,6 +40,8 @@ public final class IdleRepairEngine {
         this.port = port;
         this.voiceEnabled = voiceEnabled;
         this.duplexEnabled = duplexEnabled;
+        methods = duplexEnabled ? new Method[]{Method.DUPLEX, Method.MODERN, Method.MODERN, Method.LEGACY_SCO, Method.VOICE_RECOGNITION}
+                : new Method[]{Method.MODERN, Method.MODERN, Method.LEGACY_SCO, Method.VOICE_RECOGNITION};
         started = now;
         deadline = now + DISCOVERY_MS;
         port.log("BEGIN voiceFallback=" + voiceEnabled + " duplex=" + duplexEnabled);
@@ -93,14 +96,12 @@ public final class IdleRepairEngine {
         }
     }
     private Method method() {
-        return attempt < 2 ? Method.MODERN : attempt == 2 ? Method.DUPLEX
-                : attempt == 3 ? Method.LEGACY_SCO : Method.VOICE_RECOGNITION;
+        return methods[attempt];
     }
     private void next(long now) {
-        while (++attempt < 5) {
+        while (++attempt < methods.length) {
             Method method = method();
-            if ((method == Method.VOICE_RECOGNITION && !voiceEnabled)
-                    || (method == Method.DUPLEX && !duplexEnabled) || !port.supports(method)) {
+            if ((method == Method.VOICE_RECOGNITION && !voiceEnabled) || !port.supports(method)) {
                 port.log("SKIP method=" + method + " unsupported/disabled");
                 continue;
             }

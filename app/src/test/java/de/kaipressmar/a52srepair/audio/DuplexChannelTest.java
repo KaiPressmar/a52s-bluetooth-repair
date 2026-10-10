@@ -13,6 +13,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.ShadowAudioTrack;
 import org.robolectric.util.ReflectionHelpers;
 
@@ -92,7 +94,7 @@ public class DuplexChannelTest {
         assertFalse(DuplexChannel.matches(IdleAudioPortTest.info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,"00:11:22:33:44:02",1),output));
         assertTrue(DuplexChannel.matches(output,output));
     }
-    @Test public void realBuilderAndAdapterUseNonblockingCaptureAndReleaseTheNativeRecord() {
+    @Test @Config(shadows={UnknownCaptureConfiguration.class}) public void realBuilderAndAdapterUseNonblockingCaptureAndReleaseTheNativeRecord() {
         DuplexChannel actual=DuplexChannel.create(track,input,output,events::add);
         DuplexChannel.Capture nativeCapture=ReflectionHelpers.getField(actual,"record");
         assertTrue(actual.start());assertTrue(nativeCapture.initialized());assertTrue(nativeCapture.recording());
@@ -101,5 +103,11 @@ public class DuplexChannelTest {
             public int readInByteArray(byte[] bytes,int offset,int count,boolean blocking){assertFalse(blocking);return count;}
         });
         assertEquals(320,nativeCapture.read(new byte[320]));assertTrue(actual.close());assertFalse(nativeCapture.recording());
+    }
+    // Android's real service returns an empty list => no configuration yet. Robolectric's
+    // default IAudioService mock returns null instead; model the documented public null result.
+    @Implements(className="android.media.AudioRecordingMonitorImpl",isInAndroidSdk=false)
+    public static class UnknownCaptureConfiguration {
+        @Implementation protected android.media.AudioRecordingConfiguration getActiveRecordingConfiguration(){return null;}
     }
 }

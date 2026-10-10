@@ -66,6 +66,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
             if (mode != AudioManager.MODE_NORMAL && !(modeOwned && mode == AudioManager.MODE_IN_COMMUNICATION))
                 return "audio mode occupied=" + mode;
             if (audio.isMusicActive()) return "media playback active";
+            if (duplex != null && otherCapturePresent(duplex.session())) return "other microphone session present";
             for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
                 int type = device.getType();
                 if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET || type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
@@ -103,9 +104,10 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
                 case DUPLEX:
                     boolean mic = microphoneAllowed(), muted = audio.isMicrophoneMute();
                     boolean output = matchingPort() != null, input = matchingInput() != null;
+                    boolean captureBusy = otherCapturePresent(-1);
                     log("DUPLEX_SUPPORT microphonePermission=" + mic + " muted=" + muted
-                            + " exactOutput=" + output + " exactInput=" + input);
-                    return mic && !muted && output && input;
+                            + " exactOutput=" + output + " exactInput=" + input + " otherCapture=" + captureBusy);
+                    return mic && !muted && !captureBusy && output && input;
                 case LEGACY_SCO: return targetReady() && audio != null && audio.isBluetoothScoAvailableOffCall();
                 case VOICE_RECOGNITION: return headset.supportsVoiceRecognition(target);
                 default: return false;
@@ -148,7 +150,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
                 if (!audio.setCommunicationDevice(port)) return false;
                 if (method == IdleRepairEngine.Method.DUPLEX) {
                     AudioDeviceInfo input = matchingInput();
-                    if (input == null || !microphoneAllowed()) return false;
+                    if (input == null || !microphoneAllowed() || otherCapturePresent(-1)) return false;
                     duplex = DuplexChannel.create(track, input, port, this::log);
                     return duplex.start();
                 }
@@ -203,6 +205,13 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     }
     private boolean microphoneAllowed() {
         return context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+    private boolean otherCapturePresent(int ownSession) {
+        java.util.List<android.media.AudioRecordingConfiguration> configurations = audio.getActiveRecordingConfigurations();
+        if (configurations == null) return true; // Unknown ownership must not seize microphone access.
+        for (android.media.AudioRecordingConfiguration configuration : configurations)
+            if (ownSession < 0 || configuration.getClientAudioSessionId() != ownSession) return true;
+        return false;
     }
     @SuppressLint("MissingPermission")
     private AudioDeviceInfo matchingInput() {

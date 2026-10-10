@@ -69,18 +69,18 @@ public class IdleRepairEngineTest {
         Port p = new Port(); p.supported.clear();
         IdleRepairEngine e = new IdleRepairEngine(p, false, 0); e.tick(0);
         assertTrue(p.requests.isEmpty()); assertEquals(Result.UNRESOLVED, e.result());
-        assertEquals(5, p.events.stream().filter(x->x.startsWith("SKIP")).count());
+        assertEquals(4, p.events.stream().filter(x->x.startsWith("SKIP")).count());
     }
     @Test public void legacyCanBeUsedWhenModernDeviceIsNotAdvertised() {
         Port p = new Port(); p.supported.remove(Method.MODERN);
         IdleRepairEngine e = new IdleRepairEngine(p, false, 0); e.tick(0);
         assertEquals(List.of(Method.LEGACY_SCO), p.requests);
     }
-    @Test public void duplexRequiresOptInAndComesBeforeLegacyAfterModernExhaustion() {
+    @Test public void duplexRequiresOptInAndRunsBeforeOrdinaryScoCanMaskAnInputFault() {
         Port p=new Port();p.accepted=false;
         IdleRepairEngine e=new IdleRepairEngine(p,true,true,0);e.tick(0);
         for(int n=1;n<=5;n++){e.tick(n*1000);e.tick(n*1000+750);}
-        assertEquals(List.of(Method.MODERN,Method.MODERN,Method.DUPLEX,Method.LEGACY_SCO,Method.VOICE_RECOGNITION),p.requests);
+        assertEquals(List.of(Method.DUPLEX,Method.MODERN,Method.MODERN,Method.LEGACY_SCO,Method.VOICE_RECOGNITION),p.requests);
         assertEquals(Result.UNRESOLVED,e.result());
     }
     @Test public void duplexCannotPassOnScoAloneOrUnstableStreamEvidence() {

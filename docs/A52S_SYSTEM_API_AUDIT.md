@@ -61,8 +61,8 @@ public observations alone.
 
 ## New repair experiment
 
-Existing modern attempts still run first. If those fail with confirmed SCO-off,
-an explicitly enabled **manual** attempt can create a fresh silent speech output
+With the option off, the existing modern attempts still run first. With the
+option explicitly enabled, a **manual** attempt first creates fresh silent speech output
 and an AudioRecord VOICE_COMMUNICATION input (8-kHz mono PCM16). Both require unique
 address-matched, nonzero-ID SCO ports with the correct input/output roles. Output
 and input preferences are separate from AudioManager communication selection.
@@ -79,6 +79,8 @@ explanation discloses this and Android displays its microphone indicator.
 
 Microphone permission and the preference default are independent: RECORD_AUDIO
 alone never enables the method. Automatic idle tests never use this capture path.
+Existing or newly appearing foreign recording sessions block/cancel capture;
+only publicly exposed session IDs are compared, never another app name or audio.
 Missing ports/permission, mic mute, unknown capture state or incorrect route cannot
 be treated as success. Native errors (including ERROR_DEAD_OBJECT) terminate the
 attempt, release own resources, and require confirmed SCO-off before a different

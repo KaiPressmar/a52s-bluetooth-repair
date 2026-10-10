@@ -95,6 +95,7 @@ final class DuplexChannel {
                 && actual.getAddress().equalsIgnoreCase(expected.getAddress());
     }
     String failure() { return failure; }
+    int session() { return record.session(); }
     boolean close() {
         if (closed) return true;
         try { if (record.recording()) record.stop(); }
