@@ -118,6 +118,22 @@ public class IdleAudioPortTest {
         assertEquals(AudioManager.MODE_NORMAL,audio.getMode());assertTrue(audio.isMicrophoneMute());
         assertEquals(volume,audio.getStreamVolume(AudioManager.STREAM_VOICE_CALL));
     }
+    @Test public void wiredUsbAndHearingAidOutputsBlockWhileOrdinarySpeakerDoesNot() {
+        for(int type:List.of(AudioDeviceInfo.TYPE_WIRED_HEADSET,AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_USB_HEADSET,AudioDeviceInfo.TYPE_HEARING_AID)) {
+            shadowOf(audio).setOutputDevices(List.of(info(type,"",2)));
+            assertNotNull(port.blockedReason());assertFalse(port.start(Method.MODERN));
+        }
+        shadowOf(audio).setOutputDevices(List.of(info(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,"",2)));
+        assertNull(port.blockedReason());
+    }
+    @Test public void communicationPortRemovalBeforeRequestStillReleasesSilentTrackAndMode() {
+        shadowOf(audio).setAvailableCommunicationDevices(List.of(info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,1)));
+        assertTrue(port.supports(Method.MODERN));
+        shadowOf(audio).setAvailableCommunicationDevices(List.of());
+        assertFalse(port.start(Method.MODERN));assertTrue(port.release());
+        assertEquals(AudioManager.MODE_NORMAL,audio.getMode());assertNull(audio.getCommunicationDevice());
+    }
     @Test public void rejectedModernRequestStillReleasesModeAndTrack() {
         shadowOf(audio).setAvailableCommunicationDevices(List.of(info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,1)));
         shadowOf(audio).lockCommunicationDevice(true);assertFalse(port.start(Method.MODERN));
@@ -161,13 +177,28 @@ public class IdleAudioPortTest {
     }
     @Implements(AudioManager.class)
     public static class FailingAudio extends org.robolectric.shadows.ShadowAudioManager {
-        boolean failSet,failClear,failMode,failRead;
+        boolean failSet,failClear,failMode,failRead,failList,failLegacyStart,failLegacyStop;
         @Implementation protected boolean setCommunicationDevice(AudioDeviceInfo d) {
             boolean result=super.setCommunicationDevice(d);if(failSet)throw new IllegalStateException();return result;
         }
         @Implementation protected void clearCommunicationDevice(){if(failClear)throw new IllegalStateException();super.clearCommunicationDevice();}
         @Implementation protected void setMode(int mode){if(failMode&&mode==AudioManager.MODE_NORMAL)throw new IllegalStateException();super.setMode(mode);}
+        @Implementation protected java.util.List<AudioDeviceInfo> getAvailableCommunicationDevices() {
+            if(failList)throw new IllegalStateException();return super.getAvailableCommunicationDevices();
+        }
+        @Implementation protected void startBluetoothSco(){if(failLegacyStart)throw new IllegalStateException();}
+        @Implementation protected void stopBluetoothSco(){if(failLegacyStop)throw new IllegalStateException();}
         @Implementation protected int getMode(){if(failRead)throw new IllegalStateException();return super.getMode();}
+    }
+    @Test @Config(sdk=34,shadows=FailingAudio.class)
+    public void failedPortInventoryAndLegacyBinderReleaseDoNotLeakOwnershipOrAssumeSupport() {
+        FailingAudio platform=org.robolectric.shadow.api.Shadow.extract(audio);
+        platform.failList=true;assertFalse(port.supports(Method.MODERN));platform.failList=false;
+        platform.failLegacyStart=true;platform.failLegacyStop=true;
+        assertFalse(port.start(Method.LEGACY_SCO));assertFalse(port.release());
+        platform.failLegacyStop=false;assertTrue(port.release());
+        assertEquals(AudioManager.MODE_NORMAL,audio.getMode());
+        assertTrue(DiagnosticLog.readAll(context).contains("STOP_SCO_ERROR"));
     }
     @Test @Config(sdk=34,shadows=FailingAudio.class)
     public void binderFailureAfterAcceptanceAndDuringReleaseRemainsOwnedUntilSuccessfulCleanup() {

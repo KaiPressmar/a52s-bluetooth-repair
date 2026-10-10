@@ -106,6 +106,13 @@ public class MainActivityTest {
         }
     }
 
+    @Test public void interruptedIdleSessionIsUnresolvedOnProcessStartupAndNeverReportedAsTested() {
+        Context context=ApplicationProvider.getApplicationContext();
+        AppSettings settings=new AppSettings(context);settings.setIdleResult("RUNNING");
+        ((de.kaipressmar.a52srepair.App)context).onCreate();
+        assertEquals("UNRESOLVED",settings.idleResult());
+        assertTrue(de.kaipressmar.a52srepair.diagnostics.DiagnosticLog.readAll(context).contains("teardown unverified"));
+    }
     @Test public void legacyForegroundServiceStateIsMigratedAway() {
         Context context = ApplicationProvider.getApplicationContext();
         assertTrue(new AppSettings(context).migratedToVersionCode() >= 17);
