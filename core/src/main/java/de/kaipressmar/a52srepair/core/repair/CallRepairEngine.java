@@ -35,7 +35,10 @@ public final class CallRepairEngine {
     public static final long VOLUME_CONFIRM_MS = 1_500L;
     /** Telecom itself may need 2-3 s at call start to bring SCO up; don't race it. */
     public static final long ROUTE_CONFIRM_MS = 3_000L;
-    public static final long LEAVE_TIMEOUT_MS = 1_500L;
+    public static final long LEAVE_TIMEOUT_MS = 4_000L;
+    /** Give asynchronous SCO teardown time to settle before requesting the same device again. */
+    public static final long TEARDOWN_SETTLE_MS = 500L;
+    public static final long UNKNOWN_TEARDOWN_SETTLE_MS = 1_500L;
     public static final long RETURN_TIMEOUT_MS = 6_000L;
     public static final long ROUTE_REQUEST_TIMEOUT_MS = 4_000L;
     public static final long VERIFY_MS = 2_500L;
@@ -97,6 +100,8 @@ public final class CallRepairEngine {
     private boolean operationPreventive;
     private boolean returnRequestRepeated;
     private boolean directRouteFailed;
+    private long teardownSince = -1L;
+    private boolean teardownKnown;
     private long healthySince = -1L;
     private long lastCommandAt = Long.MIN_VALUE / 2;
     private long lastRouteChangeAt = Long.MIN_VALUE / 2;
@@ -397,16 +402,34 @@ public final class CallRepairEngine {
         long age = now - operationSince;
         switch (operation) {
             case REBUILD_LEAVING:
-                if (s.route != AudioRoute.BLUETOOTH && s.route != AudioRoute.UNKNOWN) {
-                    begin(Operation.REBUILD_RETURNING, now, operationPreventive);
-                    return step(500L, "return to Bluetooth", RepairCommand.ROUTE_TO_BLUETOOTH);
+                if (s.route == AudioRoute.EARPIECE && !Boolean.TRUE.equals(s.scoAudioConnected)) {
+                    boolean known = Boolean.FALSE.equals(s.scoAudioConnected);
+                    if (teardownSince < 0L || teardownKnown != known) {
+                        teardownSince = now;
+                        teardownKnown = known;
+                    }
+                    long settleMs = known ? TEARDOWN_SETTLE_MS : UNKNOWN_TEARDOWN_SETTLE_MS;
+                    if (now - teardownSince >= settleMs) {
+                        begin(Operation.REBUILD_RETURNING, now, operationPreventive);
+                        return step(500L, known ? "SCO off and phone route settled; return to Bluetooth"
+                                : "phone route settled; SCO teardown unknown; attempt Bluetooth return",
+                                RepairCommand.ROUTE_TO_BLUETOOTH);
+                    }
+                } else {
+                    // A route callback can precede the real link teardown. A rebound resets the dwell.
+                    teardownSince = -1L;
                 }
                 if (age >= LEAVE_TIMEOUT_MS) {
+                    // A later phone-route diagnosis must not bypass this failed teardown
+                    // by issuing a fresh direct request over the still-connected old SCO link.
+                    directRouteFailed = true;
                     endOperation();
                     retryAfter = now + SLOW_TICK_MS;
-                    return step(SLOW_TICK_MS, "Bluetooth teardown failed; no blind return request");
+                    return step(SLOW_TICK_MS, "Bluetooth teardown not settled; no blind return request");
                 }
-                return step(250L, "waiting for Bluetooth teardown");
+                return step(250L, Boolean.TRUE.equals(s.scoAudioConnected)
+                        ? "phone hop requested; waiting for SCO disconnect"
+                        : "waiting for stable phone route and Bluetooth teardown");
             case REBUILD_RETURNING:
                 if (s.route == AudioRoute.BLUETOOTH
                         && !Boolean.FALSE.equals(s.scoAudioConnected)) {
@@ -525,6 +548,7 @@ public final class CallRepairEngine {
         operation = next;
         operationSince = now;
         operationPreventive = preventive;
+        if (next == Operation.REBUILD_LEAVING) teardownSince = -1L;
         if (next == Operation.REBUILD_RETURNING) returnRequestRepeated = false;
         lastCommandAt = now;
         if (next != Operation.VERIFYING_VOLUME) lastRouteChangeAt = now;

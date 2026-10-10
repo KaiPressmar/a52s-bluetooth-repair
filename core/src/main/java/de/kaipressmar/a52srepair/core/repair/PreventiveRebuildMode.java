@@ -6,7 +6,8 @@ import de.kaipressmar.a52srepair.core.device.DeviceFamily;
  * When to rebuild Bluetooth call audio once at call start, without any detected fault.
  *
  * A silent downlink inside the vendor audio HAL is invisible to apps. While driving, the user
- * can only take the call through the car, so a preventive rebuild is the hands-free remedy.
+ * can only take the call through the car. A preventive rebuild is an unverified workaround,
+ * not a replacement for rebooting the vendor audio stack.
  */
 public enum PreventiveRebuildMode {
     ALWAYS,

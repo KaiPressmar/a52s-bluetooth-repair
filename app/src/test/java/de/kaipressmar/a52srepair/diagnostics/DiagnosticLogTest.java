@@ -29,6 +29,8 @@ public class DiagnosticLogTest {
     @Test public void reportContainsEnvironmentAndCalls() {
         String report = DiagnosticReport.build(context);
         assertTrue(report.contains("family="));
+        assertTrue(report.contains("bootElapsedMs="));
+        assertTrue(report.contains("audioMode="));
         assertTrue(report.contains("== Calls"));
     }
 }

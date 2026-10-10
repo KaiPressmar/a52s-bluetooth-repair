@@ -62,6 +62,15 @@ public final class VoiceStream {
         }
     }
 
+    /** Observation only: never take audio-mode ownership away from the real call application. */
+    public Integer mode() {
+        try {
+            return audio == null ? null : audio.getMode();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     public int maxVolume() {
         try {
             return audio == null ? -1 : audio.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL);
