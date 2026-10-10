@@ -16,12 +16,28 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.AudioDeviceInfoBuilder;
 import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class CommunicationDeviceRecoveryTest {
+    @Implements(AudioManager.class)
+    public static class FailingAudioManager extends org.robolectric.shadows.ShadowAudioManager {
+        boolean failAfterSet;
+        boolean failClear;
+        @Implementation protected boolean setCommunicationDevice(AudioDeviceInfo device) {
+            boolean accepted = super.setCommunicationDevice(device);
+            if (failAfterSet) throw new IllegalStateException("Binder failed after acceptance");
+            return accepted;
+        }
+        @Implementation protected void clearCommunicationDevice() {
+            if (failClear) throw new IllegalStateException("Binder unavailable");
+            super.clearCommunicationDevice();
+        }
+    }
     private static final String CAR = "00:11:22:33:44:01";
     private static BluetoothDevice car() { return BluetoothAdapter.getDefaultAdapter().getRemoteDevice(CAR); }
     private static AudioManager audio() {
@@ -38,6 +54,23 @@ public class CommunicationDeviceRecoveryTest {
     private static CallAudioSnapshot active() {
         return CallAudioSnapshot.builder().phase(CallPhase.ACTIVE).callCount(1)
                 .route(AudioRoute.BLUETOOTH).bluetoothRouteAvailable(true).build();
+    }
+    @Test @Config(sdk = 34, shadows = FailingAudioManager.class)
+    public void binderFailureAfterAcceptanceRetainsCleanupAndRetriesWithoutBusyLoop() {
+        AudioManager audio = audio();
+        FailingAudioManager platform = org.robolectric.shadow.api.Shadow.extract(audio);
+        platform.setAvailableCommunicationDevices(List.of(device(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, CAR, 1)));
+        platform.failAfterSet = true;
+        platform.failClear = true;
+        CommunicationDeviceRecovery recovery = new CommunicationDeviceRecovery(audio);
+        assertFalse(recovery.request(car(), 0L));
+        assertTrue(recovery.hasRequest()); // Remote acceptance cannot be forgotten after an exception.
+        recovery.maintain(active(), 15_000L, true);
+        assertEquals(5_000L, recovery.nextCleanupInMs(15_000L));
+        platform.failClear = false;
+        recovery.maintain(active(), 20_000L, true);
+        assertFalse(recovery.hasRequest());
+        assertNull(audio.getCommunicationDevice());
     }
     @Test public void exactTargetAcceptedWithoutChangingModeMuteAndReleasedAtDeadline() {
         AudioManager audio = audio();

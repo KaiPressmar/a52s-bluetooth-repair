@@ -21,6 +21,15 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class CallAudioServiceTest {
+    @Test public void connectedHfpCannotForceAnUnadvertisedTelecomRoute() {
+        ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service = controller.get();
+        service.onCallAudioStateChanged(new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, CallAudioState.ROUTE_EARPIECE));
+        service.observeHeadsets(List.of(LegacyBluetoothTargetTest.device(1)));
+        try { service.requestLegacyRoute(CallAudioState.ROUTE_BLUETOOTH); fail("must not force unavailable route"); }
+        catch (IllegalStateException expected) { assertNull(shadowOf(service).getBluetoothAudio()); }
+        controller.destroy();
+    }
     @Test @Config(sdk = {34, 36})
     public void endpointTimeoutFallsBackOnceToSameLegacyDeviceAndLateCallbacksCannotRepeatIt() {
         ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
