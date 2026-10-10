@@ -22,6 +22,9 @@ tasks.register<JacocoReport>("coverageReport") {
             exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.class", "**/databinding/**")
         }
     )
+    doFirst {
+        executionData.files.forEach { check(it.isFile && it.length() > 0) { "Missing coverage execution data: $it" } }
+    }
     reports {
         html.required = true
         xml.required = true

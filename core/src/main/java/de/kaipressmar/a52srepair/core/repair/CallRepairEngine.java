@@ -187,7 +187,7 @@ public final class CallRepairEngine {
     /** Apply changed settings to this call without resetting observations or repair budgets. */
     public void updatePolicy(boolean enabled, PreventiveRebuildMode mode) {
         repairEnabled = enabled;
-        preventiveMode = mode;
+        preventiveMode = mode == null ? PreventiveRebuildMode.OFF : mode;
         if (!enabled && !operationManual) endOperation();
     }
 

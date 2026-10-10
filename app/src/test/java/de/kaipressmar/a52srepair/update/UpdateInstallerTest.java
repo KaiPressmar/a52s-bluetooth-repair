@@ -19,6 +19,20 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class UpdateInstallerTest {
+    @Test public void installWithoutReleaseOrUnknownSourceAccessDoesNotDownload() {
+        org.robolectric.android.controller.ActivityController<android.app.Activity> controller =
+                org.robolectric.Robolectric.buildActivity(android.app.Activity.class).setup();
+        android.app.Activity activity = controller.get();
+        java.util.concurrent.atomic.AtomicReference<String> status = new java.util.concurrent.atomic.AtomicReference<>();
+        UpdateInstaller.install(activity, null, (message, error) -> { assertTrue(error); status.set(message); });
+        assertEquals(activity.getString(R.string.update_unavailable), status.get());
+        shadowOf(activity.getPackageManager()).setCanRequestPackageInstalls(false);
+        UpdateInstaller.install(activity, release, (message, error) -> { assertFalse(error); status.set(message); });
+        assertEquals(activity.getString(R.string.update_allow_install), status.get());
+        assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                shadowOf(activity).getNextStartedActivity().getAction());
+        controller.pause().stop().destroy();
+    }
     private final Context context = ApplicationProvider.getApplicationContext();
     private final byte[] bytes = {1, 2, 3, 4};
     private final UpdateRelease release = new UpdateRelease("0.20.2", "v0.20.2",

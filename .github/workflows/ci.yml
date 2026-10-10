@@ -41,7 +41,9 @@ jobs:
         run: ./gradlew coverageReport --stacktrace
 
       - name: Summarize test coverage
-        run: python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --markdown build/reports/jacoco/coverageReport/summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_coverage_*.py'
+          python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --verify --markdown build/reports/jacoco/coverageReport/summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Android lint
         run: ./gradlew :app:lintDebug --stacktrace

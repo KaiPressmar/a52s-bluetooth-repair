@@ -199,6 +199,10 @@ final class CallSession {
     }
 
     private void execute(RepairCommand command) {
+        if (command != RepairCommand.RESTORE_VOICE_VOLUME && host.bluetoothTargetAmbiguous()) {
+            DiagnosticLog.log(context, "CALL route repair deferred: ambiguous Bluetooth endpoint");
+            throw new IllegalStateException("No unambiguous Bluetooth endpoint");
+        }
         switch (command) {
             case ROUTE_TO_BLUETOOTH:
                 host.requestRoute(CallAudioState.ROUTE_BLUETOOTH);

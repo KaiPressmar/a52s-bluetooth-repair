@@ -92,6 +92,18 @@ public class CallSessionTest {
         assertEquals(count, telecom.requests.size());
     }
 
+    @Test public void ambiguousAutomaticTargetCannotMoveCallToPhoneBeforeFailingReturn() {
+        FakeTelecom telecom = new FakeTelecom() {
+            @Override public boolean bluetoothTargetAmbiguous() { return true; }
+        };
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(20_000L);
+        assertTrue(telecom.requests.isEmpty());
+        assertTrue(DiagnosticLog.readAll(context).contains("ambiguous Bluetooth endpoint"));
+        telecom.session.finish();
+    }
+
     @Test public void a52sCarCallGetsOnePreventiveRebuildAndIsReported() {
         FakeTelecom telecom = new FakeTelecom();
         telecom.session = new CallSession(context, telecom);
