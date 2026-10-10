@@ -38,6 +38,26 @@ public class MainActivityTest {
             });
         }
     }
+    @Test public void idleTestPermissionIsExplainedAndOldCallControlsRemainAvailable() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                org.robolectric.Shadows.shadowOf((android.app.Application) activity.getApplicationContext())
+                        .grantPermissions(android.Manifest.permission.BLUETOOTH_CONNECT);
+                org.robolectric.Shadows.shadowOf((android.app.Application) activity.getApplicationContext())
+                        .denyPermissions(android.Manifest.permission.READ_PHONE_STATE);
+                assertNotNull(activity.findViewById(R.id.idle_repair));
+                activity.findViewById(R.id.idle_repair).performClick();
+                androidx.appcompat.app.AlertDialog dialog = (androidx.appcompat.app.AlertDialog)
+                        org.robolectric.shadows.ShadowDialog.getLatestDialog();
+                assertEquals(activity.getString(R.string.idle_permission_body),
+                        ((TextView) dialog.findViewById(android.R.id.message)).getText().toString());
+                dialog.getButton(android.content.DialogInterface.BUTTON_NEGATIVE).performClick();
+                assertNotNull(activity.findViewById(R.id.manual_repair));
+                assertEquals("NOT_RUN", new AppSettings(activity).idleResult());
+            });
+        }
+    }
+
     @Test public void navigationSurvivesActivityRecreation() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> ((com.google.android.material.bottomnavigation.BottomNavigationView)

@@ -31,6 +31,11 @@ public final class SettingsFragment extends PreferenceFragmentCompat implements 
         setPreferencesFromResource(R.xml.preferences, rootKey);
 
         bindLanguage();
+        onClick("recovery_help", () -> new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.recovery_help_title).setMessage(R.string.recovery_help_body)
+                .setPositiveButton(R.string.recovery_bluetooth, (d,w) -> openRecoverySettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
+                .setNeutralButton(R.string.recovery_developer, (d,w) -> openRecoverySettings(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+                .setNegativeButton(R.string.action_close, null).show());
         onClick("car_link", this::manageCarLink);
         onClick("share_report", () -> {
             Intent share = DiagnosticReport.shareIntent(requireContext());
@@ -119,6 +124,11 @@ public final class SettingsFragment extends PreferenceFragmentCompat implements 
                 return true;
             });
         }
+    }
+
+    private void openRecoverySettings(String action) {
+        try { startActivity(new Intent(action)); }
+        catch (RuntimeException e) { Toast.makeText(requireContext(), R.string.recovery_settings_unavailable, Toast.LENGTH_LONG).show(); }
     }
 
     private SetupActions actions() {

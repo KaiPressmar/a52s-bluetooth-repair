@@ -47,6 +47,8 @@ public final class StatusFragment extends Fragment implements MainActivity.Refre
         binding.statProblems.statLabel.setText(R.string.stats_problems);
         binding.updateInstall.setOnClickListener(v -> actions().installUpdate());
         binding.manualCheck.setOnClickListener(v -> checkManually());
+        binding.idleRepair.setOnClickListener(v -> ((MainActivity) requireActivity()).startIdleRepair());
+        binding.idleCancel.setOnClickListener(v -> ((MainActivity) requireActivity()).cancelIdleRepair());
         binding.manualRepair.setOnClickListener(v -> {
             if (!ProtectionStatus.hasBluetoothPermission(requireContext())
                     || !ProtectionStatus.hasCallAccess(requireContext())) {
@@ -80,6 +82,16 @@ public final class StatusFragment extends Fragment implements MainActivity.Refre
         renderUpdate(actions().availableUpdate());
         renderStats(history);
         renderLastCall(history.latestBluetoothCall());
+        String idle = new AppSettings(requireContext()).idleResult();
+        int idleMessage = "RUNNING".equals(idle) ? R.string.idle_running
+                : "CHANNEL_TESTED".equals(idle) ? R.string.idle_tested
+                : "UNRESOLVED".equals(idle) ? R.string.idle_unresolved
+                : "CLEANUP_FAILED".equals(idle) ? R.string.idle_cleanup_failed
+                : "CANCELLED".equals(idle) ? R.string.idle_cancelled
+                : idle.startsWith("BLOCKED") ? R.string.idle_blocked : R.string.idle_ready;
+        binding.idleResult.setText(idleMessage);
+        binding.idleRepair.setEnabled(!"RUNNING".equals(idle));
+        binding.idleCancel.setVisibility("RUNNING".equals(idle) ? View.VISIBLE : View.GONE);
     }
 
     private void renderHero(ProtectionStatus status, CallHistory history) {

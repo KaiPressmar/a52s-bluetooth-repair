@@ -40,6 +40,12 @@
     <PreferenceCategory
         app:iconSpaceReserved="false"
         app:title="@string/pref_category_diagnostics">
+        <SwitchPreferenceCompat app:key="idle_auto" app:defaultValue="false" app:iconSpaceReserved="false"
+            app:title="@string/idle_auto_title" app:summary="@string/idle_auto_body" />
+        <SwitchPreferenceCompat app:key="idle_voice" app:defaultValue="false" app:iconSpaceReserved="false"
+            app:title="@string/idle_voice_title" app:summary="@string/idle_voice_body" />
+        <Preference app:key="recovery_help" app:iconSpaceReserved="false"
+            app:title="@string/recovery_help_title" app:summary="@string/recovery_help_summary" />
         <Preference
             app:iconSpaceReserved="false"
             app:key="share_report"

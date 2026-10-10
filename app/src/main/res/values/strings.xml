@@ -173,4 +173,27 @@
     <string name="manual_ambiguous_device">Multiple Bluetooth call devices are available. Select the intended device in the call app first; this app will not guess.</string>
     <string name="manual_microphone_muted">The microphone is muted. If this was unintentional, unmute it in the call app. This app preserves microphone mute.</string>
     <string name="setup_link_rejected">Android could not start device linking. Check Bluetooth access or use the ADB setup.</string>
+    <string name="idle_title">Test before or after a call</string>
+    <string name="idle_body">Connect your car or headset, end all calls and pause music. The app briefly opens and closes the speech audio channel. Keep this app visible; a call or leaving the app stops the test. Your device may display a call or voice session.</string>
+    <string name="idle_start">Test and reinitialize audio channel</string>
+    <string name="idle_permission_body">This optional test needs phone status access to avoid interfering with an active or incoming call. It does not read phone numbers or record audio. Call protection continues to work without this additional permission.</string>
+    <string name="idle_allow">Allow phone status access</string>
+    <string name="idle_ready">Ready for an optional channel test.</string>
+    <string name="idle_running">Testing the channel; keep the app visible. This can take up to 70 seconds.</string>
+    <string name="idle_tested">Speech audio connected and disconnected successfully. Please check the next Bluetooth call: this test does not prove that call audio is repaired.</string>
+    <string name="idle_unresolved">The audio channel could not be established. Export the diagnostic report. A phone restart may still be necessary.</string>
+    <string name="idle_cleanup_failed">Release or disconnection could not be confirmed. No further test starts in this session. Export the report; restart the phone if audio stays occupied.</string>
+    <string name="idle_cancelled">Test stopped; the app released its audio requests.</string>
+    <string name="idle_blocked">Test unavailable: phone/Bluetooth access, a connected single headset and idle audio are required. End calls, pause media and check permissions. Details are in the diagnostic report.</string>
+    <string name="idle_cooldown">Wait at least 30 seconds between channel tests.</string>
+    <string name="idle_auto_title">Automatic channel test while app is open</string>
+    <string name="idle_auto_body">Optional: test when a single headset connects or after a failed call, only while this app is visible and phone status access is granted. At most once per 10 minutes. No tests with the screen locked or app in background.</string>
+    <string name="idle_voice_title">Experimental Bluetooth voice session</string>
+    <string name="idle_voice_body">After other channel tests fail, briefly start and stop supported headset voice control. May activate the car voice screen, microphone path or tones. Only outside calls with this app visible; no audio recording.</string>
+    <string name="recovery_help_title">Further recovery options</string>
+    <string name="recovery_help_summary">Device settings and actions the app cannot perform itself</string>
+    <string name="recovery_bluetooth">Bluetooth settings</string>
+    <string name="recovery_developer">Developer settings</string>
+    <string name="recovery_settings_unavailable">The requested settings screen is unavailable on this device.</string>
+    <string name="recovery_help_body">If the channel test fails, export a report before restarting.\n\nOutside calls: in Bluetooth settings, disable and re-enable call audio for this device; disconnect and reconnect the headset or car. Restart the headset or car audio system while parked. Re-pairing removes the saved pairing and requires setup again.\n\nInstall available phone and headset/car firmware updates. A phone restart remains the only confirmed recovery on the affected owner device. Bluetooth off/on alone did not help.\n\nSome A52s owners report temporary improvements with Bluetooth SAP enabled or A2DP hardware offload disabled in developer settings. These reports conflict, may require a restart, and do not establish a fix for speech audio. Change only one setting at a time, record its original value and compare the next call. The app cannot change these settings or restart Android audio/Bluetooth system services.</string>
 </resources>

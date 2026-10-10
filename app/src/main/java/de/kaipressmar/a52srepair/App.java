@@ -12,6 +12,12 @@ public class App extends Application {
         super.onCreate();
         DynamicColors.applyToActivitiesIfAvailable(this);
         migrateFromForegroundServiceVersions();
+        AppSettings settings = new AppSettings(this);
+        if ("RUNNING".equals(settings.idleResult())) {
+            settings.setIdleResult("UNRESOLVED");
+            de.kaipressmar.a52srepair.diagnostics.DiagnosticLog.log(this,
+                    "IDLE previous process ended during operation; old Binder requests die with process; teardown unverified");
+        }
         de.kaipressmar.a52srepair.update.UpdateLinks.removeLegacyDownloads(this);
     }
 

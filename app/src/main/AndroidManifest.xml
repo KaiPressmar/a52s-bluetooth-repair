@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Restore a muted voice-call volume. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Optional runtime grant only for off-call tests: do not open audio during a phone call. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Lets Telecom bind CallAudioService during calls. Granted as app-op through the
          companion-device link to the car (or once via adb); it is never a runtime prompt. -->
     <uses-permission

@@ -14,9 +14,10 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import androidx.core.content.ContextCompat;
 import java.util.List;
+import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
 
 /** Holds the HFP profile proxy for one call session and answers link-state questions. */
-public final class HeadsetMonitor {
+public final class HeadsetMonitor implements HeadsetAccess {
     private final Context context;
     private final BluetoothAdapter adapter;
     private BluetoothHeadset headset;
@@ -29,6 +30,9 @@ public final class HeadsetMonitor {
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
+            DiagnosticLog.log(context, "HFP event action=" + intent.getAction()
+                    + " state=" + intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
+                    + " previous=" + intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, -1));
             // Read current APIs on the next snapshot; never trust intent extras as audio proof.
             if (opened && permitted()) onChanged.run();
         }
@@ -38,6 +42,8 @@ public final class HeadsetMonitor {
         return new BluetoothProfile.ServiceListener() {
                 @Override
                 public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    DiagnosticLog.log(context, "HFP proxy connected generation=" + generation
+                            + " current=" + (opened && generation == profileGeneration));
                     if (!opened || generation != profileGeneration) {
                         closeProxy(proxy);
                         return;
@@ -48,6 +54,7 @@ public final class HeadsetMonitor {
 
                 @Override
                 public void onServiceDisconnected(int profile) {
+                    DiagnosticLog.log(context, "HFP proxy disconnected generation=" + generation);
                     if (!opened || generation != profileGeneration) return;
                     headset = null;
                     profileRequested = false;
@@ -88,6 +95,7 @@ public final class HeadsetMonitor {
             nextProfileRequestAt = now + 5_000L;
             try {
                 profileRequested = adapter.getProfileProxy(context, listener(++profileGeneration), BluetoothProfile.HEADSET);
+                DiagnosticLog.log(context, "HFP proxy request generation=" + profileGeneration + " accepted=" + profileRequested);
             } catch (RuntimeException ignored) {
                 // Without the proxy the SCO state is reported as unknown.
             }
@@ -170,5 +178,23 @@ public final class HeadsetMonitor {
         if (headset == null || !permitted()) return java.util.Collections.emptyList();
         try { return new java.util.ArrayList<>(headset.getConnectedDevices()); }
         catch (RuntimeException e) { return java.util.Collections.emptyList(); }
+    }
+
+    @SuppressLint("MissingPermission")
+    public boolean supportsVoiceRecognition(BluetoothDevice device) {
+        if (headset == null || !permitted() || device == null) return false;
+        try { return headset.isVoiceRecognitionSupported(device); }
+        catch (RuntimeException e) { return false; }
+    }
+
+    /** Used only by the separately guarded off-call operation, never cellular call repair. */
+    @SuppressLint("MissingPermission")
+    public boolean startVoiceRecognition(BluetoothDevice device) {
+        return headset != null && permitted() && device != null && headset.startVoiceRecognition(device);
+    }
+
+    @SuppressLint("MissingPermission")
+    public boolean stopVoiceRecognition(BluetoothDevice device) {
+        return headset != null && permitted() && device != null && headset.stopVoiceRecognition(device);
     }
 }

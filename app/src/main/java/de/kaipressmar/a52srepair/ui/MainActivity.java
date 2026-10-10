@@ -36,6 +36,12 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
     private ActivityMainBinding binding;
     private CarLinkManager carLink;
     private UpdateRelease availableUpdate;
+    private de.kaipressmar.a52srepair.audio.IdleRepairController idleRepair;
+    private final ActivityResultLauncher<String> phoneStatusPermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted && idleRepair != null && canUpdateUi()) startIdleRepair();
+                else refreshStatus();
+            });
 
     private final ActivityResultLauncher<String> bluetoothPermission =
             registerForActivityResult(
@@ -53,6 +59,7 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
         setContentView(binding.getRoot());
         binding.root.setFitsSystemWindows(true);
         carLink = new CarLinkManager(this);
+        idleRepair = new de.kaipressmar.a52srepair.audio.IdleRepairController(this, this::refreshStatus);
 
         binding.bottomNav.setOnItemSelectedListener(item -> {
             show(item.getItemId());
@@ -78,6 +85,31 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
             });
         }
     }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (idleRepair != null) idleRepair.resume();
+    }
+    @Override protected void onPause() {
+        if (idleRepair != null) idleRepair.pause();
+        super.onPause();
+    }
+
+    public void startIdleRepair() {
+        if (!ProtectionStatus.hasBluetoothPermission(this)) { requestBluetoothPermission(); return; }
+        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            new MaterialAlertDialogBuilder(this).setTitle(R.string.idle_title)
+                    .setMessage(R.string.idle_permission_body)
+                    .setPositiveButton(R.string.idle_allow, (d, w) -> phoneStatusPermission.launch(Manifest.permission.READ_PHONE_STATE))
+                    .setNegativeButton(R.string.action_cancel, null).show();
+            return;
+        }
+        String reason = idleRepair.startManually();
+        if (reason != null) Toast.makeText(this,
+                "COOLDOWN".equals(reason) ? R.string.idle_cooldown : R.string.idle_blocked, Toast.LENGTH_LONG).show();
+        refreshStatus();
+    }
+    public void cancelIdleRepair() { if (idleRepair != null) idleRepair.cancel("user cancelled"); }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {

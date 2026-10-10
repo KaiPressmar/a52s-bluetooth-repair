@@ -4,6 +4,19 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.22.0 - Off-call speech channel recovery and deeper diagnostics
+
+- Add a manual **Test and reinitialize audio channel** before/after calls. It requires optional phone-status access, a single connected classic HFP target, known SCO-off, idle audio and a visible app. Existing in-call protection works without the extra permission.
+- Exercise exact-address-matched modern communication selection with a finite-lived silent speech track and own communication mode; after confirmed release retry once, then try legacy off-call SCO. An optional supported voice-recognition session exercises another HFP state path. No audio recording, microphone permission, focus takeover or volume/mute changes.
+- Bound discovery, connect, stable-link confirmation and teardown. Abort on calls, lost/ambiguous targets, other audio modes, media, wired/USB/hearing-aid output or activity departure. Retain ownership after Binder failures, retry cleanup at most three times and prevent more requests after unconfirmed teardown. Do not stop native voice-recognition audio after the system takes over a phone call.
+- Optional automatic tests only while the app is visible, on a sole connected HFP target or after a failed call, with a ten-minute cooldown. Background candidates are deferred; this is not hands-free background prevention.
+- Report only **channel tested**, never a repaired cellular call from an idle experiment. Add explicit start/cancel controls, translated outcomes and a guided recovery page for user-operated settings and firmware/reboot options.
+- Export operation IDs, triggers, monotonic timestamps, per-stage acceptance/timeouts/release results, HFP Binder/event transitions, public audio-port inventory and target-match flags. Expand in-call endpoint/legacy callback logging without device names, MAC addresses, phone numbers or recorded audio.
+- Add state-machine, Android lifecycle, permission, target-selection and Binder-failure regression tests on Android 12/14/16; keep combined coverage gates and signed APK verification.
+
+Physical A52s/car validation is pending. These are experimental recovery attempts, not a restart of Samsung system services; the owner's only proven workaround remains a phone reboot.
+
+
 ## 0.21.0 - bounded recovery escalation for persistent call-audio failures
 
 - The last automatic rebuild or second manual rebuild refreshes Telecom observations and reacquires the app's HFP observer, then waits before routing. It uses the older Telecom API with an unambiguous device and a 2-second phone/SCO-off dwell, allowing up to 8 seconds for teardown. Existing automatic/manual budgets remain unchanged.
