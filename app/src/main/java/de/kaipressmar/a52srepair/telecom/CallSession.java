@@ -206,6 +206,8 @@ final class CallSession {
 
     @SuppressWarnings("deprecation")
     private CallAudioSnapshot snapshot(CallAudioState audio) {
+        // Retry failed profile acquisition and recover a mid-call permission grant automatically.
+        if (!finished) headset.open();
         List<Integer> states = host.callStates();
         VoiceStream.Evidence evidence = voice.evidence();
         CallAudioSnapshot.Builder builder =

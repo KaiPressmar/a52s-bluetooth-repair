@@ -20,6 +20,7 @@ A52s/car audio recovery still needs physical validation.
 | Call playback muted or volume zero | Restore voice-call volume within the existing limit; manual reconnection also restores it when this indication exists. The car/headset can have its own volume/mute, which the app cannot measure reliably. |
 | Microphone muted | Show/log the microphone flag separately; preserve its state. An intentional input mute is not a downlink fault and is not automatically undone. |
 | Bluetooth access granted during a call | A manual check/reconnect can start the previously unavailable profile observation. No new permission is requested. |
+| Initial profile-proxy request fails | In-call snapshots retry profile acquisition at most once per 5 s; observation also recovers after a permission grant without needing phone input. |
 | Speaker/wired/streaming, hold, multiple calls, hang-up | Refuse or pause disruptive operations. Finished sessions cannot issue manual requests. |
 | HFP connected but no Bluetooth endpoint | Report unavailable; no route command can create an endpoint missing from Telecom. Reconnect/check the device outside the app. |
 | No call delivered to the app | Explain missing call access or Telecom binding. A manual button cannot grant the app-op, detect unsupported calls or force Telecom to bind the service. |
