@@ -15,6 +15,16 @@ import java.util.List;
 import org.junit.Test;
 
 public class CallReportTest {
+    @org.junit.Test public void riskWindowHandlesClockCorrectionAndFutureTimestamps() {
+        long now = 20L * 24L * 60L * 60L * 1_000L;
+        CallReport old = new CallReport(1L, 100L, CallOutcome.UNRESOLVED,
+                java.util.EnumSet.of(de.kaipressmar.a52srepair.core.diagnosis.Fault.SCO_DISCONNECTED), 1, 0, false, false);
+        CallReport recent = new CallReport(now - 1L, 100L, CallOutcome.REPAIRED,
+                java.util.EnumSet.of(de.kaipressmar.a52srepair.core.diagnosis.Fault.SCO_DISCONNECTED), 1, 0, false, false);
+        assertTrue(new CallHistory(java.util.List.of(old, recent)).riskElevated(now));
+        assertFalse(new CallHistory(java.util.List.of(recent)).riskElevated(now - 2L));
+        assertFalse(new CallHistory(java.util.List.of(old)).riskElevated(now));
+    }
     private static final long DAY = 24L * 60L * 60L * 1000L;
 
     private static CallReport report(long at, CallOutcome outcome) {

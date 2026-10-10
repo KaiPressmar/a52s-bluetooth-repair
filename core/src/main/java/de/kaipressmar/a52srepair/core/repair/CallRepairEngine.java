@@ -90,14 +90,15 @@ public final class CallRepairEngine {
         VERIFYING_VOLUME
     }
 
-    private final boolean repairEnabled;
-    private final PreventiveRebuildMode preventiveMode;
+    private boolean repairEnabled;
+    private PreventiveRebuildMode preventiveMode;
     private final boolean riskElevated;
     private final long startedAt;
 
     private Operation operation = Operation.NONE;
     private long operationSince;
     private boolean operationPreventive;
+    private boolean operationManual;
     private boolean returnRequestRepeated;
     private boolean directRouteFailed;
     private long teardownSince = -1L;
@@ -171,6 +172,7 @@ public final class CallRepairEngine {
         confirmedFaults.add(Fault.USER_REPORTED_AUDIO_PROBLEM);
         lastConfirmedFault = Fault.USER_REPORTED_AUDIO_PROBLEM;
         Step rebuild = startRebuild(s, now, false, "manual Bluetooth audio rebuild");
+        operationManual = true;
         if (s.voiceSilenced() && volumeRestores < MAX_VOLUME_RESTORES) {
             volumeRestores++;
             confirmedFaults.add(Fault.VOICE_SILENCED);
@@ -182,6 +184,13 @@ public final class CallRepairEngine {
     }
 
     /** Called for synchronous exceptions or a current Telecom endpoint error callback. */
+    /** Apply changed settings to this call without resetting observations or repair budgets. */
+    public void updatePolicy(boolean enabled, PreventiveRebuildMode mode) {
+        repairEnabled = enabled;
+        preventiveMode = mode;
+        if (!enabled && !operationManual) endOperation();
+    }
+
     public void onRouteRequestFailed(long now) {
         if (ended) return;
         // A late native rejection must not leave an explicit attempt reported as successful.
@@ -557,6 +566,7 @@ public final class CallRepairEngine {
     private void endOperation() {
         operation = Operation.NONE;
         operationPreventive = false;
+        operationManual = false;
     }
 
     private void finish(long now) {

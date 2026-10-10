@@ -8,6 +8,8 @@ import de.kaipressmar.a52srepair.BuildConfig;
 import de.kaipressmar.a52srepair.core.version.SemanticVersion;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -30,10 +32,20 @@ public final class UpdateRepository {
 
     private final Context context;
     private final SharedPreferences prefs;
+    private final Executor executor;
+    private final ReleaseFetcher fetcher;
     private final Handler main = new Handler(Looper.getMainLooper());
 
     public UpdateRepository(Context context) {
+        this(context, EXECUTOR, () -> HttpClient.fetchText(RELEASES_URL));
+    }
+
+    interface ReleaseFetcher { String fetch() throws IOException; }
+
+    UpdateRepository(Context context, Executor executor, ReleaseFetcher fetcher) {
         this.context = context.getApplicationContext();
+        this.executor = executor;
+        this.fetcher = fetcher;
         prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
@@ -41,7 +53,12 @@ public final class UpdateRepository {
         String version = prefs.getString("version", null);
         String apk = prefs.getString("apk_url", null);
         String checksum = prefs.getString("checksum_url", null);
-        if (version == null || apk == null || checksum == null) return null;
+        if (version == null || !version.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
+                || SemanticVersion.normalize(version) == null
+                || prefs.getBoolean("prerelease", false)
+                || !UpdateRelease.expectedApkName(version).equals(prefs.getString("apk_name", ""))
+                || !UpdateInstaller.isTrustedDownloadUrl(apk)
+                || !UpdateInstaller.isTrustedDownloadUrl(checksum)) return null;
         if (SemanticVersion.compare(version, BuildConfig.VERSION_NAME) <= 0) return null;
         return new UpdateRelease(
                 version,
@@ -68,11 +85,11 @@ public final class UpdateRepository {
             callback.onResult(cachedNewerRelease(), "");
             return;
         }
-        EXECUTOR.execute(
+        executor.execute(
                 () -> {
                     String error = "";
                     try {
-                        String json = HttpClient.fetchText(RELEASES_URL);
+                        String json = fetcher.fetch();
                         save(UpdateRelease.selectNewest(json, BuildConfig.VERSION_NAME), "");
                     } catch (Exception e) {
                         error = e.getClass().getSimpleName();
@@ -90,7 +107,7 @@ public final class UpdateRepository {
         long last = prefs.getLong("last_check", 0L);
         String error = prefs.getString("error", "");
         long interval = error == null || error.isEmpty() ? CHECK_INTERVAL_MS : RETRY_INTERVAL_MS;
-        return last == 0L || now - last >= interval;
+        return last == 0L || now < last || now - last >= interval;
     }
 
     private void save(UpdateRelease release, String error) {

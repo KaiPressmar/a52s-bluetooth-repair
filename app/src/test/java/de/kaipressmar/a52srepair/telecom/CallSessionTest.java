@@ -72,6 +72,26 @@ public class CallSessionTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms));
     }
 
+    @Test public void changingProtectionDuringCallStopsPendingAutomaticReturnAndAllowsManualRepair() {
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(1_200L);
+        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+                .putBoolean("protection_enabled", false).commit();
+        advance(5_000L);
+        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
+        assertEquals(ManualRepairStatus.STARTED, telecom.session.repairManually());
+        advance(5_000L);
+        assertEquals(CallAudioState.ROUTE_BLUETOOTH, (int) telecom.requests.get(telecom.requests.size() - 1));
+        telecom.session.finish();
+        int count = telecom.requests.size();
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", true).commit();
+        advance(20_000L);
+        assertEquals(count, telecom.requests.size());
+    }
+
     @Test public void a52sCarCallGetsOnePreventiveRebuildAndIsReported() {
         FakeTelecom telecom = new FakeTelecom();
         telecom.session = new CallSession(context, telecom);

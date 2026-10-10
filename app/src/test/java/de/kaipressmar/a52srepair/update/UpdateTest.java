@@ -24,7 +24,7 @@ public class UpdateTest {
                     .append(BASE).append(tag).append('/').append(name).append("\"}");
         }
         return "{\"tag_name\":\"" + tag + "\",\"draft\":" + draft
-                + ",\"prerelease\":true,\"html_url\":\"x\",\"assets\":[" + assets + "]}";
+                + ",\"prerelease\":false,\"html_url\":\"x\",\"assets\":[" + assets + "]}";
     }
 
     @Test public void selectsNewestCompleteReleaseForFlavor() throws Exception {
@@ -65,5 +65,25 @@ public class UpdateTest {
         assertTrue(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk"));
         assertFalse(UpdateInstaller.isTrustedDownloadUrl("https://example.test/app.apk"));
         assertFalse(UpdateInstaller.isTrustedDownloadUrl(null));
+        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "../app.apk"));
+        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/%2e%2e"));
+        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk?redirect=evil"));
+        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk#fragment"));
+        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/.."));
+    }
+
+    @Test public void skipsPrereleasesMalformedItemsAndUntrustedAssetsWithoutHidingValidUpdates() throws Exception {
+        String stable = release("v0.20.2", false, "bluetooth-repair-v0.20.2.apk", "bluetooth-repair-v0.20.2.apk.sha256");
+        String preview = release("v0.21.0", false, "bluetooth-repair-v0.21.0.apk", "bluetooth-repair-v0.21.0.apk.sha256")
+                .replace("\"prerelease\":false", "\"prerelease\":true");
+        String bad = release("v0.22.0", false, "bluetooth-repair-v0.22.0.apk", "bluetooth-repair-v0.22.0.apk.sha256")
+                .replace(BASE, "https://example.test/");
+        assertEquals("0.20.2", UpdateRelease.selectNewest("[null,4," + preview + "," + bad + "," + stable + "]", "0.20.1").version);
+    }
+
+    @Test public void refusesTagSuffixEvenWhenPrereleaseFlagIsMissing() throws Exception {
+        String tag = "v0.21.0-beta.1";
+        assertNull(UpdateRelease.selectNewest("[" + release(tag, false,
+                "bluetooth-repair-v0.21.0-beta.1.apk", "bluetooth-repair-v0.21.0-beta.1.apk.sha256") + "]", "0.20.1"));
     }
 }

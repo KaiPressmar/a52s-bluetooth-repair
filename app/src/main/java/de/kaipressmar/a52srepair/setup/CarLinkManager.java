@@ -88,51 +88,55 @@ public final class CarLinkManager {
             callback.onFailed(context.getString(R.string.setup_link_unsupported));
             return;
         }
-        AssociationRequest request =
-                new AssociationRequest.Builder()
-                        .addDeviceFilter(
-                                new BluetoothDeviceFilter.Builder().setAddress(device.address).build())
-                        .setSingleDevice(true)
-                        .setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH)
-                        .build();
+        try {
+            AssociationRequest request =
+                    new AssociationRequest.Builder()
+                            .addDeviceFilter(
+                                    new BluetoothDeviceFilter.Builder().setAddress(device.address).build())
+                            .setSingleDevice(true)
+                            .setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH)
+                            .build();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Executor main = context.getMainExecutor();
-            cdm.associate(
-                    request,
-                    main,
-                    new CompanionDeviceManager.Callback() {
-                        @Override
-                        public void onAssociationPending(IntentSender sender) {
-                            callback.onConfirmationRequired(sender);
-                        }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Executor main = context.getMainExecutor();
+                cdm.associate(
+                        request,
+                        main,
+                        new CompanionDeviceManager.Callback() {
+                            @Override
+                            public void onAssociationPending(IntentSender sender) {
+                                callback.onConfirmationRequired(sender);
+                            }
 
-                        @Override
-                        public void onAssociationCreated(AssociationInfo info) {
-                            CharSequence name = info.getDisplayName();
-                            callback.onLinked(name == null ? device.name : name.toString());
-                        }
+                            @Override
+                            public void onAssociationCreated(AssociationInfo info) {
+                                CharSequence name = info.getDisplayName();
+                                callback.onLinked(name == null ? device.name : name.toString());
+                            }
 
-                        @Override
-                        public void onFailure(CharSequence error) {
-                            callback.onFailed(error);
-                        }
-                    });
-        } else {
-            cdm.associate(
-                    request,
-                    new CompanionDeviceManager.Callback() {
-                        @Override
-                        public void onDeviceFound(IntentSender sender) {
-                            callback.onConfirmationRequired(sender);
-                        }
+                            @Override
+                            public void onFailure(CharSequence error) {
+                                callback.onFailed(error);
+                            }
+                        });
+            } else {
+                cdm.associate(
+                        request,
+                        new CompanionDeviceManager.Callback() {
+                            @Override
+                            public void onDeviceFound(IntentSender sender) {
+                                callback.onConfirmationRequired(sender);
+                            }
 
-                        @Override
-                        public void onFailure(CharSequence error) {
-                            callback.onFailed(error);
-                        }
-                    },
-                    new Handler(Looper.getMainLooper()));
+                            @Override
+                            public void onFailure(CharSequence error) {
+                                callback.onFailed(error);
+                            }
+                        },
+                        new Handler(Looper.getMainLooper()));
+            }
+        } catch (RuntimeException e) {
+            callback.onFailed(context.getString(R.string.setup_link_rejected));
         }
     }
 
