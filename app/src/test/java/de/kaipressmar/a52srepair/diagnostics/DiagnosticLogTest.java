@@ -31,6 +31,9 @@ public class DiagnosticLogTest {
         assertTrue(report.contains("family="));
         assertTrue(report.contains("bootElapsedMs="));
         assertTrue(report.contains("audioMode="));
+        assertTrue(report.contains("signerSha256="));
+        assertTrue(report.contains("installer="));
+        assertTrue(report.contains("routing="));
         assertTrue(report.contains("== Calls"));
     }
 }

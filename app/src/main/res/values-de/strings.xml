@@ -56,7 +56,7 @@
     <!-- Update -->
     <string name="update_title">Update verfügbar</string>
     <string name="update_body">Version %1$s ist verfügbar.</string>
-    <string name="update_install">Installieren</string>
+    <string name="update_install">Release im Browser öffnen</string>
     <string name="update_none">Die App ist aktuell.</string>
     <string name="update_failed">Prüfung fehlgeschlagen (%1$s)</string>
     <string name="update_checking">Suche nach Updates …</string>
@@ -131,15 +131,9 @@
     <!-- Car link and update errors -->
     <string name="setup_link_unsupported">Dieses Gerät unterstützt keine Companion-Verknüpfung. Nutze die ADB-Alternative.</string>
     <string name="update_unavailable">Kein Update verfügbar.</string>
-    <string name="update_allow_install">Bitte Installation aus dieser App einmalig erlauben.</string>
     <string name="update_untrusted">Update-Quelle ist nicht vertrauenswürdig.</string>
-    <string name="update_downloading">Update wird heruntergeladen …</string>
-    <string name="update_verified">Prüfsumme verifiziert – Installation wird geöffnet.</string>
-    <string name="update_installer_failed">Installer konnte nicht geöffnet werden.</string>
-    <string name="update_error">Update fehlgeschlagen: %1$s</string>
-    <string name="update_error_checksum">Prüfsumme stimmt nicht oder ist ungültig</string>
-    <string name="update_error_package">Die heruntergeladene Datei passt nicht zu dieser App oder Version</string>
-    <string name="update_error_network">Download fehlgeschlagen – bitte Internetverbindung prüfen</string>
+    <string name="update_security_help">Der Download erfolgt über den offiziellen GitHub-Release im Browser. Android prüft bei der Installation, ob die Signatur zur installierten App passt. Eine Einstufung als potenziell schädlich muss anhand der Play-Protect-Meldung geprüft und gegebenenfalls bei Google beanstandet werden. Play Protect bleibt eingeschaltet.</string>
+    <string name="update_browser_failed">Browser konnte nicht geöffnet werden.</string>
     <string name="manual_title">Manuell helfen</string>
     <string name="manual_body">Während eines Anrufs kannst du den Audiostatus prüfen oder den Bluetooth-Anrufweg neu aufbauen. Dabei läuft der Anruf kurz über das Telefon. Die Funktion schaltet Bluetooth nicht aus und ersetzt keinen Handy-Neustart.</string>
     <string name="manual_check">Jetzt prüfen</string>

@@ -51,25 +51,15 @@ public class UpdateTest {
         assertNull(UpdateRelease.selectNewest(json, "0.17.0"));
     }
 
-    @Test public void checksumParsing() {
-        String hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        assertEquals(hash, UpdateInstaller.parseSha256(hash + "  file.apk\n"));
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void rejectsMalformedChecksum() {
-        UpdateInstaller.parseSha256("nope");
-    }
-
     @Test public void onlyRepositoryDownloadsAreTrusted() {
-        assertTrue(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl("https://example.test/app.apk"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(null));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "../app.apk"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/%2e%2e"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk?redirect=evil"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/app.apk#fragment"));
-        assertFalse(UpdateInstaller.isTrustedDownloadUrl(BASE + "v1/.."));
+        assertTrue(UpdateLinks.isTrustedDownloadUrl(BASE + "v1/app.apk"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl("https://example.test/app.apk"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(null));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(BASE + "../app.apk"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(BASE + "v1/%2e%2e"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(BASE + "v1/app.apk?redirect=evil"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(BASE + "v1/app.apk#fragment"));
+        assertFalse(UpdateLinks.isTrustedDownloadUrl(BASE + "v1/.."));
     }
 
     @Test public void skipsPrereleasesMalformedItemsAndUntrustedAssetsWithoutHidingValidUpdates() throws Exception {

@@ -57,8 +57,8 @@ public final class UpdateRepository {
                 || SemanticVersion.normalize(version) == null
                 || prefs.getBoolean("prerelease", false)
                 || !UpdateRelease.expectedApkName(version).equals(prefs.getString("apk_name", ""))
-                || !UpdateInstaller.isTrustedDownloadUrl(apk)
-                || !UpdateInstaller.isTrustedDownloadUrl(checksum)) return null;
+                || !UpdateLinks.isTrustedDownloadUrl(apk)
+                || !UpdateLinks.isTrustedDownloadUrl(checksum)) return null;
         if (SemanticVersion.compare(version, BuildConfig.VERSION_NAME) <= 0) return null;
         return new UpdateRelease(
                 version,

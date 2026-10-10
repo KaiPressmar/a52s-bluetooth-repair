@@ -35,6 +35,8 @@ final class CallSession {
         void requestRoute(int telecomRoute);
 
         default boolean bluetoothTargetAmbiguous() { return false; }
+        default android.bluetooth.BluetoothDevice bluetoothDevice() { return null; }
+        default String routingDetails() { return "routingDetails=unavailable"; }
     }
 
     private static final long EVENT_DEBOUNCE_MS = 150L;
@@ -172,7 +174,8 @@ final class CallSession {
         boolean accepted = true;
 
         Integer audioMode = voice.mode();
-        String state = snapshot + " audioMode=" + (audioMode == null ? "?" : audioMode);
+        String state = snapshot + " audioMode=" + (audioMode == null ? "?" : audioMode)
+                + " " + host.routingDetails();
         if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
                 || !step.note.equals(lastLoggedNote) || now - lastLoggedAt >= LOG_HEARTBEAT_MS) {
             lastLoggedSnapshot = state;
@@ -233,7 +236,7 @@ final class CallSession {
                         .phase(TelecomMapping.dominantPhase(states))
                         .callCount(states.size())
                         .hfpConnected(headset.hfpConnected())
-                        .scoAudioConnected(evidence.requiresSco ? headset.scoAudioConnected() : null)
+                        .scoAudioConnected(evidence.requiresSco ? headset.scoAudioConnected(host.bluetoothDevice()) : null)
                         .voiceOnBluetooth(evidence.onBluetooth)
                         .voiceVolume(voice.volume(), voice.maxVolume())
                         .voiceMuted(voice.muted());

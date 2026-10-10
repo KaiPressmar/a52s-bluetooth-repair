@@ -21,6 +21,28 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class CallAudioServiceTest {
+    @Test public void missingModernEndpointsUsesExplicitBluetoothDeviceRatherThanGenericMask() {
+        ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service = controller.get();
+        android.bluetooth.BluetoothDevice car = LegacyBluetoothTargetTest.device(1);
+        service.onCallAudioStateChanged(LegacyBluetoothTargetTest.audio(CallAudioState.ROUTE_EARPIECE, null, car));
+        service.requestRoute(CallAudioState.ROUTE_BLUETOOTH);
+        assertEquals(car, shadowOf(service).getBluetoothAudio());
+        assertTrue(service.routingDetails().contains("explicitBtTarget=true"));
+        assertFalse(service.bluetoothTargetAmbiguous());
+        controller.destroy();
+    }
+
+    @Test public void legacyMultipleDevicesWithoutSelectionCannotBeRoutedBlindly() {
+        ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service = controller.get();
+        service.onCallAudioStateChanged(LegacyBluetoothTargetTest.audio(CallAudioState.ROUTE_EARPIECE, null,
+                LegacyBluetoothTargetTest.device(1), LegacyBluetoothTargetTest.device(2)));
+        assertTrue(service.bluetoothTargetAmbiguous());
+        try { service.requestRoute(CallAudioState.ROUTE_BLUETOOTH); fail("must not guess"); }
+        catch (IllegalStateException expected) { assertNull(shadowOf(service).getBluetoothAudio()); }
+        controller.destroy();
+    }
     private static void addCall(CallAudioService service, Call call) {
         // Avoid the overloaded hidden ParcelableCall type absent from the compile SDK.
         org.robolectric.util.ReflectionHelpers.callInstanceMethod(shadowOf(service), "addCall",

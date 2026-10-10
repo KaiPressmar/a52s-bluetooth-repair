@@ -23,14 +23,14 @@ public class UpdateRepositoryTest {
     private static final String APK = UpdateRelease.expectedApkName(VERSION);
 
     private String releaseJson() {
-        String base = UpdateInstaller.TRUSTED_PREFIX + "v" + VERSION + "/";
+        String base = UpdateLinks.TRUSTED_PREFIX + "v" + VERSION + "/";
         return "[{\"tag_name\":\"v" + VERSION + "\",\"assets\":[{\"name\":\"" + APK
                 + "\",\"browser_download_url\":\"" + base + APK + "\"},{\"name\":\"" + APK
                 + ".sha256\",\"browser_download_url\":\"" + base + APK + ".sha256\"}]}]";
     }
 
     private void cache() {
-        String base = UpdateInstaller.TRUSTED_PREFIX + "v" + VERSION + "/";
+        String base = UpdateLinks.TRUSTED_PREFIX + "v" + VERSION + "/";
         prefs.edit().putString("version", VERSION).putString("apk_name", APK)
                 .putString("apk_url", base + APK).putString("checksum_url", base + APK + ".sha256")
                 .putLong("last_check", System.currentTimeMillis()).commit();

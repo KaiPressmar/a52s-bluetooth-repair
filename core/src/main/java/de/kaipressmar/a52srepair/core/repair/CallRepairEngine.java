@@ -39,8 +39,9 @@ public final class CallRepairEngine {
     /** Give asynchronous SCO teardown time to settle before requesting the same device again. */
     public static final long TEARDOWN_SETTLE_MS = 500L;
     public static final long UNKNOWN_TEARDOWN_SETTLE_MS = 1_500L;
-    public static final long RETURN_TIMEOUT_MS = 6_000L;
-    public static final long ROUTE_REQUEST_TIMEOUT_MS = 4_000L;
+    // AOSP Telecom keeps a Bluetooth request pending for 5 s and may retry internally.
+    public static final long RETURN_TIMEOUT_MS = 12_000L;
+    public static final long ROUTE_REQUEST_TIMEOUT_MS = 6_000L;
     public static final long VERIFY_MS = 2_500L;
     public static final long STEADY_BLUETOOTH_MS = 1_000L;
     public static final long PREVENTIVE_WINDOW_MS = 30_000L;
@@ -449,6 +450,7 @@ public final class CallRepairEngine {
                 }
                 if (age >= RETURN_TIMEOUT_MS) {
                     endOperation();
+                    retryAfter = now + SLOW_TICK_MS;
                     return null;
                 }
                 if (!returnRequestRepeated && age >= RETURN_TIMEOUT_MS / 2

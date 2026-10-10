@@ -12,6 +12,7 @@ public class App extends Application {
         super.onCreate();
         DynamicColors.applyToActivitiesIfAvailable(this);
         migrateFromForegroundServiceVersions();
+        de.kaipressmar.a52srepair.update.UpdateLinks.removeLegacyDownloads(this);
     }
 
     /**

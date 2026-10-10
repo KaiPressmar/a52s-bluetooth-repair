@@ -127,11 +127,18 @@ public final class HeadsetMonitor {
     /** TRUE/FALSE for the SCO link of any connected HFP device, null when unknown. */
     @SuppressLint("MissingPermission") // Guarded by permitted().
     public Boolean scoAudioConnected() {
+        return scoAudioConnected(null);
+    }
+
+    /** Read the requested device, so another headset cannot prove this car recovered. */
+    @SuppressLint("MissingPermission")
+    public Boolean scoAudioConnected(BluetoothDevice target) {
         BluetoothHeadset proxy = headset;
         if (proxy == null || !permitted()) return null;
         try {
             List<BluetoothDevice> devices = proxy.getConnectedDevices();
             if (devices.isEmpty()) return null;
+            if (target != null) return devices.contains(target) ? proxy.isAudioConnected(target) : null;
             for (BluetoothDevice device : devices) {
                 if (proxy.isAudioConnected(device)) return Boolean.TRUE;
             }

@@ -4,6 +4,16 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.20.3 - device-specific call audio and browser-based updates
+
+- When modern endpoint availability is absent, Bluetooth routing now uses Telecom's selected or sole advertised Bluetooth device via `requestBluetoothAudio`, rather than only a route mask. The selected device survives the phone hop; ambiguous devices and a missing previously selected target are protected. Modern advertised endpoints remain preferred.
+- SCO verification observes the target device, so another headset cannot prove that the car recovered. Diagnostics show the routing API, device count and whether an explicit target is available, without names or addresses.
+- Direct requests wait 6 seconds; rebuild returns wait 12 seconds, repeat at most once after 6 seconds and back off 5 seconds after failure. This avoids repeating requests inside AOSP Telecom's default 5-second pending window. Existing per-call budgets and hands-off protections remain.
+- Removed package-installation permission, APK downloading/installation code and the update FileProvider path. Update discovery remains automatic; downloads and installation now start from the official project release in the browser. Old cached APKs are removed without affecting diagnostic exports.
+- Reports include the installed signing certificate fingerprint and installer source for security-warning investigation. Browser links are constructed from validated versions, never arbitrary release metadata URLs. Signing keys and package identity stay unchanged.
+- Tests cover device selection, missing/ambiguous targets, legacy routing on Android 12/14/16, per-device SCO, report-derived fallback timing, browser errors, permission removal and old-cache cleanup. Coverage gates remain enforced for CI and releases.
+- The owner's new v0.20.2 reports confirm detection but no recovered SCO, despite three automatic and two manual attempts. These changes exercise a more specific public routing path; actual audible recovery and Google's removal of the reported harmful-app warning remain unverified. See [report analysis](docs/REPORT_0202_ANALYSIS.md) and [installation warnings](docs/INSTALLATION_WARNINGS.md).
+
 ## 0.20.2 - app hardening and measured regression coverage
 
 - Protection and prevention settings now take effect during an active call. Pausing protection stops pending automatic routing without resetting retry limits; explicit manual repairs remain available. Automatic rebuilds refuse ambiguous Bluetooth targets before changing the phone route.
