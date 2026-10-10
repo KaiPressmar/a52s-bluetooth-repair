@@ -27,14 +27,14 @@ public class DuplexChannelTest {
     private Fake capture;
     private DuplexChannel channel;
     private static class Fake implements DuplexChannel.Capture {
-        boolean initialized=true,preferred=true,active,failStart,failStop,failRelease,failObservation;
+        boolean initialized=true,preferred=true,active,failStart,failStop,failRelease,failObservation,changeOnRead,stopOnStart;
         Boolean silenced=false;int reads,readResult=320,releases,stops;AudioDeviceInfo route;
         public boolean initialized(){return initialized;}public boolean prefer(AudioDeviceInfo d){return preferred;}
-        public void start(){active=true;if(failStart)throw new IllegalStateException();}
+        public void start(){active=!stopOnStart;if(failStart)throw new IllegalStateException();}
         public boolean recording(){return active;}public int session(){return 8;}
         public AudioDeviceInfo routed(){if(failObservation)throw new IllegalStateException();return route;}
         public Boolean silenced(){return silenced;}
-        public int read(byte[] buffer){reads++;Arrays.fill(buffer,(byte)91);return readResult;}
+        public int read(byte[] buffer){reads++;Arrays.fill(buffer,(byte)91);if(changeOnRead)route=null;return readResult;}
         public void stop(){stops++;if(failStop)throw new IllegalStateException();active=false;}
         public void release(){releases++;if(failRelease)throw new IllegalStateException();}
     }
@@ -80,6 +80,12 @@ public class DuplexChannelTest {
         assertFalse(channel.start());assertTrue(channel.close());
         capture=new Fake();capture.failStart=true;channel=new DuplexChannel(capture,track,input,output,events::add);
         assertFalse(channel.start());assertTrue(channel.close());assertEquals(1,capture.stops);
+        capture=new Fake();capture.stopOnStart=true;channel=new DuplexChannel(capture,track,input,output,events::add);
+        assertFalse(channel.start());assertTrue(channel.failure().contains("did not start"));assertTrue(channel.close());
+    }
+    @Test public void aRouteChangeDuringReadCannotPassAndSamplesAreStillErased() {
+        assertTrue(channel.start());capture.changeOnRead=true;assertFalse(channel.ready());
+        assertArrayEquals(new byte[320],ReflectionHelpers.<byte[]>getField(channel,"discard"));assertTrue(channel.close());
     }
     @Test public void failedStopStillAttemptsReleaseAndFailedReleaseRetainsOwnershipForRetry() {
         assertTrue(channel.start());capture.failStop=true;capture.failRelease=true;

@@ -22,6 +22,7 @@ final class DuplexChannel {
     private final Consumer<String> log;
     private final byte[] discard = new byte[320];
     private String failure, lastState = "";
+    private int lastRead = Integer.MIN_VALUE;
     private boolean closed;
     @SuppressLint("MissingPermission") // Caller verifies RECORD_AUDIO immediately before construction.
     static DuplexChannel create(AudioTrack track, AudioDeviceInfo input, AudioDeviceInfo output, Consumer<String> log) {
@@ -57,15 +58,15 @@ final class DuplexChannel {
     boolean start() {
         try {
             if (!record.initialized() || !record.prefer(input)) {
-                failure = "input preference rejected"; return false;
+                failure = "input preference rejected"; log.accept("DUPLEX_FAILURE " + failure); return false;
             }
             record.start();
             boolean active = record.recording();
-            if (!active) failure = "input did not start";
+            if (!active) { failure = "input did not start"; log.accept("DUPLEX_FAILURE " + failure); }
             log.accept("DUPLEX_START active=" + active + " inputId=" + input.getId() + " outputId=" + output.getId()
                     + " session=" + record.session() + " sampleRate=8000 source=VOICE_COMMUNICATION");
             return active;
-        } catch (RuntimeException e) { failure = "input start=" + e.getClass().getSimpleName(); return false; }
+        } catch (RuntimeException e) { failure = "input start=" + e.getClass().getSimpleName(); log.accept("DUPLEX_FAILURE " + failure); return false; }
     }
     boolean ready() {
         if (closed || failure != null) return false;
@@ -80,12 +81,15 @@ final class DuplexChannel {
                     + " output=" + (routedOut == null ? 0 : routedOut.getId()) + " exactTarget=" + matched
                     + " captureStatusKnown=" + (silenced != null);
             if (!state.equals(lastState)) { lastState = state; log.accept("DUPLEX_ROUTE " + state); }
-            // Never read from a fallback phone mic; preferred device acceptance is insufficient.
+            // Only read after exact-route evidence; the OS can still change routing between calls.
             if (!matched || silenced == null) return false;
             int read = record.read(discard);
+            if (read != lastRead) { lastRead = read; log.accept("DUPLEX_FRAMES bytes=" + read + " samplesDiscarded=true"); }
             if (read < 0) { failure = "input read error=" + read; log.accept("DUPLEX_FAILURE " + failure); }
-            return read > 0;
-        } catch (RuntimeException e) { failure = "input observation=" + e.getClass().getSimpleName(); return false; }
+            // Do not count frames across a route/silencing change as a successful BT check.
+            return read > 0 && matches(record.routed(), input) && matches(track.getRoutedDevice(), output)
+                    && Boolean.FALSE.equals(record.silenced());
+        } catch (RuntimeException e) { failure = "input observation=" + e.getClass().getSimpleName(); log.accept("DUPLEX_FAILURE " + failure); return false; }
         finally { Arrays.fill(discard, (byte) 0); }
     }
     static boolean matches(AudioDeviceInfo actual, AudioDeviceInfo expected) {

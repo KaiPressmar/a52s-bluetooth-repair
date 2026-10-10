@@ -72,8 +72,9 @@ fix or a way to restart audioserver/HAL/DSP.**
 
 SCO alone cannot pass duplex: require actual exact-target routes for both streams,
 known unsilenced capture, and delivered frames. Samples are discarded and cleared,
-never saved, transmitted, analysed or included in a log. No reads are performed
-while Android routes to a fallback phone microphone. Opening capture can briefly
+never saved, transmitted, analysed or included in a log. Reads require exact Bluetooth route evidence before and after each nonblocking
+read. The OS can change routing between these observations; no atomic routing
+lock is exposed, and samples are always discarded even in that race. Opening capture can briefly
 activate a different mic before Android applies the requested route; the runtime
 explanation discloses this and Android displays its microphone indicator.
 
