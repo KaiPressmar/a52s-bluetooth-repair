@@ -6,7 +6,7 @@ import com.google.android.material.color.DynamicColors;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import java.io.File;
 
-public final class App extends Application {
+public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();

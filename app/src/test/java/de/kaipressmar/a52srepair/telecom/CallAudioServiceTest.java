@@ -21,6 +21,12 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class CallAudioServiceTest {
+    private static void addCall(CallAudioService service, Call call) {
+        // Avoid the overloaded hidden ParcelableCall type absent from the compile SDK.
+        org.robolectric.util.ReflectionHelpers.callInstanceMethod(shadowOf(service), "addCall",
+                org.robolectric.util.ReflectionHelpers.ClassParameter.from(Call.class, call));
+    }
+
     private static Call newCall() {
         Call call = Shadow.newInstanceOf(Call.class);
         org.robolectric.util.ReflectionHelpers.setField(call, "mCallbackRecords", new java.util.concurrent.CopyOnWriteArrayList<>());
@@ -32,12 +38,12 @@ public class CallAudioServiceTest {
         PreferenceManager.getDefaultSharedPreferences(service).edit().putBoolean("protection_enabled", false).commit();
         Call first = newCall();
         Call second = newCall();
-        shadowOf(service).addCall(first);
+        addCall(service, first);
         service.onCallAdded(first);
         assertNotNull(CallAudioService.activeReport());
         assertEquals(1, CallAudioService.checkNow().callCount);
         assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, CallAudioService.repairNow());
-        shadowOf(service).addCall(second);
+        addCall(service, second);
         service.onCallAdded(second);
         assertEquals(2, CallAudioService.checkNow().callCount);
         shadowOf(service).removeCall(first);
@@ -55,7 +61,7 @@ public class CallAudioServiceTest {
         ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
         CallAudioService service = controller.get();
         Call call = newCall();
-        shadowOf(service).addCall(call);
+        addCall(service, call);
         service.onCallAdded(call);
         if (Build.VERSION.SDK_INT >= 34) {
             CallEndpoint speaker = new CallEndpoint("Speaker", CallEndpoint.TYPE_SPEAKER, android.os.ParcelUuid.fromString("00000000-0000-0000-0000-000000000001"));
