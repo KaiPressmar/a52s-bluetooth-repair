@@ -185,7 +185,7 @@ public final class CallAudioService extends InCallService implements CallSession
             legacyAudio = fresh;
             legacyTarget.observe(fresh);
         }
-        if (endpoints != null) endpoints.invalidateRequests();
+        if (Build.VERSION.SDK_INT >= 34 && endpoints != null) endpoints.invalidateRequests();
         DiagnosticLog.log(this, "CALL reread Telecom observations " + routingDetails());
     }
 
@@ -237,7 +237,7 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override @SuppressWarnings("deprecation")
     public void requestLegacyRoute(int telecomRoute) {
         audioState();
-        if (endpoints != null) endpoints.invalidateRequests();
+        if (Build.VERSION.SDK_INT >= 34 && endpoints != null) endpoints.invalidateRequests();
         if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) {
             // Endpoint UUIDs expose no Bluetooth address: never guess their device mapping.
             if (endpoints().bluetoothTargetAmbiguous() || endpoints().bluetoothCount() != 1
