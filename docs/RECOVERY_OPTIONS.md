@@ -1,4 +1,4 @@
-# Recovery options and manual controls (v0.20.0)
+# Recovery options and manual controls (v0.20.1)
 
 Research checked on 2026-10-10. The supplied reports support failed SCO/routing
 and one-way audio symptoms. They do not establish which microphone carried the
@@ -6,14 +6,18 @@ uplink, the vendor root cause, or that any phone-side workaround fixes every cas
 The new controls and state-machine regressions have automated coverage; actual
 A52s/car audio recovery still needs physical validation.
 
+The owner subsequently clarified that Bluetooth off/on never restores this fault;
+only a phone restart has been demonstrated. See [reboot-only recovery](REBOOT_RECOVERY.md)
+for the layer analysis, comparable reports and the improved teardown hypothesis.
+
 ## What the implementation can do
 
 | Case | Detection and treatment |
 | --- | --- |
 | Answer in the car, call remains on phone | Confirm available Bluetooth plus wrong call route after 3 s; request Bluetooth without screen taps. Failed direct requests can escalate within the automatic budget. |
-| Bluetooth route but SCO down or predicted voice route elsewhere | Confirm after 2 s; leave Bluetooth, observe actual departure, then request the previously selected available Bluetooth endpoint. |
+| Bluetooth route but SCO down or predicted voice route elsewhere | Confirm after 2 s; leave Bluetooth, wait for stable phone routing and SCO teardown, then request the previously selected available Bluetooth endpoint. |
 | Brief positive/unknown pulses between connection failures | Preserve the connection confirmation window across short gaps; reset after stable health or a sufficiently long gap. Never repair based only on unknown evidence. |
-| Teardown ignored | Abort after the timeout; do not call an unchanged route a rebuild or blindly request the return. Back off before another automatic attempt. |
+| Teardown ignored or SCO still connected | Wait at most 4 s. Require 500 ms of phone routing with SCO off, or 1.5 s of phone routing when SCO is unknown. Abort rather than reconnect over an old link; back off without bypassing the failed teardown. |
 | Native endpoint request rejected or timed out | Log the error code, end the current operation and back off. Cancellation by another request prompts a fresh observation. Old/duplicate outcomes cannot fail a newer request or another call. |
 | Two Bluetooth call endpoints | Prefer the last selected endpoint if still advertised. With no unambiguous target, ask the user to choose in the call app; manual preflight does not first move a working call to the phone. |
 | Voice uses BLE/LE Audio | Positive LE Audio evidence does not require classic HFP SCO. Media-only A2DP is not accepted as voice-call transport. |
@@ -75,10 +79,13 @@ updating phone and peripheral software, reconnecting/re-pairing, and diagnosing
 interference from downloaded apps using Safe mode. These are general connection
 steps, not proof of a permanent fix for this A52s firmware fault.
 
-Practical order: verify call audio is enabled for the paired device and both
+Generic checks: verify call audio is enabled for the paired device and both
 devices' call volume; avoid a competing connected headset; reconnect and retry;
 restart phone/head unit if wedged; check available official firmware. Safe mode
 can help isolate another app, but also disables this downloaded repair app.
+For the supplied owner's persistent fault, adapter toggling has already failed;
+the demonstrated fallback is a phone restart after the call. Device reconnection
+and the app's call-route rebuild remain unverified alternatives on that phone.
 
 [Samsung's Bluetooth reset guide](https://www.samsung.com/ca/support/mobile-devices/reset-bluetooth-connections-on-your-samsung-galaxy/)
 describes resetting Wi-Fi/Bluetooth settings for persistent connection problems.

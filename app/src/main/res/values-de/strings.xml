@@ -8,14 +8,14 @@
 
     <!-- Status hero -->
     <string name="status_active_title">Schutz aktiv</string>
-    <string name="status_active_body">Die App arbeitet unsichtbar während deiner Anrufe und behebt Audiofehler automatisch. Du musst nichts tun – auch nicht während der Fahrt.</string>
+    <string name="status_active_body">Die App prüft deine Anrufe und versucht erkannte Audiofehler automatisch zu beheben. Du musst dafür nichts am Handy bedienen.</string>
     <string name="status_bluetooth_off_body">Bluetooth ist gerade aus. Sobald du über Fahrzeug oder Headset telefonierst, ist der Schutz automatisch dabei.</string>
     <string name="status_setup_title">Einrichtung abschließen</string>
     <string name="status_setup_body">Noch ein oder zwei einmalige Schritte, dann arbeitet der Schutz vollautomatisch.</string>
     <string name="status_paused_title">Schutz pausiert</string>
     <string name="status_paused_body">Die automatische Reparatur ist in den Einstellungen ausgeschaltet. Anrufe werden nur protokolliert.</string>
     <string name="status_reboot_title">Neustart empfohlen</string>
-    <string name="status_reboot_body">Beim letzten Anruf bot Android keinen Bluetooth-Anrufweg an. Verbinde Auto oder Headset zuerst erneut. Bleibt der Weg nicht verfügbar, kann ein Neustart helfen.</string>
+    <string name="status_reboot_body">Android bot beim letzten Anruf keinen Bluetooth-Anrufweg an. Ist das Gerät verbunden und bleibt die Telefonie blockiert, starte das Handy nach dem Gespräch neu. Bluetooth aus und an setzt nicht alle Audiodienste zurück.</string>
     <string name="status_last_active">Zuletzt aktiv: %1$s</string>
     <string name="status_never_active">Noch kein Anruf seit der Einrichtung</string>
 
@@ -51,7 +51,7 @@
     <string name="last_call_title">Letzter Bluetooth-Anruf</string>
     <string name="last_call_none">Noch kein Anruf über Fahrzeug oder Headset aufgezeichnet.</string>
     <string name="how_title">So funktioniert es</string>
-    <string name="how_body">Android startet die App nur, solange ein Anruf läuft. Sie prüft dann, ob das Gesprächs-Audio wirklich über Fahrzeug oder Headset läuft, und baut die Bluetooth-Verbindung bei Bedarf automatisch neu auf. Zwischen den Anrufen läuft nichts im Hintergrund – keine Benachrichtigungen, kein Akkuverbrauch.</string>
+    <string name="how_body">Android startet die App während eines Anrufs. Sie prüft die verfügbaren Audiosignale und versucht bei Bedarf, den Bluetooth-Anrufweg neu aufzubauen. Das kann einen Handy-Neustart nicht ersetzen. Zwischen Anrufen arbeitet sie nicht im Hintergrund.</string>
 
     <!-- Update -->
     <string name="update_title">Update verfügbar</string>
@@ -141,7 +141,7 @@
     <string name="update_error_package">Die heruntergeladene Datei passt nicht zu dieser App oder Version</string>
     <string name="update_error_network">Download fehlgeschlagen – bitte Internetverbindung prüfen</string>
     <string name="manual_title">Manuell helfen</string>
-    <string name="manual_body">Während eines Anrufs kannst du den Audiostatus prüfen oder Bluetooth neu verbinden, wenn du die andere Person nicht hörst. Beim Neuverbinden läuft der Anruf kurz über das Telefon.</string>
+    <string name="manual_body">Während eines Anrufs kannst du den Audiostatus prüfen oder den Bluetooth-Anrufweg neu aufbauen. Dabei läuft der Anruf kurz über das Telefon. Die Funktion schaltet Bluetooth nicht aus und ersetzt keinen Handy-Neustart.</string>
     <string name="manual_check">Jetzt prüfen</string>
     <string name="manual_repair">Bluetooth-Audio neu verbinden</string>
     <string name="manual_ready">Die Prüfung verändert den Audioweg nicht. Bediene diese Funktionen im Stand.</string>
@@ -151,12 +151,12 @@
     <string name="manual_no_call">Android stellt der App keinen Anruf bereit. Falls gerade ein Gespräch läuft, prüfe den Anrufzugriff. Die App kann die Anrufanbindung nicht erzwingen.</string>
     <string name="manual_not_active">Der Anruf klingelt, wird gehalten oder endet. Die Audioreparatur benötigt ein laufendes Gespräch.</string>
     <string name="manual_multiple_calls">Es sind mehrere Anrufe vorhanden. Beende oder vereinige sie vor der Audioreparatur.</string>
-    <string name="manual_unavailable">Android bietet keinen Bluetooth-Anrufendpunkt an. Verbinde Auto oder Headset in den Bluetooth-Einstellungen erneut und prüfe nochmals. Eine Routenreparatur kann keinen fehlenden Endpunkt erzeugen.</string>
+    <string name="manual_unavailable">Android bietet keinen Bluetooth-Anrufendpunkt an. Prüfe, ob Auto oder Headset verbunden und für Anrufe freigegeben sind. Bleibt die Telefonie blockiert, starte das Handy nach dem Gespräch neu.</string>
     <string name="manual_unknown_route">Android hat den Audioweg des Anrufs noch nicht gemeldet. Warte kurz und prüfe erneut.</string>
     <string name="manual_alternative_route">Der Anruf nutzt Lautsprecher, Kabel-Audio oder ein externes Gerät. Wähle in der Anruf-App Telefon oder Bluetooth, bevor du Bluetooth hier neu verbindest.</string>
     <string name="manual_busy">Eine Audioreparatur läuft bereits. Warte einige Sekunden und prüfe erneut.</string>
     <string name="manual_cooldown">Warte zwischen manuellen Reparaturversuchen mindestens 15 Sekunden.</string>
-    <string name="manual_exhausted">Beide manuellen Versuche für diesen Anruf sind verbraucht. Prüfe die Bluetooth-Einstellungen oder verbinde das Gerät vor einem weiteren Anruf erneut.</string>
+    <string name="manual_exhausted">Beide manuellen Versuche für diesen Anruf sind verbraucht. Wenn das Gespräch stumm bleibt, starte das Handy nach dem Gespräch neu. Bluetooth aus und an setzt nicht alle Audiodienste zurück.</string>
     <string name="manual_command_failed">Android hat die Audioanforderung abgelehnt. Prüfe den Anrufzugriff und wähle das gewünschte Bluetooth-Gerät in der Anruf-App. Der Fehler wird protokolliert.</string>
     <string name="manual_started">Ein Bluetooth-Verbindungsversuch wurde gestartet. Prüfe in einigen Sekunden erneut und höre nach, ob die andere Person wieder hörbar ist.</string>
     <string name="manual_fault">Aktueller Hinweis: %1$s. Du kannst einen Bluetooth-Neuaufbau versuchen.</string>

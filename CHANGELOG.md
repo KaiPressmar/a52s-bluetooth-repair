@@ -4,6 +4,15 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.20.1 - wait for SCO teardown before reconnecting call audio
+
+- A Bluetooth rebuild now waits for stable phone routing and 500 ms of observed SCO disconnect before requesting the same endpoint again. Unknown SCO/LE Audio uses a 1.5-second stable phone dwell, explicitly logged as unverified teardown.
+- A route or SCO rebound resets the dwell. The leave phase waits at most 4 seconds; a still-connected SCO link aborts and backs off. Later automatic attempts cannot bypass failed teardown with a direct request.
+- Diagnostic exports and call starts include time since boot and audio mode; mode changes are logged read-only for comparison with a post-reboot call.
+- Manual help and fallback guidance distinguish call-route rebuilding from adapter toggling and phone restart. UI text describes repair attempts without promising recovery.
+- [Reboot-only recovery research](docs/REBOOT_RECOVERY.md) records the owner's finding that Bluetooth off/on never helps and only restarting the phone has been demonstrated. Comparable A52s reports suggest temporary/contradictory SAP and offload effects; these are not automated or treated as established causes.
+- Regression tests cover delayed and persistent SCO teardown, rebounds, unknown evidence, retry limits and report fields. Physical A52s/car validation remains pending; this patch is a better routing experiment, not a vendor-service restart.
+
 ## 0.20.0 - manual call-audio checks and verified endpoint repairs
 
 ### Manual help

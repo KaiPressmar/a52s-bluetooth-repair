@@ -71,7 +71,8 @@ final class CallSession {
                 this.context,
                 "CALL START protection=" + settings.protectionEnabled()
                         + " preventive=" + settings.preventiveMode()
-                        + " riskElevated=" + riskElevated);
+                        + " riskElevated=" + riskElevated
+                        + " bootElapsedMs=" + startedAtElapsed + " audioMode=" + voice.mode());
     }
 
     void start() {
@@ -158,7 +159,8 @@ final class CallSession {
     private boolean applyStep(CallAudioSnapshot snapshot, long now, CallRepairEngine.Step step) {
         boolean accepted = true;
 
-        String state = snapshot.toString();
+        Integer audioMode = voice.mode();
+        String state = snapshot + " audioMode=" + (audioMode == null ? "?" : audioMode);
         if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
                 || !step.note.equals(lastLoggedNote) || now - lastLoggedAt >= LOG_HEARTBEAT_MS) {
             lastLoggedSnapshot = state;

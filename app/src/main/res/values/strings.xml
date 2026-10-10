@@ -10,14 +10,14 @@
 
     <!-- Status hero -->
     <string name="status_active_title">Protection active</string>
-    <string name="status_active_body">The app works invisibly during your calls and fixes audio problems automatically. You don\'t need to do anything – not even while driving.</string>
+    <string name="status_active_body">The app checks your calls and automatically attempts to repair detected audio faults. No phone interaction is needed for these attempts.</string>
     <string name="status_bluetooth_off_body">Bluetooth is currently off. As soon as you call through your car or headset, protection is active automatically.</string>
     <string name="status_setup_title">Finish setup</string>
     <string name="status_setup_body">One or two one-time steps left, then protection works fully automatically.</string>
     <string name="status_paused_title">Protection paused</string>
     <string name="status_paused_body">Automatic repair is turned off in the settings. Calls are only recorded.</string>
     <string name="status_reboot_title">Restart recommended</string>
-    <string name="status_reboot_body">Android offered no Bluetooth call route during the last call. Reconnect the car or headset first. If the route stays unavailable, restarting the phone may help.</string>
+    <string name="status_reboot_body">Android offered no Bluetooth call route during the last call. If the device is connected but calls remain blocked, restart the phone after the call. Toggling Bluetooth does not reset all audio services.</string>
     <string name="status_last_active">Last active: %1$s</string>
     <string name="status_never_active">No call since setup yet</string>
 
@@ -54,7 +54,7 @@
     <string name="last_call_title">Last Bluetooth call</string>
     <string name="last_call_none">No call through a car or headset recorded yet.</string>
     <string name="how_title">How it works</string>
-    <string name="how_body">Android starts the app only while a call is in progress. It checks whether the call audio really plays through your car or headset and automatically rebuilds the Bluetooth connection when needed. Between calls nothing runs in the background – no notifications, no battery drain.</string>
+    <string name="how_body">Android starts the app during a call. It checks available audio signals and attempts to rebuild the Bluetooth call route when needed. This cannot replace a phone restart. Between calls it does not run in the background.</string>
 
     <!-- Update -->
     <string name="update_title">Update available</string>
@@ -152,7 +152,7 @@
     <string name="share_chooser">Share diagnostic report</string>
     <string name="share_subject">Bluetooth Call Repair – diagnostic report</string>
     <string name="manual_title">Manual help</string>
-    <string name="manual_body">During a call, check the current audio state or reconnect Bluetooth if you cannot hear the other person. Reconnecting briefly routes the call through the phone.</string>
+    <string name="manual_body">During a call, check the audio state or rebuild the Bluetooth call route. The call briefly uses the phone. This action does not toggle Bluetooth and cannot replace a phone restart.</string>
     <string name="manual_check">Check now</string>
     <string name="manual_repair">Reconnect Bluetooth audio</string>
     <string name="manual_ready">Checking does not change the audio route. Use these controls when stationary.</string>
@@ -162,12 +162,12 @@
     <string name="manual_no_call">Android has not provided a call to this app. If a call is in progress, check call access. The app cannot force Android to bind the call service.</string>
     <string name="manual_not_active">The call is ringing, held or ending. Audio repair requires an active conversation.</string>
     <string name="manual_multiple_calls">Multiple calls are present. Finish or merge them before repairing audio.</string>
-    <string name="manual_unavailable">Android offers no Bluetooth call endpoint. Reconnect the car or headset in Bluetooth settings and check again. A route repair cannot create a missing endpoint.</string>
+    <string name="manual_unavailable">Android offers no Bluetooth call endpoint. Check that the car or headset is connected and enabled for calls. If calls remain blocked, restart the phone after the call.</string>
     <string name="manual_unknown_route">Android has not reported the call audio route yet. Wait briefly and check again.</string>
     <string name="manual_alternative_route">The call uses speaker, wired audio or an external device. Select phone or Bluetooth in the call app before reconnecting Bluetooth here.</string>
     <string name="manual_busy">An audio repair is already running. Wait a few seconds and check again.</string>
     <string name="manual_cooldown">Wait at least 15 seconds between manual repair attempts.</string>
-    <string name="manual_exhausted">Both manual attempts for this call have been used. Check Bluetooth settings or reconnect the device before another call.</string>
+    <string name="manual_exhausted">Both manual attempts for this call have been used. If the call remains silent, restart the phone after the call. Toggling Bluetooth does not reset all audio services.</string>
     <string name="manual_command_failed">Android rejected the audio request. Check call access and select the intended Bluetooth device in the call app. The failure is logged.</string>
     <string name="manual_started">A Bluetooth reconnect attempt has started. Check again in a few seconds and confirm that you can hear the other person.</string>
     <string name="manual_fault">Current indication: %1$s. You can attempt a Bluetooth reconnect.</string>
