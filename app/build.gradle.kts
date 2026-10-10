@@ -1,5 +1,19 @@
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+
 plugins {
     alias(libs.plugins.android.application)
+    jacoco
+}
+
+jacoco { toolVersion = "0.8.14" }
+
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension> {
+        // Robolectric loads instrumented Android classes without a normal source location.
+        isIncludeNoLocationClasses = true
+        includes = listOf("de.kaipressmar.a52srepair.*")
+        excludes = listOf("jdk.internal.*")
+    }
 }
 
 // RELEASE_VERSION (repository root) is the single source of the version name; CI may override it.
