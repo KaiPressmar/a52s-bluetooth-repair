@@ -27,6 +27,12 @@ public final class HeadsetMonitor implements HeadsetAccess {
     private boolean profileRequested;
     private long nextProfileRequestAt;
     private long profileGeneration;
+    private final java.util.Set<String> loggedErrors = new java.util.HashSet<>();
+
+    private void observationError(String operation, RuntimeException failure) {
+        String key = operation + ':' + failure.getClass().getSimpleName();
+        if (loggedErrors.add(key)) DiagnosticLog.log(context, "HFP observation error=" + key);
+    }
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
@@ -86,7 +92,8 @@ public final class HeadsetMonitor implements HeadsetAccess {
                 // Bluetooth runs under its own privileged UID. These are protected system actions.
                 ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED);
                 receiverRegistered = true;
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
+                observationError("receiver-register", failure);
                 // Existing in-call snapshot checks remain available if registration fails.
             }
         }
@@ -96,7 +103,8 @@ public final class HeadsetMonitor implements HeadsetAccess {
             try {
                 profileRequested = adapter.getProfileProxy(context, listener(++profileGeneration), BluetoothProfile.HEADSET);
                 DiagnosticLog.log(context, "HFP proxy request generation=" + profileGeneration + " accepted=" + profileRequested);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
+                observationError("proxy-request", failure);
                 // Without the proxy the SCO state is reported as unknown.
             }
         }
@@ -109,7 +117,8 @@ public final class HeadsetMonitor implements HeadsetAccess {
         nextProfileRequestAt = 0L;
         if (receiverRegistered) {
             receiverRegistered = false;
-            try { context.unregisterReceiver(receiver); } catch (RuntimeException ignored) {}
+            try { context.unregisterReceiver(receiver); }
+            catch (RuntimeException failure) { observationError("receiver-unregister", failure); }
         }
         BluetoothHeadset proxy = headset;
         headset = null;
@@ -126,7 +135,8 @@ public final class HeadsetMonitor implements HeadsetAccess {
         if (adapter != null && proxy != null) {
             try {
                 adapter.closeProfileProxy(BluetoothProfile.HEADSET, proxy);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
+                observationError("proxy-close", failure);
             }
         }
     }
@@ -139,6 +149,7 @@ public final class HeadsetMonitor implements HeadsetAccess {
                     && adapter.getProfileConnectionState(BluetoothProfile.HEADSET)
                             == BluetoothAdapter.STATE_CONNECTED;
         } catch (RuntimeException e) {
+            observationError("hfp-state", e);
             return false;
         }
     }
@@ -163,6 +174,7 @@ public final class HeadsetMonitor implements HeadsetAccess {
             }
             return Boolean.FALSE;
         } catch (RuntimeException e) {
+            observationError("sco-state", e);
             return null;
         }
     }
@@ -177,14 +189,14 @@ public final class HeadsetMonitor implements HeadsetAccess {
     public List<BluetoothDevice> connectedDevices() {
         if (headset == null || !permitted()) return java.util.Collections.emptyList();
         try { return new java.util.ArrayList<>(headset.getConnectedDevices()); }
-        catch (RuntimeException e) { return java.util.Collections.emptyList(); }
+        catch (RuntimeException e) { observationError("connected-devices", e); return java.util.Collections.emptyList(); }
     }
 
     @SuppressLint("MissingPermission")
     public boolean supportsVoiceRecognition(BluetoothDevice device) {
         if (headset == null || !permitted() || device == null) return false;
         try { return headset.isVoiceRecognitionSupported(device); }
-        catch (RuntimeException e) { return false; }
+        catch (RuntimeException e) { observationError("voice-support", e); return false; }
     }
 
     /** Used only by the separately guarded off-call operation, never cellular call repair. */

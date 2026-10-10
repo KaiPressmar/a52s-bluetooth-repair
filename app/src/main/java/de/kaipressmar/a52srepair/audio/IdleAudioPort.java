@@ -48,6 +48,9 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     }
     public void open() { headset.open(); }
     public void closeObserver() { headset.close(); }
+    void resetIdleObservationTarget() {
+        if (!modernOwned && !legacyOwned && !voiceOwned && !modeOwned && track == null) target = null;
+    }
     @Override public String blockedReason() {
         if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
             return "Bluetooth permission missing";

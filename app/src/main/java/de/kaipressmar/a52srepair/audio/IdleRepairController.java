@@ -107,7 +107,7 @@ public final class IdleRepairController {
             if (port == null) { port = factory.create(() -> handler.post(tick), "watch"); port.open(); }
             // A sole connected HFP target is deliberately required by the operation too.
             boolean ready = port.targetReady();
-            if (!ready) observedTarget = "";
+            if (!ready) { observedTarget = ""; port.resetIdleObservationTarget(); }
             else if (!"present".equals(observedTarget) || settings.idlePostCallPending()) {
                 if (port.blockedReason() == null && !settings.idleCooldown(SystemClock.elapsedRealtime(), AUTO_COOLDOWN_MS)) {
                     observedTarget = "present";

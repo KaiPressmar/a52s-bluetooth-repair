@@ -44,6 +44,44 @@ public class HeadsetMonitorTest {
         assertEquals(false, org.robolectric.util.ReflectionHelpers.getField(monitor, "profileRequested"));
         monitor.close();
     }
+    @org.robolectric.annotation.Implements(BluetoothHeadset.class)
+    public static class UnavailableHeadset extends org.robolectric.shadows.ShadowBluetoothHeadset {
+        @org.robolectric.annotation.Implementation
+        protected java.util.List<android.bluetooth.BluetoothDevice> getConnectedDevices() {
+            throw new IllegalStateException("Do not log this private device detail");
+        }
+    }
+    @Test @Config(sdk=34, shadows=UnavailableHeadset.class)
+    public void failedHfpObservationsRemainUnknownAndLogReasonWithoutFloodOrPrivateMessage() {
+        Application app=ApplicationProvider.getApplicationContext();
+        shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        HeadsetMonitor monitor=new HeadsetMonitor(app);
+        BluetoothHeadset proxy=org.robolectric.shadow.api.Shadow.newInstanceOf(BluetoothHeadset.class);
+        org.robolectric.util.ReflectionHelpers.setField(monitor,"headset",proxy);
+        assertTrue(monitor.connectedDevices().isEmpty());assertTrue(monitor.connectedDevices().isEmpty());
+        assertEquals(null,monitor.scoAudioConnected());assertEquals(null,monitor.scoAudioConnected());
+        String log=de.kaipressmar.a52srepair.diagnostics.DiagnosticLog.readAll(app);
+        assertEquals(2,log.lines().filter(x->x.contains("HFP observation error=")).count());
+        assertTrue(log.contains("sco-state:IllegalStateException"));
+        assertTrue(!log.contains("private device detail"));monitor.close();
+    }
+    @Test public void voiceSessionDriverUsesTheConnectedTargetAndObservesRealStateChanges() {
+        Application app=ApplicationProvider.getApplicationContext();
+        shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        BluetoothHeadset proxy=org.robolectric.shadow.api.Shadow.newInstanceOf(BluetoothHeadset.class);
+        android.bluetooth.BluetoothDevice car=android.bluetooth.BluetoothAdapter.getDefaultAdapter().getRemoteDevice("00:11:22:33:44:01");
+        shadowOf(proxy).addConnectedDevice(car);
+        HeadsetMonitor monitor=new HeadsetMonitor(app);
+        org.robolectric.util.ReflectionHelpers.setField(monitor,"headset",proxy);
+        assertEquals(false,monitor.supportsVoiceRecognition(null));
+        assertEquals(false,monitor.startVoiceRecognition(null));
+        assertEquals(false,monitor.stopVoiceRecognition(null));
+        assertTrue(monitor.startVoiceRecognition(car));assertEquals(Boolean.TRUE,monitor.scoAudioConnected(car));
+        assertTrue(monitor.stopVoiceRecognition(car));assertEquals(Boolean.FALSE,monitor.scoAudioConnected(car));
+        shadowOf(app).denyPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        assertEquals(false,monitor.startVoiceRecognition(car));assertEquals(false,monitor.stopVoiceRecognition(car));
+        monitor.close();
+    }
     @Test public void anotherHeadsetsScoDoesNotVerifyTheSelectedCarsAudio() {
         Application app = ApplicationProvider.getApplicationContext();
         shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);

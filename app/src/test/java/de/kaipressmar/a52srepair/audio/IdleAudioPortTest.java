@@ -90,6 +90,12 @@ public class IdleAudioPortTest {
         hfp.devices=List.of(other);assertFalse(port.targetReady());assertFalse(port.start(Method.LEGACY_SCO));
         hfp.devices=List.of();assertFalse(port.targetReady());
     }
+    @Test public void onlyIdleObservationCanForgetItsPinnedTarget() {
+        assertTrue(port.start(Method.VOICE_RECOGNITION));
+        BluetoothDevice other=device("00:11:22:33:44:02");hfp.devices=List.of(other);
+        port.resetIdleObservationTarget();assertFalse(port.targetReady());
+        assertTrue(port.release());port.resetIdleObservationTarget();assertTrue(port.targetReady());
+    }
     @Test public void modernRequiresUniqueAddressMatchedNonzeroScoOutput() {
         assertFalse(port.supports(Method.MODERN));
         for(AudioDeviceInfo d:List.of(info(AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,ADDRESS,1),
