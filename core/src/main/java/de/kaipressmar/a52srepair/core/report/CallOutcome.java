@@ -8,7 +8,7 @@ public enum CallOutcome {
     REPAIRED(false),
     /** A repairable fault persisted until the call ended. */
     UNRESOLVED(true),
-    /** HFP connected, but no Bluetooth route was offered: a reboot is required. */
+    /** HFP connected, but no Bluetooth route was offered; route repair is unavailable. */
     BLUETOOTH_UNAVAILABLE(true),
     /** The call left Bluetooth by user/car choice: a strong hint that audio was not working. */
     LEFT_BLUETOOTH(true),

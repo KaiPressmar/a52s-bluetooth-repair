@@ -59,4 +59,12 @@ For v0.20 also test [manual and endpoint scenarios](docs/RECOVERY_OPTIONS.md#dev
 
 Status: the supplied reports predate v0.20. No physical A52s call has been performed in this workspace; these checks remain pending on the affected phone.
 
+For v0.20.1 exercise delayed SCO disconnect, persistent SCO during the phone hop,
+route/SCO rebounds and unknown SCO/LE Audio. No Bluetooth return should happen over
+an observed connected old SCO link. Check the 500 ms/1.5 s stable dwell and 4 s
+abort/backoff. Compare failure and post-reboot reports as described in
+[reboot-only recovery](docs/REBOOT_RECOVERY.md). Bluetooth off/on is explicitly not
+the owner's proven fix. These timing thresholds and audible recovery require
+physical A52s/car validation; only the phone restart has been confirmed by the owner.
+
 A passing CI build proves the code-level invariants only. Whether the Telecom-level rebuild clears the vendor fault must be confirmed with real calls on the affected phone.

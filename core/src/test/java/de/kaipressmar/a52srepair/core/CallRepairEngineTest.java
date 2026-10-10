@@ -21,6 +21,70 @@ import org.junit.Test;
 public class CallRepairEngineTest {
     private static final long T0 = 1_000_000L;
 
+    @Test public void phoneRouteCannotTriggerReturnWhileScoStillConnected() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.requestManualRepair(ok, T0);
+        CallAudioSnapshot phoneWithSco = ok.toBuilder().route(AudioRoute.EARPIECE).build();
+        assertTrue(e.onSnapshot(phoneWithSco, T0 + 250L).commands.isEmpty());
+        assertTrue(e.onSnapshot(phoneWithSco, T0 + 2_000L).commands.isEmpty());
+        CallAudioSnapshot off = phoneWithSco.toBuilder().scoAudioConnected(false).build();
+        assertTrue(e.onSnapshot(off, T0 + 2_100L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH),
+                e.onSnapshot(off, T0 + 2_600L).commands);
+    }
+
+    @Test public void teardownNeedsStableDisconnectAndResetsWhenScoReappears() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        CallAudioSnapshot off = droppedToPhone();
+        e.requestManualRepair(ok, T0);
+        assertTrue(e.onSnapshot(off, T0 + 100L).commands.isEmpty());
+        assertTrue(e.onSnapshot(off.toBuilder().scoAudioConnected(true).build(), T0 + 400L).commands.isEmpty());
+        assertTrue(e.onSnapshot(off, T0 + 500L).commands.isEmpty());
+        assertTrue(e.onSnapshot(off, T0 + 999L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(off, T0 + 1_000L).commands);
+    }
+
+    @Test public void unknownScoUsesLongerStablePhoneDwellAndRouteChangesResetIt() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        CallAudioSnapshot unknown = droppedToPhone().toBuilder().scoAudioConnected(null).build();
+        e.requestManualRepair(ok, T0);
+        assertTrue(e.onSnapshot(unknown, T0 + 100L).commands.isEmpty());
+        assertTrue(e.onSnapshot(unknown, T0 + 1_000L).commands.isEmpty());
+        assertTrue(e.onSnapshot(ok, T0 + 1_100L).commands.isEmpty());
+        assertTrue(e.onSnapshot(unknown, T0 + 1_200L).commands.isEmpty());
+        assertTrue(e.onSnapshot(unknown, T0 + 2_699L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(unknown, T0 + 2_700L).commands);
+    }
+
+    @Test public void persistentScoDuringPhoneHopAbortsAndCannotProveManualRecovery() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.requestManualRepair(ok, T0);
+        CallAudioSnapshot phoneWithSco = ok.toBuilder().route(AudioRoute.EARPIECE).build();
+        assertTrue(e.onSnapshot(phoneWithSco, T0 + 100L).commands.isEmpty());
+        assertTrue(e.onSnapshot(phoneWithSco, T0 + CallRepairEngine.LEAVE_TIMEOUT_MS).commands.isEmpty());
+        assertTrue(e.onSnapshot(ok, T0 + 10_000L).commands.isEmpty());
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 20_000L).outcome);
+    }
+
+    @Test public void automaticRebuildCannotReconnectOverPersistentOldScoLink() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().voiceOnBluetooth(false).build()) {
+            @Override void react(RepairCommand c) {
+                if (c == RepairCommand.ROUTE_TO_EARPIECE) {
+                    state = state.toBuilder().route(AudioRoute.EARPIECE).build();
+                }
+            }
+        };
+        h.runFor(60_000L);
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
+        assertTrue(h.executed.stream().allMatch(c -> c == RepairCommand.ROUTE_TO_EARPIECE));
+        assertEquals(CallOutcome.UNRESOLVED, h.end().outcome);
+    }
+
     @Test public void repeatedBriefHealthyPulsesCannotPostponeFaultConfirmationForever() {
         Harness h = new Harness(PreventiveRebuildMode.OFF,
                 FaultClassifierTest.carCall().scoAudioConnected(false).build()) {
@@ -72,8 +136,9 @@ public class CallRepairEngineTest {
         assertEquals(0, e.report(T0 + 2L).routeAttempts);
         assertFalse(e.report(T0 + 2L).preventiveRebuild);
         e.onSnapshot(droppedToPhone(), T0 + 250L);
-        e.onSnapshot(ok, T0 + 500L);
-        e.onSnapshot(ok, T0 + 500L + CallRepairEngine.VERIFY_MS);
+        e.onSnapshot(droppedToPhone(), T0 + 750L);
+        e.onSnapshot(ok, T0 + 1_000L);
+        e.onSnapshot(ok, T0 + 1_000L + CallRepairEngine.VERIFY_MS);
         assertEquals(CallOutcome.REPAIRED, e.report(T0 + 5_000L).outcome);
         e.onRouteRequestFailed(T0 + 6_000L);
         assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 6_000L).outcome);

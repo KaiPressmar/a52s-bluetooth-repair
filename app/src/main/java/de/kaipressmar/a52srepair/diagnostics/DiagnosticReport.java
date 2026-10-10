@@ -4,9 +4,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
+import android.media.AudioManager;
 import androidx.core.content.FileProvider;
 import de.kaipressmar.a52srepair.BuildConfig;
 import de.kaipressmar.a52srepair.R;
+import de.kaipressmar.a52srepair.audio.VoiceStream;
 import de.kaipressmar.a52srepair.core.report.CallReport;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
@@ -34,6 +37,9 @@ public final class DiagnosticReport {
                 .append(" codename=").append(Build.DEVICE)
                 .append(" sdk=").append(Build.VERSION.SDK_INT)
                 .append(" build=").append(Build.DISPLAY).append('\n')
+                .append("bootElapsedMs=").append(SystemClock.elapsedRealtime())
+                .append(" audioMode=").append(new VoiceStream(context.getSystemService(AudioManager.class)).mode())
+                .append('\n')
                 .append("family=").append(DeviceInfo.family())
                 .append(" defaultPreventive=").append(DeviceInfo.defaultPreventiveMode())
                 .append('\n')
