@@ -92,3 +92,44 @@ routing is refused rather than guessed. Check the second manual attempt and its
 separate limits; closing the call/service must cancel this app's AudioManager
 request. Compare a failing call against one after the owner's proven phone reboot.
 These scenarios remain physically unverified until exercised on the A52s.
+
+## 0.22.0 off-call channel recovery — physical validation pending
+
+Automated tests cover state timing, short SCO pulses, per-target matching, permission
+and call guards, finite fallback order, incoming-call preemption, activity pause,
+mode/mute/volume preservation and Binder-after-acceptance/cleanup failures. CI runs
+Robolectric on SDK 31/34/36 and core JUnit with combined coverage gates. The new
+public APIs cannot be validated against Samsung's vendor implementation in CI.
+
+On the affected A52s and the parked car/headset:
+
+1. Export a baseline while the fault exists, before reboot. End all calls and pause
+   music. Connect exactly one classic HFP device. Start the new off-call test,
+   read the phone-status explanation, grant the optional permission and keep the
+   app visible. Export the report afterwards, regardless of outcome.
+2. Verify the UI distinguishes CHANNEL_TESTED (stable SCO on AND off) from
+   UNRESOLVED, BLOCKED or CLEANUP_FAILED. Accepted requests must not report a
+   repaired cellular call. Verify mic mute and call volume did not change.
+3. Make a cellular call, answer on the car without touching the phone, verify
+   actual incoming speech and microphone operation. Export during and after the
+   call. Repeat without an idle test for comparison. A successful idle test can
+   still be followed by a failed carrier call.
+4. If ordinary off-call tests fail, enable the optional voice-session fallback and
+   repeat; note car voice UI/tones. Do not run a separate assistant simultaneously.
+   Export native-state/support/timeout/release observations and next-call result.
+5. Interrupt each stage by an incoming/outgoing call, Home, screen lock, permission
+   revocation, headset removal/replacement and connecting a second headset.
+   Check no further attempt starts, no alternate device is selected, call audio
+   is not torn down by voice-session cleanup and no mic/mode request remains.
+6. Check opted-in auto tests only while the app is visible, no repeats within ten
+   minutes, protection pause disables auto, manual attempts have 30-second
+   cooldown and background failed calls are deferred to the next visible session.
+7. Kill the app process mid-test, reopen, verify interrupted result is unresolved
+   and controls are usable. Inspect audio state independently; system Binder
+   cleanup is not proof the firmware released a stuck transport.
+8. Compare new and previous APKs with the same signing key and increasing version
+   code. READ_PHONE_STATE is new and optional; original in-call protection must
+   work without it. Google Play Protect classification remains unverified.
+
+Do not count an idle test as a repaired call in call-history statistics. Reboot
+remains the only proven owner workaround until the above confirms otherwise.

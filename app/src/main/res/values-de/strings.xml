@@ -162,4 +162,27 @@
     <string name="manual_ambiguous_device">Mehrere Bluetooth-Anrufgeräte sind verfügbar. Wähle das gewünschte Gerät zuerst in der Anruf-App; diese App wählt keines auf Verdacht.</string>
     <string name="manual_microphone_muted">Das Mikrofon ist stummgeschaltet. Falls das unbeabsichtigt ist, hebe die Stummschaltung in der Anruf-App auf. Diese App lässt die Mikrofon-Stummschaltung unverändert.</string>
     <string name="setup_link_rejected">Android konnte die Geräteverknüpfung nicht starten. Prüfe den Bluetooth-Zugriff oder nutze die ADB-Einrichtung.</string>
+    <string name="idle_title">Test vor oder nach einem Anruf</string>
+    <string name="idle_body">Verbinde Auto oder Kopfhörer, beende alle Anrufe und pausiere Musik. Die App öffnet und schließt kurz den Sprachaudiokanal. Lass die App geöffnet; ein Anruf oder das Verlassen der App beendet den Test. Das Gerät kann eine Anruf- oder Sprachsitzung anzeigen.</string>
+    <string name="idle_start">Audiokanal prüfen und neu initialisieren</string>
+    <string name="idle_permission_body">Dieser optionale Test benötigt Zugriff auf den Telefonstatus, damit er laufende oder eingehende Anrufe nicht stört. Er liest keine Telefonnummern und zeichnet kein Audio auf. Der Anrufschutz funktioniert weiterhin ohne diese zusätzliche Berechtigung.</string>
+    <string name="idle_allow">Telefonstatus erlauben</string>
+    <string name="idle_ready">Bereit für einen optionalen Audiokanal-Test.</string>
+    <string name="idle_running">Audiokanal wird geprüft; lass die App geöffnet. Das kann bis zu 70 Sekunden dauern.</string>
+    <string name="idle_tested">Sprachaudiokanal erfolgreich verbunden und wieder getrennt. Bitte prüfe den nächsten Bluetooth-Anruf: Dieser Test beweist noch keine erfolgreiche Anrufreparatur.</string>
+    <string name="idle_unresolved">Der Audiokanal ließ sich nicht aufbauen. Exportiere den Diagnosebericht. Ein Handy-Neustart kann weiterhin nötig sein.</string>
+    <string name="idle_cleanup_failed">Freigabe oder Trennung ließ sich nicht bestätigen. In dieser Sitzung startet kein weiterer Test. Exportiere den Bericht; starte das Handy neu, falls der Audiokanal belegt bleibt.</string>
+    <string name="idle_cancelled">Test beendet; die App hat ihre Audioanforderungen freigegeben.</string>
+    <string name="idle_blocked">Test nicht verfügbar: Telefon-/Bluetooth-Zugriff, genau ein verbundenes Audiogerät und freies Audio sind erforderlich. Beende Anrufe, pausiere Medien und prüfe die Berechtigungen. Details stehen im Diagnosebericht.</string>
+    <string name="idle_cooldown">Warte mindestens 30 Sekunden zwischen Audiokanal-Tests.</string>
+    <string name="idle_auto_title">Automatischer Audiokanal-Test bei geöffneter App</string>
+    <string name="idle_auto_body">Optional: Test beim Verbinden eines einzelnen Audiogeräts oder nach einem fehlgeschlagenen Anruf, nur bei sichtbarer App und erlaubtem Telefonstatus. Höchstens einmal in 10 Minuten. Kein Test bei gesperrtem Bildschirm oder im Hintergrund.</string>
+    <string name="idle_voice_title">Experimentelle Bluetooth-Sprachsitzung</string>
+    <string name="idle_voice_body">Nach erfolglosen Audiokanal-Tests unterstützte Sprachsteuerung kurz starten und beenden. Kann Sprachsteuerungsanzeige, Mikrofonpfad oder Töne im Auto aktivieren. Nur außerhalb von Anrufen bei sichtbarer App; keine Audioaufzeichnung.</string>
+    <string name="recovery_help_title">Weitere Reparaturmöglichkeiten</string>
+    <string name="recovery_help_summary">Geräteeinstellungen und Schritte, die die App nicht selbst ausführen kann</string>
+    <string name="recovery_bluetooth">Bluetooth-Einstellungen</string>
+    <string name="recovery_developer">Entwickleroptionen</string>
+    <string name="recovery_settings_unavailable">Die angefragte Einstellungsseite ist auf diesem Gerät nicht verfügbar.</string>
+    <string name="recovery_help_body">Falls der Audiokanal-Test scheitert, exportiere vor einem Neustart einen Bericht.\n\nAußerhalb von Anrufen: In den Bluetooth-Einstellungen Anrufaudio für dieses Gerät aus- und wieder einschalten; Kopfhörer oder Auto trennen und neu verbinden. Kopfhörer oder Auto-Audiosystem im Stand neu starten. Erneutes Koppeln entfernt die gespeicherte Kopplung und erfordert die Einrichtung erneut.\n\nVerfügbare Firmware-Updates für Handy und Kopfhörer/Auto installieren. Ein Handy-Neustart bleibt der einzige bestätigte Reparaturweg auf dem betroffenen Nutzergerät. Bluetooth aus/ein allein half nicht.\n\nEinige A52s-Nutzer berichten von temporären Verbesserungen mit aktiviertem Bluetooth SAP oder deaktiviertem A2DP-Hardware-Offload in den Entwickleroptionen. Die Berichte widersprechen sich, können einen Neustart voraussetzen und belegen keine Reparatur des Sprachaudios. Ändere jeweils nur eine Einstellung, notiere den ursprünglichen Wert und vergleiche den nächsten Anruf. Die App kann diese Einstellungen oder Androids Audio-/Bluetooth-Systemdienste nicht selbst ändern.</string>
 </resources>

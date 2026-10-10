@@ -168,6 +168,10 @@ final class CallSession {
 
         CallReport report = report(now);
         reports.add(report);
+        if (report.outcome.problem) {
+            settings.setIdlePostCallPending(true);
+            DiagnosticLog.log(context, "IDLE post-call candidate recorded; execution requires visible app and idle phone");
+        }
         DiagnosticLog.log(context, "CALL END " + report);
     }
 
@@ -190,6 +194,8 @@ final class CallSession {
         Integer audioMode = voice.mode();
         String state = snapshot + " audioMode=" + (audioMode == null ? "?" : audioMode)
                 + " communicationRequest=" + communication.hasRequest() + " " + host.routingDetails();
+        state += " " + de.kaipressmar.a52srepair.diagnostics.AudioDiagnostics.capture(
+                context.getSystemService(AudioManager.class), host.bluetoothDevice());
         if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
                 || !step.note.equals(lastLoggedNote) || now - lastLoggedAt >= LOG_HEARTBEAT_MS) {
             lastLoggedSnapshot = state;

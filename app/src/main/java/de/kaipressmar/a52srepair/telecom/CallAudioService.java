@@ -68,6 +68,7 @@ public final class CallAudioService extends InCallService implements CallSession
 
     @Override
     public void onCallAdded(Call call) {
+        de.kaipressmar.a52srepair.audio.IdleRepairController.callStarted();
         activeService = new WeakReference<>(this);
         call.registerCallback(callCallback);
         if (session == null) {
@@ -98,6 +99,8 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @SuppressWarnings("deprecation")
     public void onCallAudioStateChanged(CallAudioState audioState) {
+        DiagnosticLog.log(this, "CALL observation source=legacy route=" + audioState.getRoute()
+                + " supportedMask=" + audioState.getSupportedRouteMask() + " muted=" + audioState.isMuted());
         legacyAudio = audioState;
         legacyTarget.observe(audioState);
         if (Build.VERSION.SDK_INT >= 34) audioState = endpoints().merge(audioState);
@@ -107,6 +110,8 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @RequiresApi(34)
     public void onCallEndpointChanged(CallEndpoint endpoint) {
+        DiagnosticLog.log(this, "CALL observation source=endpoint selectedType=" + endpoint.getEndpointType()
+                + " token=" + endpoint.getIdentifier().hashCode());
         endpoints().selected(endpoint);
         if (session != null) session.onAudioStateChanged(audioState());
     }
@@ -114,6 +119,10 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @RequiresApi(34)
     public void onAvailableCallEndpointsChanged(List<CallEndpoint> available) {
+        StringBuilder types = new StringBuilder();
+        for (CallEndpoint endpoint : available) types.append(endpoint.getEndpointType()).append(':')
+                .append(endpoint.getIdentifier().hashCode()).append(';');
+        DiagnosticLog.log(this, "CALL observation source=available-endpoints types/tokens=" + types);
         endpoints().available(available);
         if (session != null) session.onAudioStateChanged(audioState());
     }
@@ -206,6 +215,7 @@ public final class CallAudioService extends InCallService implements CallSession
         DiagnosticLog.log(this, "CALL routing path=endpoint " + routingDetails());
         endpoints().request(telecomRoute, requester,
                     () -> {
+                        DiagnosticLog.log(this, "CALL endpoint request acknowledged; audio connection still requires observation");
                         if (session == targetSession && session != null) session.onEvent();
                     }, code -> {
                         if (session != targetSession || session == null) return;

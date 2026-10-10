@@ -101,6 +101,25 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.BluetoothRepair.Card.Outlined"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/idle_title" android:textAppearance="@style/TextAppearance.BluetoothRepair.Section" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/idle_body" android:textAppearance="?attr/textAppearanceBodyMedium" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/idle_repair"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/idle_start" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/idle_cancel"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/action_cancel" android:visibility="gone" />
+                <TextView android:id="@+id/idle_result" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite" android:text="@string/idle_ready" android:textAppearance="?attr/textAppearanceBodyMedium" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- One-time setup, hidden as soon as everything is in place. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/setup_card"

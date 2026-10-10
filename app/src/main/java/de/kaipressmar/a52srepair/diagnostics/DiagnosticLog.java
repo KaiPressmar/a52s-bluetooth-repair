@@ -31,7 +31,8 @@ public final class DiagnosticLog {
         }
         try (Writer w =
                 new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
-            w.write(timestamp(System.currentTimeMillis()) + " | " + event + "\n");
+            w.write(timestamp(System.currentTimeMillis()) + " | elapsedMs=" + android.os.SystemClock.elapsedRealtime()
+                    + " " + event + "\n");
         } catch (IOException ignored) {
             // Diagnostics must never affect call handling.
         }
