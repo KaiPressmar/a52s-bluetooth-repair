@@ -11,8 +11,10 @@ public enum Fault {
     DOWNLINK_NOT_ON_BLUETOOTH(true),
     /** Voice-call stream is muted or at volume 0. */
     VOICE_SILENCED(true),
-    /** HFP is connected, but Telecom offers no Bluetooth route: only a reboot helps. */
-    BLUETOOTH_ROUTE_MISSING(false);
+    /** HFP is connected, but Telecom offers no Bluetooth route to request. */
+    BLUETOOTH_ROUTE_MISSING(false),
+    /** Explicit user report; not a fault inferred from Android's audio signals. */
+    USER_REPORTED_AUDIO_PROBLEM(true);
 
     public final boolean repairable;
 

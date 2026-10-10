@@ -11,6 +11,7 @@ import de.kaipressmar.a52srepair.core.model.CallPhase;
 import de.kaipressmar.a52srepair.core.repair.CallRepairEngine;
 import de.kaipressmar.a52srepair.core.repair.PreventiveRebuildMode;
 import de.kaipressmar.a52srepair.core.repair.RepairCommand;
+import de.kaipressmar.a52srepair.core.repair.ManualRepairStatus;
 import de.kaipressmar.a52srepair.core.report.CallOutcome;
 import de.kaipressmar.a52srepair.core.report.CallReport;
 import java.util.ArrayList;
@@ -19,6 +20,126 @@ import org.junit.Test;
 
 public class CallRepairEngineTest {
     private static final long T0 = 1_000_000L;
+
+    @Test public void repeatedBriefHealthyPulsesCannotPostponeFaultConfirmationForever() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF,
+                FaultClassifierTest.carCall().scoAudioConnected(false).build()) {
+            @Override void react(RepairCommand c) {}
+        };
+        h.tick();
+        h.now += 1_500L;
+        h.state = FaultClassifierTest.carCall().build();
+        h.tick();
+        h.now += 100L;
+        h.state = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        h.tick();
+        h.now += 600L;
+        h.tick();
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), h.executed);
+    }
+
+    @Test public void healthyGapResetsConnectionConfirmationAfterStabilityWindow() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.onSnapshot(broken, T0);
+        e.onSnapshot(ok, T0 + 500L);
+        e.onSnapshot(ok, T0 + 3_000L);
+        assertTrue(e.onSnapshot(broken, T0 + 3_100L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), e.onSnapshot(broken, T0 + 5_100L).commands);
+    }
+
+    @Test public void manualRepairDoesNotResetExhaustedAutomaticBudget() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, droppedToPhone()) {
+            @Override void react(RepairCommand c) {}
+        };
+        h.runFor(90_000L);
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.engine.report(h.now).routeAttempts);
+        assertEquals(ManualRepairStatus.STARTED, h.engine.requestManualRepair(h.state, h.now).status);
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.engine.report(h.now).routeAttempts);
+        assertEquals(1, h.engine.report(h.now).manualRepairs);
+    }
+
+    @Test public void manualRepairWorksWithProtectionOffAndHealthyApiSignals() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.onSnapshot(ok, T0);
+        CallRepairEngine.ManualRepair request = e.requestManualRepair(ok, T0 + 1L);
+        assertEquals(ManualRepairStatus.STARTED, request.status);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), request.step.commands);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 2L).outcome);
+        assertEquals(1, e.report(T0 + 2L).manualRepairs);
+        assertEquals(0, e.report(T0 + 2L).routeAttempts);
+        assertFalse(e.report(T0 + 2L).preventiveRebuild);
+        e.onSnapshot(droppedToPhone(), T0 + 250L);
+        e.onSnapshot(ok, T0 + 500L);
+        e.onSnapshot(ok, T0 + 500L + CallRepairEngine.VERIFY_MS);
+        assertEquals(CallOutcome.REPAIRED, e.report(T0 + 5_000L).outcome);
+        e.onRouteRequestFailed(T0 + 6_000L);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 6_000L).outcome);
+    }
+
+    @Test public void ignoredManualTeardownCannotProveRecoveryOrSendBlindReturn() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.requestManualRepair(ok, T0);
+        assertTrue(e.onSnapshot(ok, T0 + CallRepairEngine.LEAVE_TIMEOUT_MS).commands.isEmpty());
+        assertTrue(e.onSnapshot(ok, T0 + 20_000L).commands.isEmpty());
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 20_000L).outcome);
+    }
+
+    @Test public void manualRepairHasItsOwnBoundedBudgetAndCooldown() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        assertEquals(ManualRepairStatus.STARTED, e.requestManualRepair(ok, T0).status);
+        assertEquals(ManualRepairStatus.BUSY, e.requestManualRepair(ok, T0 + 1L).status);
+        e.onRouteRequestFailed(T0 + 2L);
+        assertEquals(ManualRepairStatus.COOLDOWN, e.requestManualRepair(ok, T0 + 3L).status);
+        assertEquals(ManualRepairStatus.STARTED,
+                e.requestManualRepair(ok, T0 + CallRepairEngine.MANUAL_COOLDOWN_MS).status);
+        e.onRouteRequestFailed(T0 + 20_000L);
+        assertEquals(ManualRepairStatus.BUDGET_EXHAUSTED, e.requestManualRepair(ok, T0 + 60_000L).status);
+        assertEquals(0, e.report(T0 + 60_000L).routeAttempts);
+    }
+
+    @Test public void manualRepairCanRevokeHandsOffButRejectsUnsafeStates() {
+        Harness h = new Harness(PreventiveRebuildMode.OFF, FaultClassifierTest.carCall().build());
+        h.runFor(10_000L);
+        h.state = droppedToPhone();
+        h.runFor(5_000L);
+        assertTrue(h.engine.report(h.now).userLeftBluetooth);
+        assertEquals(ManualRepairStatus.STARTED, h.engine.requestManualRepair(h.state, h.now).status);
+        assertFalse(h.engine.report(h.now).userLeftBluetooth);
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, e.requestManualRepair(ok.toBuilder().phase(CallPhase.RINGING).build(), T0).status);
+        assertEquals(ManualRepairStatus.MULTIPLE_CALLS, e.requestManualRepair(ok.toBuilder().callCount(2).build(), T0).status);
+        assertEquals(ManualRepairStatus.BLUETOOTH_UNAVAILABLE, e.requestManualRepair(ok.toBuilder().bluetoothRouteAvailable(false).build(), T0).status);
+        assertEquals(ManualRepairStatus.ALTERNATIVE_ROUTE, e.requestManualRepair(ok.toBuilder().route(AudioRoute.SPEAKER).build(), T0).status);
+        assertEquals(ManualRepairStatus.ROUTE_UNKNOWN, e.requestManualRepair(ok.toBuilder().route(AudioRoute.UNKNOWN).build(), T0).status);
+        e.onSnapshot(ok.toBuilder().phase(CallPhase.ENDED).build(), T0);
+        assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, e.requestManualRepair(ok, T0).status);
+        assertEquals(0, e.report(T0).manualRepairs);
+    }
+
+    @Test public void manualRepairRestoresConfirmedSilencedVolumeWithinExistingBudget() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot quiet = FaultClassifierTest.carCall().voiceVolume(0, 7).build();
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE, RepairCommand.RESTORE_VOICE_VOLUME),
+                e.requestManualRepair(quiet, T0).step.commands);
+        assertEquals(1, e.report(T0).volumeRestores);
+    }
+
+    @Test public void explicitRouteFailureBacksOffWithoutResettingAutomaticBudget() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot phone = droppedToPhone();
+        e.onSnapshot(phone, T0);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(phone, T0 + 3_000L).commands);
+        e.onRouteRequestFailed(T0 + 3_001L);
+        assertTrue(e.onSnapshot(phone, T0 + 3_002L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), e.onSnapshot(phone, T0 + 8_001L).commands);
+        assertEquals(2, e.report(T0 + 8_001L).routeAttempts);
+    }
 
     /** Drives the engine like the Android session: tick, execute, let the "system" react. */
     private static class Harness {

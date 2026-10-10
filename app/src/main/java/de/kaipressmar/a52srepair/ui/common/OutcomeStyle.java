@@ -56,6 +56,8 @@ public final class OutcomeStyle {
                 return R.string.fault_downlink;
             case VOICE_SILENCED:
                 return R.string.fault_voice_silenced;
+            case USER_REPORTED_AUDIO_PROBLEM:
+                return R.string.fault_user_reported;
             case BLUETOOTH_ROUTE_MISSING:
             default:
                 return R.string.fault_route_missing;

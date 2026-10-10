@@ -25,6 +25,11 @@ public class FaultClassifierTest {
         assertEquals(Fault.NONE, FaultClassifier.classify(carCall().build()));
     }
 
+    @Test public void IntentionalMicrophoneMuteIsNotAPlaybackFault() {
+        assertEquals(Fault.NONE, FaultClassifier.classify(carCall().microphoneMuted(true).build()));
+        org.junit.Assert.assertTrue(carCall().microphoneMuted(true).build().toBuilder().build().microphoneMuted);
+    }
+
     @Test public void ringingAndHoldingNeverCarryFaults() {
         assertEquals(Fault.NONE, FaultClassifier.classify(
                 carCall().phase(CallPhase.RINGING).route(AudioRoute.EARPIECE).build()));

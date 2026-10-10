@@ -12,6 +12,7 @@ import de.kaipressmar.a52srepair.core.model.CallAudioSnapshot;
 import de.kaipressmar.a52srepair.core.model.CallPhase;
 import de.kaipressmar.a52srepair.core.repair.CallRepairEngine;
 import de.kaipressmar.a52srepair.core.repair.RepairCommand;
+import de.kaipressmar.a52srepair.core.repair.ManualRepairStatus;
 import de.kaipressmar.a52srepair.core.report.CallReport;
 import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
@@ -30,6 +31,8 @@ final class CallSession {
         List<Integer> callStates();
 
         void requestRoute(int telecomRoute);
+
+        default boolean bluetoothTargetAmbiguous() { return false; }
     }
 
     private static final long EVENT_DEBOUNCE_MS = 150L;
@@ -91,10 +94,41 @@ final class CallSession {
         return report(elapsed());
     }
 
+    /** Read-only manual check; never routes audio or consumes a repair attempt. */
+    CallAudioSnapshot inspect() {
+        if (finished) return null;
+        headset.open(); // Also recover observation after Bluetooth permission is granted mid-call.
+        CallAudioSnapshot state = snapshot();
+        DiagnosticLog.log(context, "CALL manual check " + state);
+        return state;
+    }
+
+    ManualRepairStatus repairManually() {
+        if (finished) return ManualRepairStatus.NO_ACTIVE_CALL;
+        headset.open();
+        CallAudioSnapshot state = snapshot();
+        long now = elapsed();
+        // Platform target selection is checked before any intermediate route is requested.
+        if (state.phase.carriesAudio() && state.callCount == 1 && state.bluetoothRouteAvailable
+                && host.bluetoothTargetAmbiguous()) return ManualRepairStatus.AMBIGUOUS_DEVICE;
+        CallRepairEngine.ManualRepair result = engine.requestManualRepair(state, now);
+        DiagnosticLog.log(context, "CALL manual repair result=" + result.status);
+        if (result.status == ManualRepairStatus.STARTED && !applyStep(state, now, result.step)) {
+            return ManualRepairStatus.COMMAND_FAILED;
+        }
+        return result.status;
+    }
+
+    void onRouteRequestFailed() {
+        if (finished) return;
+        engine.onRouteRequestFailed(elapsed());
+        onEvent();
+    }
+
     private CallReport report(long now) {
         CallReport r = engine.report(now);
         return new CallReport(startedAtWall, r.durationMs, r.outcome, r.faults,
-                r.routeAttempts, r.volumeRestores, r.preventiveRebuild, r.userLeftBluetooth);
+                r.routeAttempts, r.volumeRestores, r.preventiveRebuild, r.userLeftBluetooth, r.manualRepairs);
     }
 
     void finish() {
@@ -118,6 +152,11 @@ final class CallSession {
     private void tick(CallAudioSnapshot snapshot) {
         long now = elapsed();
         CallRepairEngine.Step step = engine.onSnapshot(snapshot, now);
+        applyStep(snapshot, now, step);
+    }
+
+    private boolean applyStep(CallAudioSnapshot snapshot, long now, CallRepairEngine.Step step) {
+        boolean accepted = true;
 
         String state = snapshot.toString();
         if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
@@ -135,11 +174,14 @@ final class CallSession {
             try {
                 execute(command);
             } catch (RuntimeException e) {
+                accepted = false;
                 // Binder/permission failures must not kill call observation or reset budgets.
                 DiagnosticLog.log(context, "CALL command " + command + " failed: " + e.getClass().getSimpleName());
+                if (command != RepairCommand.RESTORE_VOICE_VOLUME) onRouteRequestFailed();
             }
         }
         schedule(step.nextCheckInMs);
+        return accepted;
     }
 
     private void execute(RepairCommand command) {
@@ -165,18 +207,19 @@ final class CallSession {
     @SuppressWarnings("deprecation")
     private CallAudioSnapshot snapshot(CallAudioState audio) {
         List<Integer> states = host.callStates();
+        VoiceStream.Evidence evidence = voice.evidence();
         CallAudioSnapshot.Builder builder =
                 CallAudioSnapshot.builder()
                         .phase(TelecomMapping.dominantPhase(states))
                         .callCount(states.size())
                         .hfpConnected(headset.hfpConnected())
-                        .scoAudioConnected(headset.scoAudioConnected())
-                        .voiceOnBluetooth(voice.playsOnBluetooth())
+                        .scoAudioConnected(evidence.requiresSco ? headset.scoAudioConnected() : null)
+                        .voiceOnBluetooth(evidence.onBluetooth)
                         .voiceVolume(voice.volume(), voice.maxVolume())
                         .voiceMuted(voice.muted());
         if (audio != null) {
             int mask = audio.getSupportedRouteMask();
-            builder.route(TelecomMapping.route(audio.getRoute()))
+            builder.microphoneMuted(audio.isMuted()).route(TelecomMapping.route(audio.getRoute()))
                     .bluetoothRouteAvailable((mask & CallAudioState.ROUTE_BLUETOOTH) != 0)
                     .earpieceAvailable((mask & CallAudioState.ROUTE_EARPIECE) != 0);
         }

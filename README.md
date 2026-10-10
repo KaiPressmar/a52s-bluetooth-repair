@@ -32,11 +32,11 @@ You probably have the known **Galaxy A52s 5G (SM-A528B / SM-A528N) Bluetooth cal
 
 - ✅ Bluetooth to the car or headset stays connected and **music works**,
 - ❌ but during **phone calls** you hear nothing, the other side hears nothing, or the call stays on the phone,
-- 🔁 and only **restarting the phone** fixes it – until it happens again hours or days later.
+- 🔁 and **restarting the phone** often helps temporarily – until it happens again hours or days later.
 
-Many owners report it since the January 2025 update. Samsung has reportedly ended updates for the A52s, so a vendor fix is unlikely. Background, affected firmware and community workarounds: [docs/A52S_CALL_AUDIO_ISSUE.md](docs/A52S_CALL_AUDIO_ISSUE.md).
+Many owners report it since the January 2025 update. Public reports do not establish a universal fix for the affected firmware. Background, affected firmware and community workarounds: [docs/A52S_CALL_AUDIO_ISSUE.md](docs/A52S_CALL_AUDIO_ISSUE.md).
 
-> 🇩🇪 **Deutsch:** Galaxy A52s 5G – Bluetooth-Anruf im Auto oder mit Headset: Der Gesprächspartner hört mich, aber ich höre ihn nicht (kein Ton, einseitiges Audio, Freisprecheinrichtung stumm). Musik geht, nur ein Neustart hilft. Genau dafür ist diese App – komplett auf Deutsch und Englisch.
+> 🇩🇪 **Deutsch:** Galaxy A52s 5G – Bluetooth-Anruf im Auto oder mit Headset: Der Gesprächspartner hört mich, aber ich höre ihn nicht (kein Ton, einseitiges Audio, Freisprecheinrichtung stumm). Musik geht; ein Neustart hilft häufig vorübergehend. Genau dafür ist diese App – komplett auf Deutsch und Englisch.
 
 ## Download and setup
 
@@ -45,7 +45,7 @@ Many owners report it since the January 2025 update. Samsung has reportedly ende
 3. **Open the app** and complete the two one-time steps:
    - allow **Bluetooth access**;
    - tap **Link car**, pick your car and confirm the Android dialog. The dialog calls the car a "watch"; that is the only device type through which Android lets apps control call audio.
-4. Done when the app shows **Protection active**. You never need to open it again; it updates itself from this repository.
+4. Done when the app shows **Protection active**. Automatic checks need no phone input. While stationary, the status screen also offers **Check now** and **Reconnect Bluetooth audio** during a call.
 
 *Alternative to step 3 with a computer:* `adb shell appops set de.kaipressmar.a52srepair MANAGE_ONGOING_CALLS allow`
 
@@ -57,9 +57,12 @@ Many owners report it since the January 2025 update. Samsung has reportedly ende
   - rebuilds the Bluetooth audio link (car → phone → car, about 1 second),
   - restores a muted call volume.
 - **Preventive on the A52s:** a silent downlink inside Samsung's audio stack can't be detected by any app, so the app rebuilds the Bluetooth audio once at the start of every car call. You can switch this off.
-- **Honest:** if Android offers no Bluetooth call route at all, no app can fix it. The app records it and tells you a restart is needed.
+- **Manual help:** read-only checks and an explicit bounded Bluetooth reconnect also work when automatic protection is paused or audio signals look healthy. They require Android to provide the call to the app.
+- **Honest:** a missing call endpoint cannot be created by a route command. The app explains when access, reconnection or device-side recovery is needed. No public API proves audible remote speech.
 
 Repairs go through Android's call system (Telecom), exactly like the audio button in the phone app. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains why earlier approaches could not work and shows the Android source evidence.
+
+Primary Android/Samsung sources and further recovery options are documented in [docs/RECOVERY_OPTIONS.md](docs/RECOVERY_OPTIONS.md).
 
 The app follows your phone's language (English or German) and can be switched under *Settings → Language*; on Android 13+ also in the system's per-app language settings.
 
@@ -77,7 +80,7 @@ No. Android binds the app only during calls; otherwise it doesn't run at all and
 
 <details><summary><b>Why does the call briefly switch to the phone at the start?</b></summary>
 
-That is the preventive rebuild of the Bluetooth audio link on the A52s. It takes about one second and prevents the "I can't hear them" fault. In the settings you can change it to "only after problems" or switch it off.
+That is the preventive rebuild of the Bluetooth audio link on the A52s. It briefly moves audio to the phone and back and may mitigate the "I can't hear them" fault; actual recovery must be checked on the device. In the settings you can change it to "only after problems" or switch it off.
 </details>
 
 <details><summary><b>Why does the setup dialog mention a watch and permissions?</b></summary>

@@ -17,6 +17,7 @@ public final class CallAudioSnapshot {
     public final int voiceVolume;
     public final int voiceMaxVolume;
     public final boolean voiceMuted;
+    public final boolean microphoneMuted;
     public final int callCount;
 
     private CallAudioSnapshot(Builder b) {
@@ -30,6 +31,7 @@ public final class CallAudioSnapshot {
         voiceVolume = b.voiceVolume;
         voiceMaxVolume = b.voiceMaxVolume;
         voiceMuted = b.voiceMuted;
+        microphoneMuted = b.microphoneMuted;
         callCount = b.callCount;
     }
 
@@ -48,6 +50,7 @@ public final class CallAudioSnapshot {
                 .voiceOnBluetooth(voiceOnBluetooth)
                 .voiceVolume(voiceVolume, voiceMaxVolume)
                 .voiceMuted(voiceMuted)
+                .microphoneMuted(microphoneMuted)
                 .callCount(callCount);
     }
 
@@ -60,7 +63,7 @@ public final class CallAudioSnapshot {
     public String toString() {
         return String.format(
                 Locale.ROOT,
-                "phase=%s route=%s btAvailable=%s earpiece=%s hfp=%s sco=%s voiceOnBt=%s volume=%s muted=%s calls=%d",
+                "phase=%s route=%s btAvailable=%s earpiece=%s hfp=%s sco=%s voiceOnBt=%s volume=%s muted=%s calls=%d micMuted=%s",
                 phase,
                 route,
                 bluetoothRouteAvailable,
@@ -70,7 +73,8 @@ public final class CallAudioSnapshot {
                 voiceOnBluetooth == null ? "?" : voiceOnBluetooth,
                 voiceMaxVolume > 0 ? voiceVolume + "/" + voiceMaxVolume : "?",
                 voiceMuted,
-                callCount);
+                callCount,
+                microphoneMuted);
     }
 
     public static final class Builder {
@@ -84,6 +88,7 @@ public final class CallAudioSnapshot {
         private int voiceVolume = -1;
         private int voiceMaxVolume = -1;
         private boolean voiceMuted;
+        private boolean microphoneMuted;
         private int callCount = 1;
 
         public Builder phase(CallPhase value) { phase = value; return this; }
@@ -95,6 +100,7 @@ public final class CallAudioSnapshot {
         public Builder voiceOnBluetooth(Boolean value) { voiceOnBluetooth = value; return this; }
         public Builder voiceVolume(int volume, int max) { voiceVolume = volume; voiceMaxVolume = max; return this; }
         public Builder voiceMuted(boolean value) { voiceMuted = value; return this; }
+        public Builder microphoneMuted(boolean value) { microphoneMuted = value; return this; }
         public Builder callCount(int value) { callCount = value; return this; }
 
         public CallAudioSnapshot build() {

@@ -47,4 +47,18 @@ public class MainActivityTest {
         Context context = ApplicationProvider.getApplicationContext();
         assertTrue(new AppSettings(context).migratedToVersionCode() >= 17);
     }
+
+    @Test public void manualCheckExplainsMissingAccessWithoutPretendingToRepair() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                assertNotNull(activity.findViewById(R.id.manual_check));
+                assertNotNull(activity.findViewById(R.id.manual_repair));
+                activity.findViewById(R.id.manual_check).performClick();
+                TextView result = activity.findViewById(R.id.manual_result);
+                assertEquals(activity.getString(R.string.manual_need_bluetooth), result.getText().toString());
+                activity.findViewById(R.id.manual_repair).performClick();
+                assertEquals(activity.getString(R.string.manual_need_bluetooth), result.getText().toString());
+            });
+        }
+    }
 }

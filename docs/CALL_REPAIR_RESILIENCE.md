@@ -1,5 +1,7 @@
 # Call-audio resilience, v0.19.1
 
+Historical v0.19 behavior. For current endpoint routing and manual actions, see [RECOVERY_OPTIONS.md](RECOVERY_OPTIONS.md).
+
 ## Evidence and sources
 
 The October 9 A52s report proves failed Bluetooth selections and persistent

@@ -28,10 +28,10 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 - A confirmed fault clears only after 2.5 s of positive SCO or voice-route evidence without a conflicting fault. Missing evidence or a brief healthy pulse is not verified recovery.
 - The preventive rebuild runs at most once, only within the first 30 s, only on a single call, and only after 1 s of steady Bluetooth.
 - "HFP connected but no Bluetooth route" is reported, never "repaired".
-- With automatic repair switched off, the engine observes and reports only.
+- With automatic repair switched off, automatic observation remains read-only; an explicit manual reconnect is separately authorized and bounded.
 - Diagnostics never change the audio mode (instrumentation smoke test).
 
-## Real-device protocol (v0.19.1)
+## Real-device protocol (v0.20.0)
 
 Setup:
 
@@ -55,6 +55,8 @@ For v0.19 also exercise the [additional device cases](docs/CALL_REPAIR_RESILIENC
 
 For v0.19.1 also run the [hands-free answer scenarios](docs/CALL_REPAIR_RESILIENCE.md#hands-free-answer-without-phone-input) without touching the phone. A long ringing interval and a brief positive audio pulse must not suppress repair of an immediate answer fallback.
 
-Status: the supplied reports predate v0.19. No physical A52s call has been performed in this workspace; these checks remain pending on the affected phone.
+For v0.20 also test [manual and endpoint scenarios](docs/RECOVERY_OPTIONS.md#device-validation), including paused protection, native failure, unknown evidence, multiple endpoints, LE Audio, permission recovery and preserving microphone mute. The status-screen integration test exercises both buttons against a bound fake call. CI screenshots cover English/German and light/dark UI.
+
+Status: the supplied reports predate v0.20. No physical A52s call has been performed in this workspace; these checks remain pending on the affected phone.
 
 A passing CI build proves the code-level invariants only. Whether the Telecom-level rebuild clears the vendor fault must be confirmed with real calls on the affected phone.

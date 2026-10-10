@@ -2,9 +2,14 @@ package de.kaipressmar.a52srepair.telecom;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertNull;
 import android.os.ParcelUuid;
 import android.telecom.CallAudioState;
 import android.telecom.CallEndpoint;
+import android.telecom.CallEndpointException;
+import android.os.OutcomeReceiver;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 import java.util.UUID;
 import org.junit.Test;
@@ -55,5 +60,46 @@ public class EndpointAudioStateTest {
         EndpointAudioState s = new EndpointAudioState();
         s.selected(endpoint(CallEndpoint.TYPE_UNKNOWN));
         assertEquals(0, s.merge(new CallAudioState(false, CallAudioState.ROUTE_BLUETOOTH, 15)).getRoute());
+    }
+
+    @Test public void modernMicrophoneMuteOverridesStaleLegacyWithoutUnmuting() {
+        EndpointAudioState s = new EndpointAudioState();
+        s.selected(endpoint(CallEndpoint.TYPE_BLUETOOTH));
+        s.muted(true);
+        org.junit.Assert.assertTrue(s.merge(new CallAudioState(false, CallAudioState.ROUTE_BLUETOOTH, 15)).isMuted());
+        org.junit.Assert.assertTrue(s.merge(null).isMuted());
+    }
+
+    @Test public void rebuildReturnsToThePreviouslySelectedActualBluetoothEndpoint() {
+        EndpointAudioState s = new EndpointAudioState();
+        CallEndpoint car = endpoint(CallEndpoint.TYPE_BLUETOOTH);
+        CallEndpoint other = endpoint(CallEndpoint.TYPE_BLUETOOTH);
+        CallEndpoint phone = endpoint(CallEndpoint.TYPE_EARPIECE);
+        s.available(List.of(other, phone, car));
+        assertNull(s.target(CallAudioState.ROUTE_BLUETOOTH)); // No guessing between devices.
+        org.junit.Assert.assertTrue(s.bluetoothTargetAmbiguous());
+        s.selected(car);
+        s.selected(phone);
+        assertSame(car, s.target(CallAudioState.ROUTE_BLUETOOTH));
+        org.junit.Assert.assertFalse(s.bluetoothTargetAmbiguous());
+        assertSame(phone, s.target(CallAudioState.ROUTE_WIRED_OR_EARPIECE));
+        s.available(List.of());
+        assertNull(s.target(CallAudioState.ROUTE_BLUETOOTH));
+    }
+
+    @Test public void endpointOutcomesIgnoreSupersededAndDuplicateCallbacks() {
+        EndpointAudioState s = new EndpointAudioState();
+        s.available(List.of(endpoint(CallEndpoint.TYPE_BLUETOOTH), endpoint(CallEndpoint.TYPE_EARPIECE)));
+        List<OutcomeReceiver<Void, CallEndpointException>> callbacks = new ArrayList<>();
+        AtomicInteger success = new AtomicInteger();
+        AtomicInteger failure = new AtomicInteger();
+        s.request(CallAudioState.ROUTE_WIRED_OR_EARPIECE, (e, c) -> callbacks.add(c), success::incrementAndGet, failure::set);
+        s.request(CallAudioState.ROUTE_BLUETOOTH, (e, c) -> callbacks.add(c), success::incrementAndGet, failure::set);
+        callbacks.get(0).onError(new CallEndpointException(null, CallEndpointException.ERROR_REQUEST_TIME_OUT));
+        assertEquals(0, failure.get());
+        callbacks.get(1).onError(new CallEndpointException(null, CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST));
+        callbacks.get(1).onResult(null);
+        assertEquals(CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST, failure.get());
+        assertEquals(0, success.get());
     }
 }

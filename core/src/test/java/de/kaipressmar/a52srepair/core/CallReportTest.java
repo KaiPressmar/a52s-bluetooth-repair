@@ -38,6 +38,14 @@ public class CallReportTest {
         assertTrue(futureFault.faults.isEmpty());
     }
 
+    @Test public void manualRepairCountsRoundTripAndOldReportsRemainReadable() {
+        CallReport old = CallReport.decode("1;1;2;HEALTHY;;0;0;0;0");
+        assertEquals(0, old.manualRepairs);
+        CallReport manual = new CallReport(1L, 2L, CallOutcome.UNRESOLVED,
+                EnumSet.of(Fault.USER_REPORTED_AUDIO_PROBLEM), 3, 0, false, false, 2);
+        assertEquals(manual.toString(), CallReport.decode(manual.encode()).toString());
+    }
+
     @Test public void riskElevatedOnlyForRecentProblems() {
         long now = 100L * DAY;
         CallHistory calm = new CallHistory(List.of(report(now - DAY, CallOutcome.HEALTHY)));

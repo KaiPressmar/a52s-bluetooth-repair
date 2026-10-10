@@ -6,7 +6,7 @@ This project investigates a device-specific Bluetooth call-audio failure. Treat 
 
 - The app must stay invisible: no background service, no notifications, no polling. Work happens only while Telecom has the app bound during a call.
 - Repairs must be hands-free: the user is driving and can only accept calls through the car.
-- Prefer the smallest reversible intervention, and route changes only through Telecom (`InCallService.setAudioRoute`).
+- Prefer the smallest reversible intervention, and route changes only through Telecom (`requestCallEndpointChange` with actual available endpoints on Android 14+, legacy `setAudioRoute` when endpoint observations are unavailable).
 - Decisions belong in `:core` (pure Java, unit-tested); `:app` only collects state and executes commands.
 - Keep diagnosis read-only and log state before and after each repair step.
 - Never silently broaden permissions or add root/Shizuku requirements.

@@ -1,6 +1,6 @@
 # Galaxy A52s 5G – Bluetooth call-audio failure
 
-Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-09 (v0.19.0). Current resilience rules and sources: [CALL_REPAIR_RESILIENCE.md](CALL_REPAIR_RESILIENCE.md).
+Research notes and technical analysis that the detection and repair logic is based on. Last updated: 2026-10-10 (v0.20.0). Current recovery options, manual controls and primary sources: [RECOVERY_OPTIONS.md](RECOVERY_OPTIONS.md). Earlier resilience rules: [CALL_REPAIR_RESILIENCE.md](CALL_REPAIR_RESILIENCE.md).
 
 ## Symptom variants
 
@@ -13,7 +13,7 @@ All variants share one property: Bluetooth stays connected and media (A2DP) usua
 | C – transport down | Route looks right, but no SCO link | SCO selected, `BluetoothHeadset.isAudioConnected()` false | HFP transport mismatch |
 | **D – one-way audio** | **The other side hears us (mic over car works), but we hear nothing** | SCO selected and connected; the downlink is routed elsewhere, silenced, or dead in the vendor HAL | `DOWNLINK_ROUTE_MISMATCH`, `DOWNLINK_SILENCED`, or **not observable** |
 
-Variant D is the one in the 2026-10-07 field report ([field-reports/2026-10-07-vw-one-way-audio.md](field-reports/2026-10-07-vw-one-way-audio.md)). Up to v0.14 the app rated it `HEALTHY_CALL`, because every route check passes: the microphone path proves that SCO is up.
+Variant D is the one in the 2026-10-07 field report ([field-reports/2026-10-07-vw-one-way-audio.md](field-reports/2026-10-07-vw-one-way-audio.md)). Up to v0.14 the app rated it `HEALTHY_CALL`, because every route check passes: hearing the caller alone does not prove which microphone carried the uplink; positive SCO observations establish transport, not audible remote speech.
 
 ## Timeline and affected firmware
 
@@ -34,7 +34,7 @@ Variant D is the one in the 2026-10-07 field report ([field-reports/2026-10-07-v
 | Battery → set **Bluetooth** and system services to *Unrestricted* | Reported to delay recurrence. Supports the "stack degrades over time" hypothesis |
 | Clear Bluetooth app cache, re-pair, wipe cache partition | Mixed results |
 
-The pattern behind all of these: the fault **builds up over runtime** and is cleared by restarting the Bluetooth/audio stack. A normal app cannot restart Samsung's Bluetooth process or the Qualcomm audio HAL. It can only use the public communication-route, volume and SCO APIs.
+The pattern behind all of these: the fault **builds up over runtime** and is cleared by restarting the Bluetooth/audio stack. A normal app cannot restart Samsung's Bluetooth process or the Qualcomm audio HAL. It uses Telecom call routing and voice-volume APIs; generic app SCO commands are not an additional telephony repair.
 
 ## What an app can observe during a call
 
@@ -52,17 +52,19 @@ The last row is the hard limit. If SCO is up, routing is correct and volume is a
 
 **Design constraint: everything must be hands-free.** The fault usually happens in the car, where the driver can only accept the call through the head unit and must not operate the phone. The app therefore must not depend on user input to repair. For the invisible case it rebuilds SCO **preventively once at the start of every Bluetooth call** (step 4 below).
 
-## Repair ladder (v0.16)
+## Repair ladder (v0.20)
 
-AOSP analysis showed that up to v0.15 the app's `setCommunicationDevice()` requests had **no effect during cellular calls**: on Android 14 only the audio-mode owner (Telecom) controls the communication route. Since v0.16 every route step goes through Telecom (`InCallService.setAudioRoute()`), which genuinely tears down and rebuilds the HFP SCO link, exactly like the audio button in the phone app. Details and sources: [ARCHITECTURE.md](ARCHITECTURE.md).
+AOSP analysis showed that up to v0.15 the app's `setCommunicationDevice()` requests had **no effect during cellular calls**: on Android 14 only the audio-mode owner (Telecom) controls the communication route. Since v0.16 every route step goes through Telecom (`InCallService.setAudioRoute()`), or API 34+ endpoint requests. The app observes actual route departure and return before verifying recovery; a request alone is insufficient. Details and sources: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 From least to most invasive. Each step is verified before the next one runs:
 
 1. **Restore call volume** (`VOICE_SILENCED`): unmute and set `STREAM_VOICE_CALL` to about 60 %.
 2. **Route the call to the car** (`CALL_NOT_ON_BLUETOOTH`, variant A): `setAudioRoute(ROUTE_BLUETOOTH)`.
-3. **Rebuild Bluetooth audio** (`SCO_DISCONNECTED`, `DOWNLINK_NOT_ON_BLUETOOTH`, variants C/D): `setAudioRoute(ROUTE_WIRED_OR_EARPIECE)`, wait until Telecom has left Bluetooth, then `setAudioRoute(ROUTE_BLUETOOTH)`. This forces a new SCO link and codec negotiation with the car.
+3. **Rebuild Bluetooth audio** (`SCO_DISCONNECTED`, `DOWNLINK_NOT_ON_BLUETOOTH`, variants C/D): `setAudioRoute(ROUTE_WIRED_OR_EARPIECE)`, wait until Telecom has left Bluetooth, then `setAudioRoute(ROUTE_BLUETOOTH)`. This asks Telecom to establish a new link. If departure is ignored, the operation aborts instead of claiming a rebuild.
 4. **Preventive rebuild at call start** (A52s: every car call; configurable): step 3 once, after 1 s of steady Bluetooth within the first 30 s. It covers the silent downlink that no API can observe. Cost: about 1 s of audio on the phone at call start.
-5. **Report** (`BLUETOOTH_ROUTE_MISSING`, variant B): no app can repair it, so the status screen recommends a reboot.
+5. **Report** (`BLUETOOTH_ROUTE_MISSING`, variant B): route repair cannot create a missing endpoint. Check/reconnect the device; a reboot can help a wedged stack but is not a guaranteed permanent fix.
+
+6. **Explicit manual reconnect:** while stationary, use the status controls even with automatic protection paused or apparently healthy API signals. See [RECOVERY_OPTIONS.md](RECOVERY_OPTIONS.md).
 
 Safety rules: confirmation windows, at most 3 route operations per call, speaker and wired routes untouched, and no fighting a user's or car's switch to the phone. See [TESTING.md](../TESTING.md).
 

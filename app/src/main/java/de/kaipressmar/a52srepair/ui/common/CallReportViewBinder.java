@@ -20,6 +20,9 @@ public final class CallReportViewBinder {
         row.reportIcon.setBackgroundTintList(
                 ColorStateList.valueOf(ContextCompat.getColor(context, style.container)));
         row.reportTitle.setText(style.title);
+        if (report.manualRepairs > 0 && report.outcome == de.kaipressmar.a52srepair.core.report.CallOutcome.REPAIRED) {
+            row.reportTitle.setText(R.string.outcome_manual_verified);
+        }
         row.reportMeta.setText(
                 context.getString(
                         R.string.history_meta,

@@ -32,13 +32,14 @@ public final class Formatting {
         for (Fault fault : report.faults) {
             parts.add(context.getString(OutcomeStyle.faultLabel(fault)));
         }
-        int steps = report.routeAttempts + report.volumeRestores;
+        int steps = report.routeAttempts + report.volumeRestores + report.manualRepairs;
         if (steps > 0) {
             parts.add(context.getResources().getQuantityString(R.plurals.history_actions, steps, steps));
         }
         if (report.preventiveRebuild) {
             parts.add(context.getString(R.string.history_preventive));
         }
+        if (report.manualRepairs > 0) parts.add(context.getString(R.string.history_manual, report.manualRepairs));
         return String.join(" · ", parts);
     }
 }
