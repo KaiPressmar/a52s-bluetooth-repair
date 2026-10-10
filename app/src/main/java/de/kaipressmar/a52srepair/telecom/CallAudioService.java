@@ -24,6 +24,8 @@ public final class CallAudioService extends InCallService implements CallSession
     private static WeakReference<CallAudioService> activeService = new WeakReference<>(null);
     private CallSession session;
     private EndpointAudioState endpoints;
+    private final LegacyBluetoothTarget legacyTarget = new LegacyBluetoothTarget();
+    private CallAudioState legacyAudio;
 
     @RequiresApi(34)
     private EndpointAudioState endpoints() {
@@ -35,6 +37,11 @@ public final class CallAudioService extends InCallService implements CallSession
     public static CallReport activeReport() {
         CallAudioService service = activeService.get();
         return service == null || service.session == null ? null : service.session.report();
+    }
+
+    public static String activeRoutingDetails() {
+        CallAudioService service = activeService.get();
+        return service == null || service.session == null ? "no active routing observations" : service.routingDetails();
     }
 
     public static CallAudioSnapshot checkNow() {
@@ -80,6 +87,8 @@ public final class CallAudioService extends InCallService implements CallSession
             session.finish();
             session = null;
             endpoints = null;
+            legacyAudio = null;
+            legacyTarget.clear();
             if (activeService.get() == this) activeService.clear();
         } else {
             session.onEvent();
@@ -89,6 +98,8 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override
     @SuppressWarnings("deprecation")
     public void onCallAudioStateChanged(CallAudioState audioState) {
+        legacyAudio = audioState;
+        legacyTarget.observe(audioState);
         if (Build.VERSION.SDK_INT >= 34) audioState = endpoints().merge(audioState);
         if (session != null) session.onAudioStateChanged(audioState);
     }
@@ -120,13 +131,17 @@ public final class CallAudioService extends InCallService implements CallSession
             session.finish();
             session = null;
         }
+        legacyAudio = null;
+        legacyTarget.clear();
+        endpoints = null;
         super.onDestroy();
     }
 
     @Override
     @SuppressWarnings("deprecation")
     public CallAudioState audioState() {
-        CallAudioState legacy = getCallAudioState();
+        CallAudioState legacy = legacyAudio == null ? getCallAudioState() : legacyAudio;
+        legacyTarget.observe(legacy);
         return Build.VERSION.SDK_INT >= 34 ? endpoints().merge(legacy) : legacy;
     }
 
@@ -141,7 +156,25 @@ public final class CallAudioService extends InCallService implements CallSession
     }
 
     @Override public boolean bluetoothTargetAmbiguous() {
-        return Build.VERSION.SDK_INT >= 34 && endpoints().bluetoothTargetAmbiguous();
+        audioState();
+        return Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()
+                ? endpoints().bluetoothTargetAmbiguous() : legacyTarget.ambiguous();
+    }
+
+    @Override public android.bluetooth.BluetoothDevice bluetoothDevice() {
+        audioState();
+        return legacyTarget.target();
+    }
+
+    @Override public String routingDetails() {
+        return "endpointApi=" + (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability())
+                + " legacyBtDevices=" + legacyTarget.size()
+                + " hfpDevices=" + legacyTarget.headsetCount()
+                + " explicitBtTarget=" + (legacyTarget.target() != null);
+    }
+
+    @Override public void observeHeadsets(List<android.bluetooth.BluetoothDevice> devices) {
+        legacyTarget.observeHeadsets(devices);
     }
 
     @Override
@@ -149,6 +182,7 @@ public final class CallAudioService extends InCallService implements CallSession
         DiagnosticLog.log(this, "CALL request Telecom route=" + CallAudioState.audioRouteToString(telecomRoute));
         if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) {
             CallSession targetSession = session;
+            DiagnosticLog.log(this, "CALL routing path=endpoint " + routingDetails());
             endpoints().request(telecomRoute,
                     (endpoint, callback) -> requestCallEndpointChange(endpoint, getMainExecutor(), callback),
                     () -> {
@@ -161,6 +195,17 @@ public final class CallAudioService extends InCallService implements CallSession
                     });
             return;
         }
+        if (telecomRoute == CallAudioState.ROUTE_BLUETOOTH) {
+            android.bluetooth.BluetoothDevice target = bluetoothDevice();
+            if (legacyTarget.ambiguous()) throw new IllegalStateException("Ambiguous legacy Bluetooth devices");
+            if (target != null) {
+                DiagnosticLog.log(this, "CALL routing path=explicit-device " + routingDetails());
+                requestBluetoothAudio(target);
+                legacyTarget.requested(target);
+                return;
+            }
+        }
+        DiagnosticLog.log(this, "CALL routing path=legacy-mask " + routingDetails());
         setAudioRoute(telecomRoute);
     }
 }

@@ -3,8 +3,6 @@ package de.kaipressmar.a52srepair.update;
 import de.kaipressmar.a52srepair.BuildConfig;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -12,10 +10,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Minimal HTTPS client for GitHub release metadata and assets. */
+/** Minimal HTTPS client for read-only GitHub release metadata. */
 final class HttpClient {
     static final long MAX_TEXT_BYTES = 2L * 1024 * 1024;
-    static final long MAX_APK_BYTES = 64L * 1024 * 1024;
     interface ConnectionFactory { HttpURLConnection open(String url) throws IOException; }
     private static final ConnectionFactory CONNECTIONS = url -> (HttpURLConnection) new URL(url).openConnection();
     private HttpClient() {}
@@ -30,12 +27,6 @@ final class HttpClient {
         return out.toString(StandardCharsets.UTF_8.name());
     }
 
-    static void downloadTo(String url, File target) throws IOException {
-        try (OutputStream out = new FileOutputStream(target)) {
-            download(url, out, CONNECTIONS, MAX_APK_BYTES);
-        }
-    }
-
     static void download(String url, OutputStream out, ConnectionFactory connections, long maxBytes) throws IOException {
         HttpURLConnection connection = connections.open(url);
         connection.setConnectTimeout(10_000);
@@ -43,7 +34,7 @@ final class HttpClient {
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "BluetoothRepair/" + BuildConfig.VERSION_NAME);
         connection.setRequestProperty(
-                "Accept", "application/vnd.github+json, application/octet-stream");
+                "Accept", "application/vnd.github+json");
         try {
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) throw new IOException("HTTP " + code);

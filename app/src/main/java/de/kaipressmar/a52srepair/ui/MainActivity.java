@@ -24,7 +24,7 @@ import de.kaipressmar.a52srepair.ui.common.SetupActions;
 import de.kaipressmar.a52srepair.ui.history.HistoryFragment;
 import de.kaipressmar.a52srepair.ui.settings.SettingsFragment;
 import de.kaipressmar.a52srepair.ui.status.StatusFragment;
-import de.kaipressmar.a52srepair.update.UpdateInstaller;
+import de.kaipressmar.a52srepair.update.UpdateLinks;
 import de.kaipressmar.a52srepair.update.UpdateRelease;
 import de.kaipressmar.a52srepair.update.UpdateRepository;
 import java.util.List;
@@ -206,8 +206,17 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
 
     @Override
     public void installUpdate() {
-        UpdateInstaller.install(this, availableUpdate, (message, error) ->
-                Toast.makeText(this, message, error ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show());
+        if (!canUpdateUi() || availableUpdate == null) return;
+        UpdateRelease release = availableUpdate;
+        UpdateLinks.Listener listener = (message, error) -> {
+            if (canUpdateUi()) Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        };
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.update_title)
+                .setMessage(R.string.update_security_help)
+                .setPositiveButton(R.string.update_install, (d, w) -> UpdateLinks.openReleasePage(this, release, listener))
+                .setNegativeButton(R.string.action_close, null)
+                .show();
     }
 
     @Override

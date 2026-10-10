@@ -19,6 +19,25 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class HeadsetMonitorTest {
+    @Test public void anotherHeadsetsScoDoesNotVerifyTheSelectedCarsAudio() {
+        Application app = ApplicationProvider.getApplicationContext();
+        shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        android.bluetooth.BluetoothAdapter adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        android.bluetooth.BluetoothDevice car = adapter.getRemoteDevice("00:11:22:33:44:01");
+        android.bluetooth.BluetoothDevice watch = adapter.getRemoteDevice("00:11:22:33:44:02");
+        BluetoothHeadset proxy = org.robolectric.shadow.api.Shadow.newInstanceOf(BluetoothHeadset.class);
+        shadowOf(proxy).addConnectedDevice(car);
+        shadowOf(proxy).addConnectedDevice(watch);
+        assertTrue(proxy.startVoiceRecognition(watch));
+        HeadsetMonitor monitor = new HeadsetMonitor(app);
+        org.robolectric.util.ReflectionHelpers.setField(monitor, "headset", proxy);
+        assertEquals(2, monitor.connectedDevices().size());
+        assertEquals(Boolean.TRUE, monitor.scoAudioConnected());
+        assertEquals(Boolean.FALSE, monitor.scoAudioConnected(car));
+        assertEquals(Boolean.TRUE, monitor.scoAudioConnected(watch));
+        assertEquals(null, monitor.scoAudioConnected(adapter.getRemoteDevice("00:11:22:33:44:03")));
+        monitor.close();
+    }
     @Test public void audioEventsAreObservedOnlyWhileMonitorIsOpen() {
         Application app = ApplicationProvider.getApplicationContext();
         shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
@@ -46,6 +65,7 @@ public class HeadsetMonitorTest {
         monitor.open();
         assertEquals(null, monitor.scoAudioConnected());
         assertEquals(false, monitor.hfpConnected());
+        assertTrue(monitor.connectedDevices().isEmpty());
         monitor.close();
     }
 

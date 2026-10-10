@@ -4,6 +4,8 @@ The goal is a repair that works hands-free in the car without ever turning a hyp
 
 ## Test layers
 
+Coverage reports and enforced module thresholds: [docs/COVERAGE.md](docs/COVERAGE.md).
+
 1. **`:core` JVM tests** (`./gradlew :core:test`): fault classification, the per-call repair state machine with a simulated clock and a simulated Telecom, call-report encoding and statistics, version and device helpers. Every safety rule lives here.
 2. **Robolectric tests** (`:app:testDebugUnitTest`, runtime-relevant tests run on Android 14 and 16):
    - Telecom constant mapping;
@@ -68,3 +70,5 @@ the owner's proven fix. These timing thresholds and audible recovery require
 physical A52s/car validation; only the phone restart has been confirmed by the owner.
 
 A passing CI build proves the code-level invariants only. Whether the Telecom-level rebuild clears the vendor fault must be confirmed with real calls on the affected phone.
+
+For v0.20.3, run the [report-derived device scenarios](docs/REPORT_0202_ANALYSIS.md#physical-validation-still-required). Verify explicit legacy targets when modern endpoints are absent, retained car selection with a second peripheral, no routing after target disappearance and no premature repeated request. Updates open only the official release in the browser; verify that package-installation permission is absent and diagnostic sharing still works. A Play Protect classification requires separate investigation as described in [installation warnings](docs/INSTALLATION_WARNINGS.md).

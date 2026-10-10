@@ -62,8 +62,8 @@ public final class UpdateRelease {
                 if (expectedApk.equals(name)) apkUrl = url;
                 else if ((expectedApk + ".sha256").equals(name)) checksumUrl = url;
             }
-            if (!UpdateInstaller.isTrustedDownloadUrl(apkUrl)
-                    || !UpdateInstaller.isTrustedDownloadUrl(checksumUrl)) continue;
+            if (!UpdateLinks.isTrustedDownloadUrl(apkUrl)
+                    || !UpdateLinks.isTrustedDownloadUrl(checksumUrl)) continue;
 
             UpdateRelease candidate =
                     new UpdateRelease(

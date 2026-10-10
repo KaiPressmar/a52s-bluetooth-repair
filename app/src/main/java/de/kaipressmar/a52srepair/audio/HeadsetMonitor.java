@@ -127,11 +127,18 @@ public final class HeadsetMonitor {
     /** TRUE/FALSE for the SCO link of any connected HFP device, null when unknown. */
     @SuppressLint("MissingPermission") // Guarded by permitted().
     public Boolean scoAudioConnected() {
+        return scoAudioConnected(null);
+    }
+
+    /** Read the requested device, so another headset cannot prove this car recovered. */
+    @SuppressLint("MissingPermission")
+    public Boolean scoAudioConnected(BluetoothDevice target) {
         BluetoothHeadset proxy = headset;
         if (proxy == null || !permitted()) return null;
         try {
             List<BluetoothDevice> devices = proxy.getConnectedDevices();
             if (devices.isEmpty()) return null;
+            if (target != null) return devices.contains(target) ? proxy.isAudioConnected(target) : null;
             for (BluetoothDevice device : devices) {
                 if (proxy.isAudioConnected(device)) return Boolean.TRUE;
             }
@@ -144,5 +151,13 @@ public final class HeadsetMonitor {
     private boolean permitted() {
         return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Connected HFP candidates for firmware that omits legacy Telecom device lists. */
+    @SuppressLint("MissingPermission")
+    public List<BluetoothDevice> connectedDevices() {
+        if (headset == null || !permitted()) return java.util.Collections.emptyList();
+        try { return new java.util.ArrayList<>(headset.getConnectedDevices()); }
+        catch (RuntimeException e) { return java.util.Collections.emptyList(); }
     }
 }
