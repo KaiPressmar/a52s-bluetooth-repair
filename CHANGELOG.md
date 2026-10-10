@@ -4,6 +4,27 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.20.0 - manual call-audio checks and verified endpoint repairs
+
+### Manual help
+
+- The status screen offers a read-only **Check now** action and an explicit **Reconnect Bluetooth audio** action during calls, including when automatic protection is paused or API signals look healthy.
+- Manual reconnection has two attempts per call with a 15-second cooldown, without resetting automatic limits. It can revoke the phone-route hands-off gate; speaker, wired and streaming routes, multiple calls and unavailable endpoints are still protected.
+- Reports persist manual attempts and distinguish a user-reported problem from a detected fault. Old reports remain readable. A failed/unverified manual rebuild is not reported as repaired.
+- Missing Bluetooth/call access, no Telecom-bound call, unavailable or ambiguous devices, ongoing repairs and exhausted attempts have explicit feedback. Microphone mute is observed and preserved.
+
+### More reliable repairs
+
+- Android 14+ uses actual advertised call endpoints with completion/error callbacks when modern availability has been received; older devices and legacy-only observations retain Telecom routing. Rebuilds prefer the previously selected Bluetooth endpoint and do not guess between multiple devices.
+- Native request failures stop the operation and back off; superseded/duplicate callbacks are ignored. A timed-out teardown no longer sends an unverified return request.
+- Short healthy/unknown pulses do not indefinitely postpone connection-fault confirmation; a stable healthy window resets it.
+- LE Audio voice evidence no longer requires a classic SCO link. Bluetooth observation can start after permission is granted during a call.
+
+### Validation and limits
+
+- Regression coverage includes manual checks/reconnections, paused protection, hidden user-reported faults, budgets, persistence, teardown failures, endpoint selection/outcomes, LE Audio and the status-screen controls on Android 14 and 16.
+- [Recovery options](docs/RECOVERY_OPTIONS.md) documents primary Android/Samsung sources, practical device checks and actions unavailable to a normal app. Physical A52s/car validation remains pending; audible speech and a vendor HAL reset cannot be guaranteed by these APIs.
+
 ## 0.19.1 - recognize hands-free answer fallbacks
 
 ### Fixed

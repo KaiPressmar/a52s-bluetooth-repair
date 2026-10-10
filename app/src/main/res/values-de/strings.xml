@@ -15,7 +15,7 @@
     <string name="status_paused_title">Schutz pausiert</string>
     <string name="status_paused_body">Die automatische Reparatur ist in den Einstellungen ausgeschaltet. Anrufe werden nur protokolliert.</string>
     <string name="status_reboot_title">Neustart empfohlen</string>
-    <string name="status_reboot_body">Beim letzten Anruf war die Bluetooth-Telefonie im System blockiert. Das kann keine App beheben – ein Neustart des Telefons stellt sie wieder her.</string>
+    <string name="status_reboot_body">Beim letzten Anruf bot Android keinen Bluetooth-Anrufweg an. Verbinde Auto oder Headset zuerst erneut. Bleibt der Weg nicht verfügbar, kann ein Neustart helfen.</string>
     <string name="status_last_active">Zuletzt aktiv: %1$s</string>
     <string name="status_never_active">Noch kein Anruf seit der Einrichtung</string>
 
@@ -140,4 +140,31 @@
     <string name="update_error_checksum">Prüfsumme stimmt nicht oder ist ungültig</string>
     <string name="update_error_package">Die heruntergeladene Datei passt nicht zu dieser App oder Version</string>
     <string name="update_error_network">Download fehlgeschlagen – bitte Internetverbindung prüfen</string>
+    <string name="manual_title">Manuell helfen</string>
+    <string name="manual_body">Während eines Anrufs kannst du den Audiostatus prüfen oder Bluetooth neu verbinden, wenn du die andere Person nicht hörst. Beim Neuverbinden läuft der Anruf kurz über das Telefon.</string>
+    <string name="manual_check">Jetzt prüfen</string>
+    <string name="manual_repair">Bluetooth-Audio neu verbinden</string>
+    <string name="manual_ready">Die Prüfung verändert den Audioweg nicht. Bediene diese Funktionen im Stand.</string>
+    <string name="manual_need_bluetooth">Bluetooth-Zugriff fehlt. Schließe die Bluetooth-Einrichtung unten ab.</string>
+    <string name="manual_need_calls">Anrufzugriff fehlt. Schließe die Einrichtung des Anrufzugriffs unten ab.</string>
+    <string name="manual_bluetooth_off">Bluetooth ist ausgeschaltet. Schalte es in den Android-Einstellungen ein.</string>
+    <string name="manual_no_call">Android stellt der App keinen Anruf bereit. Falls gerade ein Gespräch läuft, prüfe den Anrufzugriff. Die App kann die Anrufanbindung nicht erzwingen.</string>
+    <string name="manual_not_active">Der Anruf klingelt, wird gehalten oder endet. Die Audioreparatur benötigt ein laufendes Gespräch.</string>
+    <string name="manual_multiple_calls">Es sind mehrere Anrufe vorhanden. Beende oder vereinige sie vor der Audioreparatur.</string>
+    <string name="manual_unavailable">Android bietet keinen Bluetooth-Anrufendpunkt an. Verbinde Auto oder Headset in den Bluetooth-Einstellungen erneut und prüfe nochmals. Eine Routenreparatur kann keinen fehlenden Endpunkt erzeugen.</string>
+    <string name="manual_unknown_route">Android hat den Audioweg des Anrufs noch nicht gemeldet. Warte kurz und prüfe erneut.</string>
+    <string name="manual_alternative_route">Der Anruf nutzt Lautsprecher, Kabel-Audio oder ein externes Gerät. Wähle in der Anruf-App Telefon oder Bluetooth, bevor du Bluetooth hier neu verbindest.</string>
+    <string name="manual_busy">Eine Audioreparatur läuft bereits. Warte einige Sekunden und prüfe erneut.</string>
+    <string name="manual_cooldown">Warte zwischen manuellen Reparaturversuchen mindestens 15 Sekunden.</string>
+    <string name="manual_exhausted">Beide manuellen Versuche für diesen Anruf sind verbraucht. Prüfe die Bluetooth-Einstellungen oder verbinde das Gerät vor einem weiteren Anruf erneut.</string>
+    <string name="manual_command_failed">Android hat die Audioanforderung abgelehnt. Prüfe den Anrufzugriff und wähle das gewünschte Bluetooth-Gerät in der Anruf-App. Der Fehler wird protokolliert.</string>
+    <string name="manual_started">Ein Bluetooth-Verbindungsversuch wurde gestartet. Prüfe in einigen Sekunden erneut und höre nach, ob die andere Person wieder hörbar ist.</string>
+    <string name="manual_fault">Aktueller Hinweis: %1$s. Du kannst einen Bluetooth-Neuaufbau versuchen.</string>
+    <string name="manual_no_fault">Android meldet keinen Audiofehler. Das beweist keinen hörbaren Ton. Bei einem stummen Gespräch kannst du trotzdem einen manuellen Bluetooth-Neuaufbau versuchen.</string>
+    <string name="manual_unverified">Der manuelle Neuaufbau ist noch nicht bestätigt. Android-Signale allein können hörbare Sprache nicht bestätigen.</string>
+    <string name="fault_user_reported">Audioproblem manuell gemeldet</string>
+    <string name="history_manual">Manuelle Versuche: %1$d</string>
+    <string name="outcome_manual_verified">Bluetooth nach manueller Reparatur bestätigt</string>
+    <string name="manual_ambiguous_device">Mehrere Bluetooth-Anrufgeräte sind verfügbar. Wähle das gewünschte Gerät zuerst in der Anruf-App; diese App wählt keines auf Verdacht.</string>
+    <string name="manual_microphone_muted">Das Mikrofon ist stummgeschaltet. Falls das unbeabsichtigt ist, hebe die Stummschaltung in der Anruf-App auf. Diese App lässt die Mikrofon-Stummschaltung unverändert.</string>
 </resources>

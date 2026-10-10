@@ -23,6 +23,8 @@ public final class HeadsetMonitor {
     private final Runnable onChanged;
     private boolean opened;
     private boolean receiverRegistered;
+    private boolean profileRequested;
+    private long nextProfileRequestAt;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
@@ -62,28 +64,36 @@ public final class HeadsetMonitor {
     }
 
     public void open() {
-        if (opened) return;
         opened = true;
         if (adapter == null || !permitted()) return;
+        if (receiverRegistered && profileRequested) return;
         IntentFilter filter = new IntentFilter(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        try {
-            // Bluetooth runs under its own privileged UID. These are protected system actions.
-            ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED);
-            receiverRegistered = true;
-        } catch (RuntimeException ignored) {
-            // Existing in-call snapshot checks remain available if registration fails.
+        if (!receiverRegistered) {
+            try {
+                // Bluetooth runs under its own privileged UID. These are protected system actions.
+                ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED);
+                receiverRegistered = true;
+            } catch (RuntimeException ignored) {
+                // Existing in-call snapshot checks remain available if registration fails.
+            }
         }
-        try {
-            adapter.getProfileProxy(context, listener, BluetoothProfile.HEADSET);
-        } catch (RuntimeException ignored) {
-            // Without the proxy the SCO state is reported as unknown.
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (!profileRequested && now >= nextProfileRequestAt) {
+            nextProfileRequestAt = now + 5_000L;
+            try {
+                profileRequested = adapter.getProfileProxy(context, listener, BluetoothProfile.HEADSET);
+            } catch (RuntimeException ignored) {
+                // Without the proxy the SCO state is reported as unknown.
+            }
         }
     }
 
     public void close() {
         opened = false;
+        profileRequested = false;
+        nextProfileRequestAt = 0L;
         if (receiverRegistered) {
             receiverRegistered = false;
             try { context.unregisterReceiver(receiver); } catch (RuntimeException ignored) {}

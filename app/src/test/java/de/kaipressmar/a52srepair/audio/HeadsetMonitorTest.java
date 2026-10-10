@@ -48,4 +48,20 @@ public class HeadsetMonitorTest {
         assertEquals(false, monitor.hfpConnected());
         monitor.close();
     }
+
+    @Test public void permissionGrantedDuringCallCanStartObservation() {
+        Application app = ApplicationProvider.getApplicationContext();
+        shadowOf(app).denyPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        AtomicInteger events = new AtomicInteger();
+        HeadsetMonitor monitor = new HeadsetMonitor(app, events::incrementAndGet);
+        monitor.open();
+        shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        monitor.open();
+        shadowOf(Looper.getMainLooper()).idle();
+        int before = events.get();
+        app.sendBroadcast(new Intent(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED));
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(events.get() > before);
+        monitor.close();
+    }
 }

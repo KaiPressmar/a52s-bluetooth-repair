@@ -17,7 +17,7 @@
     <string name="status_paused_title">Protection paused</string>
     <string name="status_paused_body">Automatic repair is turned off in the settings. Calls are only recorded.</string>
     <string name="status_reboot_title">Restart recommended</string>
-    <string name="status_reboot_body">During the last call, Bluetooth calling was blocked inside the system. No app can fix that – restarting the phone restores it.</string>
+    <string name="status_reboot_body">Android offered no Bluetooth call route during the last call. Reconnect the car or headset first. If the route stays unavailable, restarting the phone may help.</string>
     <string name="status_last_active">Last active: %1$s</string>
     <string name="status_never_active">No call since setup yet</string>
 
@@ -151,4 +151,31 @@
 
     <string name="share_chooser">Share diagnostic report</string>
     <string name="share_subject">Bluetooth Call Repair – diagnostic report</string>
+    <string name="manual_title">Manual help</string>
+    <string name="manual_body">During a call, check the current audio state or reconnect Bluetooth if you cannot hear the other person. Reconnecting briefly routes the call through the phone.</string>
+    <string name="manual_check">Check now</string>
+    <string name="manual_repair">Reconnect Bluetooth audio</string>
+    <string name="manual_ready">Checking does not change the audio route. Use these controls when stationary.</string>
+    <string name="manual_need_bluetooth">Bluetooth access is missing. Complete the Bluetooth setup below.</string>
+    <string name="manual_need_calls">Call access is missing. Complete the call access setup below.</string>
+    <string name="manual_bluetooth_off">Bluetooth is switched off. Turn it on in Android settings.</string>
+    <string name="manual_no_call">Android has not provided a call to this app. If a call is in progress, check call access. The app cannot force Android to bind the call service.</string>
+    <string name="manual_not_active">The call is ringing, held or ending. Audio repair requires an active conversation.</string>
+    <string name="manual_multiple_calls">Multiple calls are present. Finish or merge them before repairing audio.</string>
+    <string name="manual_unavailable">Android offers no Bluetooth call endpoint. Reconnect the car or headset in Bluetooth settings and check again. A route repair cannot create a missing endpoint.</string>
+    <string name="manual_unknown_route">Android has not reported the call audio route yet. Wait briefly and check again.</string>
+    <string name="manual_alternative_route">The call uses speaker, wired audio or an external device. Select phone or Bluetooth in the call app before reconnecting Bluetooth here.</string>
+    <string name="manual_busy">An audio repair is already running. Wait a few seconds and check again.</string>
+    <string name="manual_cooldown">Wait at least 15 seconds between manual repair attempts.</string>
+    <string name="manual_exhausted">Both manual attempts for this call have been used. Check Bluetooth settings or reconnect the device before another call.</string>
+    <string name="manual_command_failed">Android rejected the audio request. Check call access and select the intended Bluetooth device in the call app. The failure is logged.</string>
+    <string name="manual_started">A Bluetooth reconnect attempt has started. Check again in a few seconds and confirm that you can hear the other person.</string>
+    <string name="manual_fault">Current indication: %1$s. You can attempt a Bluetooth reconnect.</string>
+    <string name="manual_no_fault">Android reports no audio fault. This cannot prove audible speech. If the call is silent, you can still attempt a manual Bluetooth reconnect.</string>
+    <string name="manual_unverified">The manual reconnect has not been verified. Android signals alone cannot confirm that speech is audible.</string>
+    <string name="fault_user_reported">Audio problem reported manually</string>
+    <string name="history_manual">Manual attempts: %1$d</string>
+    <string name="outcome_manual_verified">Bluetooth verified after manual repair</string>
+    <string name="manual_ambiguous_device">Multiple Bluetooth call devices are available. Select the intended device in the call app first; this app will not guess.</string>
+    <string name="manual_microphone_muted">The microphone is muted. If this was unintentional, unmute it in the call app. This app preserves microphone mute.</string>
 </resources>

@@ -14,6 +14,7 @@ import androidx.preference.PreferenceManager;
 import androidx.test.core.app.ApplicationProvider;
 import de.kaipressmar.a52srepair.core.report.CallOutcome;
 import de.kaipressmar.a52srepair.core.report.CallReport;
+import de.kaipressmar.a52srepair.core.repair.ManualRepairStatus;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
 import java.time.Duration;
@@ -171,5 +172,106 @@ public class CallSessionTest {
         telecom.session.finish();
         telecom.session.finish();
         assertEquals(1, new CallReportRepository(context).history().all().size());
+    }
+
+    @Test public void manualCheckIsReadOnlyAndExplicitRepairWorksWhilePaused() {
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+                .putBoolean("protection_enabled", false).commit();
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        advance(100L);
+        assertTrue(telecom.session.inspect().bluetoothRouteAvailable);
+        assertTrue(telecom.requests.isEmpty());
+        assertEquals(ManualRepairStatus.STARTED, telecom.session.repairManually());
+        advance(10_000L);
+        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE, CallAudioState.ROUTE_BLUETOOTH), telecom.requests);
+        assertEquals(1, telecom.session.report().manualRepairs);
+        assertEquals(0, telecom.session.report().routeAttempts);
+        assertEquals(CallOutcome.UNRESOLVED, telecom.session.report().outcome); // Unknown SCO/voice != proof.
+        telecom.session.finish();
+        assertEquals(1, new CallReportRepository(context).history().latestBluetoothCall().manualRepairs);
+        int before = telecom.requests.size();
+        assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, telecom.session.repairManually());
+        assertEquals(null, telecom.session.inspect());
+        advance(60_000L);
+        assertEquals(before, telecom.requests.size());
+    }
+
+    @Test public void manualCommandExceptionIsReportedAndObservationContinues() {
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", false).commit();
+        FakeTelecom telecom = new FakeTelecom() {
+            @Override public void requestRoute(int route) {
+                requests.add(route);
+                throw new SecurityException("routing denied");
+            }
+        };
+        telecom.session = new CallSession(context, telecom);
+        telecom.session.start();
+        assertEquals(ManualRepairStatus.COMMAND_FAILED, telecom.session.repairManually());
+        advance(20_000L);
+        assertEquals(1, telecom.requests.size());
+        assertEquals(CallOutcome.UNRESOLVED, telecom.session.report().outcome);
+        telecom.session.finish();
+    }
+
+    @Test public void ambiguousBluetoothTargetIsRejectedBeforeTeardown() {
+        FakeTelecom telecom = new FakeTelecom() {
+            @Override public boolean bluetoothTargetAmbiguous() { return true; }
+        };
+        telecom.session = new CallSession(context, telecom);
+        assertEquals(ManualRepairStatus.AMBIGUOUS_DEVICE, telecom.session.repairManually());
+        assertTrue(telecom.requests.isEmpty());
+        assertEquals(0, telecom.session.report().manualRepairs);
+        telecom.session.finish();
+    }
+
+    @Test public void inspectionSeparatesMicrophoneMuteFromPlaybackMute() {
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.audio = new CallAudioState(true, CallAudioState.ROUTE_BLUETOOTH, ALL_ROUTES);
+        telecom.session = new CallSession(context, telecom);
+        assertTrue(telecom.session.inspect().microphoneMuted);
+        assertFalse(telecom.session.inspect().voiceMuted);
+        assertTrue(telecom.requests.isEmpty());
+        telecom.session.finish();
+    }
+
+    @Test public void statusButtonsInspectAndRepairTheBoundCall() throws Exception {
+        android.app.Application app = ApplicationProvider.getApplicationContext();
+        shadowOf(app).grantPermissions(android.Manifest.permission.BLUETOOTH_CONNECT);
+        shadowOf(app.getSystemService(android.bluetooth.BluetoothManager.class).getAdapter()).setEnabled(true);
+        android.app.AppOpsManager ops = app.getSystemService(android.app.AppOpsManager.class);
+        shadowOf(ops).setMode("android:manage_ongoing_calls", android.os.Process.myUid(), app.getPackageName(),
+                android.app.AppOpsManager.MODE_ALLOWED);
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", false).commit();
+        FakeTelecom telecom = new FakeTelecom();
+        telecom.session = new CallSession(context, telecom);
+        org.robolectric.android.controller.ServiceController<CallAudioService> controller =
+                org.robolectric.Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service = controller.get();
+        java.lang.reflect.Field session = CallAudioService.class.getDeclaredField("session");
+        session.setAccessible(true);
+        session.set(service, telecom.session);
+        java.lang.reflect.Field active = CallAudioService.class.getDeclaredField("activeService");
+        active.setAccessible(true);
+        active.set(null, new java.lang.ref.WeakReference<>(service));
+        telecom.session.start();
+        try (androidx.test.core.app.ActivityScenario<de.kaipressmar.a52srepair.ui.MainActivity> scenario =
+                androidx.test.core.app.ActivityScenario.launch(de.kaipressmar.a52srepair.ui.MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_check).performClick();
+                assertTrue(telecom.requests.isEmpty());
+                activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_repair).performClick();
+                assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
+                android.widget.TextView message = activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_result);
+                assertEquals(activity.getString(de.kaipressmar.a52srepair.R.string.manual_started), message.getText().toString());
+            });
+            advance(10_000L);
+            assertEquals(2, telecom.requests.size());
+        } finally {
+            controller.destroy();
+        }
+        assertEquals(null, CallAudioService.checkNow());
+        assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, CallAudioService.repairNow());
     }
 }

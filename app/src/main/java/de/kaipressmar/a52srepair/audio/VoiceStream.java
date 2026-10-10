@@ -16,25 +16,42 @@ public final class VoiceStream {
 
     /** Predicted Bluetooth routing for voice attributes; not proof of audible speech. */
     public Boolean playsOnBluetooth() {
-        if (audio == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null;
+        return evidence().onBluetooth;
+    }
+
+    public static final class Evidence {
+        public final Boolean onBluetooth;
+        public final boolean requiresSco;
+        Evidence(Boolean onBluetooth, boolean requiresSco) {
+            this.onBluetooth = onBluetooth;
+            this.requiresSco = requiresSco;
+        }
+    }
+
+    public Evidence evidence() {
+        if (audio == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return new Evidence(null, true);
         try {
             AudioAttributes voice =
                     new AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                             .build();
             List<AudioDeviceInfo> devices = audio.getAudioDevicesForAttributes(voice);
-            if (devices == null || devices.isEmpty()) return null;
-            for (AudioDeviceInfo device : devices) {
-                int type = device.getType();
-                if (type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-                        || type == AudioDeviceInfo.TYPE_BLE_HEADSET) {
-                    return Boolean.TRUE;
-                }
-            }
-            return Boolean.FALSE;
+            if (devices == null) return new Evidence(null, true);
+            return evidenceForTypes(devices.stream().mapToInt(AudioDeviceInfo::getType).toArray());
         } catch (RuntimeException e) {
-            return null;
+            return new Evidence(null, true);
         }
+    }
+
+    static Evidence evidenceForTypes(int... types) {
+        if (types.length == 0) return new Evidence(null, true);
+        boolean sco = false, ble = false;
+        for (int type : types) {
+            sco |= type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+            ble |= type == AudioDeviceInfo.TYPE_BLE_HEADSET;
+        }
+        // LE Audio does not establish a classic HFP SCO link. Do not diagnose it as disconnected.
+        return new Evidence(sco || ble, sco || !ble);
     }
 
     public int volume() {

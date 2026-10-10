@@ -23,6 +23,13 @@ import de.kaipressmar.a52srepair.ui.common.CallReportViewBinder;
 import de.kaipressmar.a52srepair.ui.common.Formatting;
 import de.kaipressmar.a52srepair.ui.common.SetupActions;
 import de.kaipressmar.a52srepair.update.UpdateRelease;
+import de.kaipressmar.a52srepair.telecom.CallAudioService;
+import de.kaipressmar.a52srepair.core.model.CallAudioSnapshot;
+import de.kaipressmar.a52srepair.core.model.AudioRoute;
+import de.kaipressmar.a52srepair.core.diagnosis.Fault;
+import de.kaipressmar.a52srepair.core.diagnosis.FaultClassifier;
+import de.kaipressmar.a52srepair.core.repair.ManualRepairStatus;
+import de.kaipressmar.a52srepair.ui.common.OutcomeStyle;
 
 /** Home screen: protection state, one-time setup, 30-day summary and the last call. */
 public final class StatusFragment extends Fragment implements MainActivity.Refreshable {
@@ -39,6 +46,15 @@ public final class StatusFragment extends Fragment implements MainActivity.Refre
         binding.statRepaired.statLabel.setText(R.string.stats_repaired);
         binding.statProblems.statLabel.setText(R.string.stats_problems);
         binding.updateInstall.setOnClickListener(v -> actions().installUpdate());
+        binding.manualCheck.setOnClickListener(v -> checkManually());
+        binding.manualRepair.setOnClickListener(v -> {
+            if (!ProtectionStatus.hasBluetoothPermission(requireContext())
+                    || !ProtectionStatus.hasCallAccess(requireContext())) {
+                checkManually();
+                return;
+            }
+            binding.manualResult.setText(manualMessage(CallAudioService.repairNow()));
+        });
         return binding.getRoot();
     }
 
@@ -172,5 +188,54 @@ public final class StatusFragment extends Fragment implements MainActivity.Refre
 
     private SetupActions actions() {
         return (SetupActions) requireActivity();
+    }
+
+    private void checkManually() {
+        int message;
+        CallAudioSnapshot state = CallAudioService.checkNow();
+        if (!ProtectionStatus.hasBluetoothPermission(requireContext())) message = R.string.manual_need_bluetooth;
+        else if (!ProtectionStatus.hasCallAccess(requireContext())) message = R.string.manual_need_calls;
+        else if (ProtectionStatus.evaluate(requireContext()) == ProtectionStatus.BLUETOOTH_OFF) message = R.string.manual_bluetooth_off;
+        else if (state == null) message = R.string.manual_no_call;
+        else if (!state.phase.carriesAudio()) message = R.string.manual_not_active;
+        else if (state.callCount > 1) message = R.string.manual_multiple_calls;
+        else if (!state.bluetoothRouteAvailable) message = R.string.manual_unavailable;
+        else if (state.route == AudioRoute.UNKNOWN) message = R.string.manual_unknown_route;
+        else if (state.route == AudioRoute.SPEAKER || state.route == AudioRoute.WIRED_HEADSET
+                || state.route == AudioRoute.STREAMING) message = R.string.manual_alternative_route;
+        else {
+            Fault fault = FaultClassifier.classify(state);
+            if (fault != Fault.NONE) {
+                binding.manualResult.setText(getString(R.string.manual_fault,
+                        getString(OutcomeStyle.faultLabel(fault)))
+                        + (state.microphoneMuted ? "\n" + getString(R.string.manual_microphone_muted) : ""));
+                return;
+            }
+            if (state.microphoneMuted) {
+                binding.manualResult.setText(R.string.manual_microphone_muted);
+                return;
+            }
+            CallReport report = CallAudioService.activeReport();
+            message = report != null && report.manualRepairs > 0 && report.outcome == CallOutcome.UNRESOLVED
+                    ? R.string.manual_unverified : R.string.manual_no_fault;
+        }
+        binding.manualResult.setText(message);
+    }
+
+    private static int manualMessage(ManualRepairStatus status) {
+        switch (status) {
+            case STARTED: return R.string.manual_started;
+            case BLUETOOTH_UNAVAILABLE: return R.string.manual_unavailable;
+            case ROUTE_UNKNOWN: return R.string.manual_unknown_route;
+            case MULTIPLE_CALLS: return R.string.manual_multiple_calls;
+            case ALTERNATIVE_ROUTE: return R.string.manual_alternative_route;
+            case BUSY: return R.string.manual_busy;
+            case COOLDOWN: return R.string.manual_cooldown;
+            case BUDGET_EXHAUSTED: return R.string.manual_exhausted;
+            case COMMAND_FAILED: return R.string.manual_command_failed;
+            case AMBIGUOUS_DEVICE: return R.string.manual_ambiguous_device;
+            case NO_ACTIVE_CALL:
+            default: return R.string.manual_no_call;
+        }
     }
 }

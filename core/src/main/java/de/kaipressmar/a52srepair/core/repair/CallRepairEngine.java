@@ -53,6 +53,17 @@ public final class CallRepairEngine {
     public static final long IDLE_TICK_MS = 15_000L;
     public static final int MAX_ROUTE_ATTEMPTS = 3;
     public static final int MAX_VOLUME_RESTORES = 2;
+    public static final int MAX_MANUAL_REPAIRS = 2;
+    public static final long MANUAL_COOLDOWN_MS = 15_000L;
+
+    public static final class ManualRepair {
+        public final ManualRepairStatus status;
+        public final Step step;
+        ManualRepair(ManualRepairStatus status, Step step) {
+            this.status = status;
+            this.step = step;
+        }
+    }
 
     /** Result of one evaluation: commands to run now and when to evaluate again. */
     public static final class Step {
@@ -102,14 +113,20 @@ public final class CallRepairEngine {
 
     private Fault currentFault = Fault.NONE;
     private long faultSince;
+    private long lastConnectionFaultAt = Long.MIN_VALUE / 2;
     private Fault lastConfirmedFault = Fault.NONE;
     private final Set<Fault> confirmedFaults = EnumSet.noneOf(Fault.class);
 
     private int routeAttempts;
     private int volumeRestores;
     private boolean preventiveDone;
+    private boolean preventiveSuppressed;
     private boolean ended;
     private long endedAt;
+    private int manualRepairs;
+    private long lastManualAt = Long.MIN_VALUE / 2;
+    private boolean manualAwaitingReturn;
+    private long retryAfter;
 
     public CallRepairEngine(
             boolean repairEnabled,
@@ -120,6 +137,57 @@ public final class CallRepairEngine {
         this.preventiveMode = preventiveMode == null ? PreventiveRebuildMode.OFF : preventiveMode;
         this.riskElevated = riskElevated;
         this.startedAt = startedAt;
+    }
+
+    /** Separate explicit-user budget; never resets automatic repair or volume limits. */
+    public ManualRepair requestManualRepair(CallAudioSnapshot s, long now) {
+        ManualRepairStatus denied = null;
+        if (ended || !s.phase.carriesAudio() || s.callCount == 0) denied = ManualRepairStatus.NO_ACTIVE_CALL;
+        else if (s.callCount > 1) denied = ManualRepairStatus.MULTIPLE_CALLS;
+        else if (!s.bluetoothRouteAvailable) denied = ManualRepairStatus.BLUETOOTH_UNAVAILABLE;
+        else if (s.route == AudioRoute.UNKNOWN) denied = ManualRepairStatus.ROUTE_UNKNOWN;
+        else if (s.route == AudioRoute.SPEAKER || s.route == AudioRoute.WIRED_HEADSET
+                || s.route == AudioRoute.STREAMING) denied = ManualRepairStatus.ALTERNATIVE_ROUTE;
+        else if (operation != Operation.NONE) denied = ManualRepairStatus.BUSY;
+        else if (manualRepairs >= MAX_MANUAL_REPAIRS) denied = ManualRepairStatus.BUDGET_EXHAUSTED;
+        else if (now - lastManualAt < MANUAL_COOLDOWN_MS) denied = ManualRepairStatus.COOLDOWN;
+        if (denied != null) return new ManualRepair(denied, step(FAST_TICK_MS, "manual repair refused: " + denied));
+
+        manualRepairs++;
+        lastManualAt = now;
+        bluetoothEverAvailable = true;
+        userLeftBluetooth = false;
+        lastRoute = s.route;
+        usableBluetoothSince = -1L;
+        lastBluetoothUsable = false;
+        healthySince = -1L;
+        manualAwaitingReturn = true;
+        preventiveSuppressed = true; // Explicit rebuild replaces a pending preventive experiment.
+        confirmedFaults.add(Fault.USER_REPORTED_AUDIO_PROBLEM);
+        lastConfirmedFault = Fault.USER_REPORTED_AUDIO_PROBLEM;
+        Step rebuild = startRebuild(s, now, false, "manual Bluetooth audio rebuild");
+        if (s.voiceSilenced() && volumeRestores < MAX_VOLUME_RESTORES) {
+            volumeRestores++;
+            confirmedFaults.add(Fault.VOICE_SILENCED);
+            List<RepairCommand> commands = new ArrayList<>(rebuild.commands);
+            commands.add(RepairCommand.RESTORE_VOICE_VOLUME);
+            rebuild = new Step(commands, rebuild.nextCheckInMs, rebuild.note + "; restore voice volume");
+        }
+        return new ManualRepair(ManualRepairStatus.STARTED, rebuild);
+    }
+
+    /** Called for synchronous exceptions or a current Telecom endpoint error callback. */
+    public void onRouteRequestFailed(long now) {
+        if (ended) return;
+        // A late native rejection must not leave an explicit attempt reported as successful.
+        if (manualRepairs > 0 && lastConfirmedFault == Fault.NONE) {
+            manualAwaitingReturn = true;
+            lastConfirmedFault = Fault.USER_REPORTED_AUDIO_PROBLEM;
+        }
+        if (!routeOperationActive()) return;
+        if (operation == Operation.ROUTE_REQUEST) directRouteFailed = true;
+        endOperation();
+        retryAfter = now + SLOW_TICK_MS;
     }
 
     public Step onSnapshot(CallAudioSnapshot s, long now) {
@@ -138,6 +206,7 @@ public final class CallRepairEngine {
                 && (Boolean.TRUE.equals(s.scoAudioConnected) || Boolean.TRUE.equals(s.voiceOnBluetooth));
         if (healthyEvidence) {
             if (healthySince < 0L) healthySince = now;
+            if (now - healthySince >= VERIFY_MS) lastConnectionFaultAt = Long.MIN_VALUE / 2;
         } else {
             healthySince = -1L;
         }
@@ -158,9 +227,15 @@ public final class CallRepairEngine {
         if (fault != currentFault) {
             // A failed selection changes the visible symptom (phone <-> Bluetooth/SCO),
             // not the underlying outage. Repeated taps must not postpone repair indefinitely.
-            if (!connectionFault(fault) || !connectionFault(currentFault)) faultSince = now;
+            boolean shortGap = fault == Fault.NONE && connectionFault(currentFault)
+                    && s.phase.carriesAudio() && s.bluetoothRouteAvailable && s.callCount == 1;
+            boolean recurring = connectionFault(fault) && currentFault == Fault.NONE
+                    && now - lastConnectionFaultAt < VERIFY_MS;
+            if (!shortGap && !recurring
+                    && (!connectionFault(fault) || !connectionFault(currentFault))) faultSince = now;
             currentFault = fault;
         }
+        if (connectionFault(fault)) lastConnectionFaultAt = now;
 
         if (userLeftBluetooth) {
             return step(IDLE_TICK_MS, "user left Bluetooth – hands off");
@@ -168,6 +243,7 @@ public final class CallRepairEngine {
 
         if (fault == Fault.NONE) {
             if (lastConfirmedFault != Fault.NONE) {
+                if (manualAwaitingReturn) return step(FAST_TICK_MS, "manual rebuild not verified: no completed return");
                 if (healthySince < 0L) return step(FAST_TICK_MS, "recovery not verified: Bluetooth audio evidence missing");
                 long steady = now - healthySince;
                 if (steady < VERIFY_MS) return step(VERIFY_MS - steady, "confirming stable Bluetooth recovery");
@@ -191,6 +267,7 @@ public final class CallRepairEngine {
 
         if (!fault.repairable) return step(SLOW_TICK_MS, fault + " not repairable");
         if (!repairEnabled) return step(SLOW_TICK_MS, fault + " observed (repair disabled)");
+        if (now < retryAfter) return step(retryAfter - now, "waiting after failed route command");
 
         switch (fault) {
             case VOICE_SILENCED:
@@ -224,7 +301,8 @@ public final class CallRepairEngine {
                 routeAttempts,
                 volumeRestores,
                 preventiveDone,
-                userLeftBluetooth);
+                userLeftBluetooth,
+                manualRepairs);
     }
 
     public boolean isEnded() {
@@ -319,14 +397,21 @@ public final class CallRepairEngine {
         long age = now - operationSince;
         switch (operation) {
             case REBUILD_LEAVING:
-                if (s.route != AudioRoute.BLUETOOTH || age >= LEAVE_TIMEOUT_MS) {
+                if (s.route != AudioRoute.BLUETOOTH && s.route != AudioRoute.UNKNOWN) {
                     begin(Operation.REBUILD_RETURNING, now, operationPreventive);
                     return step(500L, "return to Bluetooth", RepairCommand.ROUTE_TO_BLUETOOTH);
+                }
+                if (age >= LEAVE_TIMEOUT_MS) {
+                    endOperation();
+                    retryAfter = now + SLOW_TICK_MS;
+                    return step(SLOW_TICK_MS, "Bluetooth teardown failed; no blind return request");
                 }
                 return step(250L, "waiting for Bluetooth teardown");
             case REBUILD_RETURNING:
                 if (s.route == AudioRoute.BLUETOOTH
                         && !Boolean.FALSE.equals(s.scoAudioConnected)) {
+                    if (manualAwaitingReturn) healthySince = now;
+                    manualAwaitingReturn = false;
                     begin(Operation.VERIFYING_ROUTE, now, operationPreventive);
                     return step(VERIFY_MS, "Bluetooth back, verifying");
                 }
@@ -399,6 +484,7 @@ public final class CallRepairEngine {
         if (!repairEnabled
                 || !wanted
                 || preventiveDone
+                || preventiveSuppressed
                 || s.callCount > 1
                 || s.route != AudioRoute.BLUETOOTH
                 || !s.phase.carriesAudio()

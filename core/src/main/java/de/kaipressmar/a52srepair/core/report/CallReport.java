@@ -17,6 +17,7 @@ public final class CallReport {
     public final int volumeRestores;
     public final boolean preventiveRebuild;
     public final boolean userLeftBluetooth;
+    public final int manualRepairs;
 
     public CallReport(
             long startedAt,
@@ -27,6 +28,13 @@ public final class CallReport {
             int volumeRestores,
             boolean preventiveRebuild,
             boolean userLeftBluetooth) {
+        this(startedAt, durationMs, outcome, faults, routeAttempts, volumeRestores,
+                preventiveRebuild, userLeftBluetooth, 0);
+    }
+
+    public CallReport(long startedAt, long durationMs, CallOutcome outcome, Set<Fault> faults,
+            int routeAttempts, int volumeRestores, boolean preventiveRebuild,
+            boolean userLeftBluetooth, int manualRepairs) {
         this.startedAt = startedAt;
         this.durationMs = durationMs;
         this.outcome = outcome;
@@ -36,6 +44,7 @@ public final class CallReport {
         this.volumeRestores = volumeRestores;
         this.preventiveRebuild = preventiveRebuild;
         this.userLeftBluetooth = userLeftBluetooth;
+        this.manualRepairs = manualRepairs;
     }
 
     public boolean usedBluetooth() {
@@ -59,7 +68,8 @@ public final class CallReport {
                 Integer.toString(routeAttempts),
                 Integer.toString(volumeRestores),
                 preventiveRebuild ? "1" : "0",
-                userLeftBluetooth ? "1" : "0");
+                userLeftBluetooth ? "1" : "0",
+                Integer.toString(manualRepairs));
     }
 
     /** Returns {@code null} for malformed or unknown lines instead of throwing. */
@@ -86,7 +96,8 @@ public final class CallReport {
                     Integer.parseInt(p[5]),
                     Integer.parseInt(p[6]),
                     "1".equals(p[7]),
-                    "1".equals(p[8]));
+                    "1".equals(p[8]),
+                    p.length > 9 ? Integer.parseInt(p[9]) : 0);
         } catch (RuntimeException e) {
             return null;
         }
@@ -96,13 +107,14 @@ public final class CallReport {
     public String toString() {
         return String.format(
                 Locale.ROOT,
-                "outcome=%s faults=%s durationMs=%d routeAttempts=%d volumeRestores=%d preventive=%s userLeftBt=%s",
+                "outcome=%s faults=%s durationMs=%d routeAttempts=%d volumeRestores=%d preventive=%s userLeftBt=%s manualRepairs=%d",
                 outcome,
                 faults,
                 durationMs,
                 routeAttempts,
                 volumeRestores,
                 preventiveRebuild,
-                userLeftBluetooth);
+                userLeftBluetooth,
+                manualRepairs);
     }
 }

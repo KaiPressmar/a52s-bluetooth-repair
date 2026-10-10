@@ -20,7 +20,7 @@ During a cellular call the mode owner is the telephony stack, so a third-party a
 
 ## The Telecom path
 
-The component that actually owns call audio routing is Telecom (`CallAudioRouteStateMachine`). Its public control surface is `InCallService.setAudioRoute()`, the same call the dialer makes when you tap the audio button. Switching car → phone → car makes Telecom disconnect and reconnect the HFP SCO link (`BluetoothHeadset.disconnectAudio()/connectAudio()`). This is a real rebuild, not a bookkeeping change.
+The component that actually owns call audio routing is Telecom (`CallAudioRouteStateMachine`). The app uses API 34+ `requestCallEndpointChange()` with actual available endpoints and result callbacks; it retains legacy `setAudioRoute()` on older devices or when no modern availability was supplied. Switching car → phone → car makes Telecom disconnect and reconnect the HFP SCO link (`BluetoothHeadset.disconnectAudio()/connectAudio()`). The app must observe departure and return; a command alone does not prove the link was rebuilt.
 
 Telecom binds a **non-UI InCallService** from any package when the app holds the `MANAGE_ONGOING_CALLS` app-op (`InCallController.getInCallServiceType()`, android14-release). That permission is `signature|appop`, and the app-op can be granted in two ways:
 
@@ -61,8 +61,8 @@ CallSession.tick():  snapshot (Telecom route + HFP/SCO + voice route/volume)
         ▼
 CallRepairEngine.onSnapshot(snapshot, elapsed) ──► Step{commands, nextCheckInMs}
         │
-        ├─ ROUTE_TO_EARPIECE   → setAudioRoute(ROUTE_WIRED_OR_EARPIECE)
-        ├─ ROUTE_TO_BLUETOOTH  → setAudioRoute(ROUTE_BLUETOOTH)
+        ├─ ROUTE_TO_EARPIECE   → available earpiece endpoint / legacy route
+        ├─ ROUTE_TO_BLUETOOTH  → available Bluetooth endpoint / legacy route
         └─ RESTORE_VOICE_VOLUME→ unmute + 60 % STREAM_VOICE_CALL
         ▼
 last call removed ──► CallReport persisted, Telecom unbinds, process idle
@@ -78,13 +78,17 @@ Ticks are 1 s during the first 30 s of a call and 5–15 s afterwards. Every Tel
 | Call on the phone although the car is a usable route (≥ 3 s) | `ROUTE_TO_BLUETOOTH` |
 | SCO link down, or voice played off Bluetooth (≥ 2 s) | Rebuild |
 | Voice stream muted / 0 (≥ 1.5 s) | Restore volume |
-| HFP connected, but Telecom offers no Bluetooth route | Report only. A reboot is needed, and the status screen says so. |
+| HFP connected, but Telecom offers no Bluetooth route | Report unavailable. Check/reconnect the device; a restart may help a wedged stack. |
 | Speaker or wired headset | Never touched, also when chosen in the middle of a rebuild |
-| Call left Bluetooth without our command (user or car chose the phone) | Hands off for the rest of the call; outcome `LEFT_BLUETOOTH` |
+| Call left Bluetooth without our command (user or car chose the phone) | Hands off after established audio until a new Bluetooth selection or an accepted explicit manual request |
 | Call drops to the phone within 8 s after one of our route changes (the rebuilt SCO link collapsed; Telecom falls back to the earpiece) | Treated as a failed repair and routed back to the car once; a second drop is respected as a user choice |
-| Conference / waiting call | No preventive rebuild |
+| Conference / waiting call | Defer route repair, including explicit manual requests |
 
-Budget: three route operations and two volume restores per call, and every operation is verified. "Automatic repair" off means observe-only: faults are still classified and reported.
+Budget: three automatic route attempts, at most one preventive experiment and two volume restores per call. Explicit manual requests have a separate limit of two with a 15 s cooldown and retain the automatic budgets. Every operation is verified. "Automatic repair" off means observe-only unless the user explicitly requests a manual reconnect. The read-only manual check never executes an engine command.
+
+On API 34+, routing selects the last known Bluetooth endpoint if still available, otherwise a single unambiguous candidate. Native rejection ends the current operation and backs off. Superseded outcomes and outcomes from an ended session are ignored. Successful acknowledgements trigger observation, not an assumed repair.
+
+Manual controls and source-backed alternatives: [RECOVERY_OPTIONS.md](RECOVERY_OPTIONS.md).
 
 ## Settings
 
