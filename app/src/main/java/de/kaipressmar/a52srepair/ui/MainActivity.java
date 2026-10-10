@@ -37,11 +37,17 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
     private CarLinkManager carLink;
     private UpdateRelease availableUpdate;
     private de.kaipressmar.a52srepair.audio.IdleRepairController idleRepair;
+    private boolean pendingIdlePermissionStart;
     private final ActivityResultLauncher<String> phoneStatusPermission = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(), granted -> {
-                if (granted && idleRepair != null && canUpdateUi()) startIdleRepair();
-                else refreshStatus();
-            });
+            new ActivityResultContracts.RequestPermission(), this::onPhoneStatusResult);
+
+    void onPhoneStatusResult(boolean granted) {
+        pendingIdlePermissionStart = granted && idleRepair != null && canUpdateUi();
+        if (pendingIdlePermissionStart && getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            pendingIdlePermissionStart = false;
+            startIdleRepair();
+        } else refreshStatus();
+    }
 
     private final ActivityResultLauncher<String> bluetoothPermission =
             registerForActivityResult(
@@ -89,6 +95,7 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
     @Override protected void onResume() {
         super.onResume();
         if (idleRepair != null) idleRepair.resume();
+        if (pendingIdlePermissionStart) { pendingIdlePermissionStart = false; startIdleRepair(); }
     }
     @Override protected void onPause() {
         if (idleRepair != null) idleRepair.pause();

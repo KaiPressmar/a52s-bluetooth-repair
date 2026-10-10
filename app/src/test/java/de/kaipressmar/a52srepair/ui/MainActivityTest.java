@@ -58,6 +58,19 @@ public class MainActivityTest {
         }
     }
 
+    @Test public void grantingPhoneStatusWhilePausedDefersTheManualTestUntilResume() {
+        Context context=ApplicationProvider.getApplicationContext();
+        org.robolectric.Shadows.shadowOf((android.app.Application)context).grantPermissions(
+                android.Manifest.permission.BLUETOOTH_CONNECT,android.Manifest.permission.READ_PHONE_STATE);
+        org.robolectric.Shadows.shadowOf(context.getSystemService(android.telecom.TelecomManager.class)).setIsInCall(false);
+        org.robolectric.android.controller.ActivityController<MainActivity> controller=
+                org.robolectric.Robolectric.buildActivity(MainActivity.class).setup();
+        controller.pause();controller.get().onPhoneStatusResult(true);
+        assertEquals("NOT_RUN",new AppSettings(context).idleResult());
+        controller.resume();assertEquals("RUNNING",new AppSettings(context).idleResult());
+        controller.pause().stop().destroy();assertEquals("CANCELLED",new AppSettings(context).idleResult());
+    }
+
     @Test public void navigationSurvivesActivityRecreation() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> ((com.google.android.material.bottomnavigation.BottomNavigationView)
