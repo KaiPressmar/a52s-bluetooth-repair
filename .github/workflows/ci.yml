@@ -37,8 +37,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      - name: Unit tests (core domain + Android 14 and 16 runtime)
-        run: ./gradlew :core:test :app:testDebugUnitTest --stacktrace
+      - name: Unit tests and combined coverage (core + Android runtime)
+        run: ./gradlew coverageReport --stacktrace
+
+      - name: Summarize test coverage
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_coverage_*.py'
+          python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --verify --markdown build/reports/jacoco/coverageReport/summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Android lint
         run: ./gradlew :app:lintDebug --stacktrace
@@ -56,6 +61,9 @@ jobs:
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.html
             app/build/screenshots/
+            core/build/test-results/test/
+            app/build/test-results/testDebugUnitTest/
+            build/reports/jacoco/coverageReport/
           if-no-files-found: ignore
           retention-days: 14
 

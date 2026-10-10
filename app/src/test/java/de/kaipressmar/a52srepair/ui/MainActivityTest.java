@@ -19,6 +19,30 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class MainActivityTest {
+    @Test public void navigationSurvivesActivityRecreation() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> ((com.google.android.material.bottomnavigation.BottomNavigationView)
+                    activity.findViewById(R.id.bottom_nav)).setSelectedItemId(R.id.nav_history));
+            scenario.recreate();
+            scenario.onActivity(activity -> assertEquals(R.id.nav_history,
+                    ((com.google.android.material.bottomnavigation.BottomNavigationView)
+                            activity.findViewById(R.id.bottom_nav)).getSelectedItemId()));
+        }
+    }
+
+    @Test public void delayedUpdateCannotNavigateAfterStateWasSavedOrActivityDestroyed() {
+        new AppSettings(ApplicationProvider.getApplicationContext()).setProtectionEnabled(false);
+        org.robolectric.android.controller.ActivityController<MainActivity> controller =
+                org.robolectric.Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        de.kaipressmar.a52srepair.update.UpdateRelease release = new de.kaipressmar.a52srepair.update.UpdateRelease(
+                "9.0.0", "v9.0.0", "app.apk", "", "", "", false);
+        controller.pause().saveInstanceState(new android.os.Bundle()).stop();
+        activity.onCheckedUpdateResult(release, "");
+        controller.destroy();
+        activity.onCheckedUpdateResult(release, "");
+        activity.refreshStatus();
+    }
     @Test public void freshInstallAsksForOneTimeSetup() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {

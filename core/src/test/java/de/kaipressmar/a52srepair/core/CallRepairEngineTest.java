@@ -21,6 +21,39 @@ import org.junit.Test;
 public class CallRepairEngineTest {
     private static final long T0 = 1_000_000L;
 
+    @Test public void pausingLiveProtectionCancelsAutomaticReturnWithoutResettingBudget() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
+        e.onSnapshot(broken, T0);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), e.onSnapshot(broken, T0 + 2_000L).commands);
+        e.updatePolicy(false, PreventiveRebuildMode.OFF);
+        assertTrue(e.onSnapshot(droppedToPhone(), T0 + 2_250L).commands.isEmpty());
+        assertTrue(e.onSnapshot(droppedToPhone(), T0 + 4_000L).commands.isEmpty());
+        assertEquals(1, e.report(T0 + 4_000L).routeAttempts);
+        e.updatePolicy(true, PreventiveRebuildMode.OFF);
+        assertFalse(e.onSnapshot(droppedToPhone(), T0 + 8_000L).commands.isEmpty());
+        assertEquals(2, e.report(T0 + 8_000L).routeAttempts);
+    }
+
+    @Test public void pausedPolicyRetainsAnExplicitManualRebuild() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.ALWAYS, false, T0);
+        e.requestManualRepair(FaultClassifierTest.carCall().build(), T0);
+        e.updatePolicy(false, PreventiveRebuildMode.OFF);
+        e.onSnapshot(droppedToPhone(), T0 + 250L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(droppedToPhone(), T0 + 750L).commands);
+        assertEquals(1, e.report(T0 + 750L).manualRepairs);
+        assertEquals(0, e.report(T0 + 750L).routeAttempts);
+    }
+
+    @Test public void preventiveSettingChangeIsAppliedBeforeAnotherPreventiveAttempt() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.ALWAYS, false, T0);
+        CallAudioSnapshot ok = FaultClassifierTest.carCall().build();
+        e.onSnapshot(ok, T0);
+        e.updatePolicy(true, PreventiveRebuildMode.OFF);
+        assertTrue(e.onSnapshot(ok, T0 + 2_000L).commands.isEmpty());
+        assertFalse(e.report(T0 + 2_000L).preventiveRebuild);
+    }
+
     @Test public void phoneRouteCannotTriggerReturnWhileScoStillConnected() {
         CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
         CallAudioSnapshot ok = FaultClassifierTest.carCall().build();

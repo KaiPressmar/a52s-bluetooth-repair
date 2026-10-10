@@ -1,6 +1,8 @@
 package de.kaipressmar.a52srepair.telecom;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import androidx.preference.PreferenceManager;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -45,6 +47,11 @@ final class CallSession {
     private final VoiceStream voice;
     private final CallReportRepository reports;
     private final CallRepairEngine engine;
+    private final AppSettings settings;
+    private final SharedPreferences preferences;
+    private final SharedPreferences.OnSharedPreferenceChangeListener settingsChanged = (prefs, key) -> {
+        if (AppSettings.KEY_PROTECTION_ENABLED.equals(key) || AppSettings.KEY_PREVENTIVE_MODE.equals(key)) onEvent();
+    };
     private final long startedAtWall;
     private final long startedAtElapsed;
     private String lastLoggedSnapshot = "";
@@ -61,7 +68,8 @@ final class CallSession {
         voice = new VoiceStream(this.context.getSystemService(AudioManager.class));
         reports = new CallReportRepository(this.context);
 
-        AppSettings settings = new AppSettings(this.context);
+        settings = new AppSettings(this.context);
+        preferences = PreferenceManager.getDefaultSharedPreferences(this.context);
         startedAtWall = System.currentTimeMillis();
         startedAtElapsed = SystemClock.elapsedRealtime();
         boolean riskElevated = reports.history().riskElevated(startedAtWall);
@@ -76,6 +84,7 @@ final class CallSession {
     }
 
     void start() {
+        preferences.registerOnSharedPreferenceChangeListener(settingsChanged);
         headset.open();
         schedule(0L);
     }
@@ -106,6 +115,7 @@ final class CallSession {
 
     ManualRepairStatus repairManually() {
         if (finished) return ManualRepairStatus.NO_ACTIVE_CALL;
+        engine.updatePolicy(settings.protectionEnabled(), settings.preventiveMode());
         headset.open();
         CallAudioSnapshot state = snapshot();
         long now = elapsed();
@@ -137,6 +147,7 @@ final class CallSession {
         long now = elapsed();
         engine.onSnapshot(snapshot().toBuilder().phase(CallPhase.ENDED).build(), now);
         finished = true;
+        preferences.unregisterOnSharedPreferenceChangeListener(settingsChanged);
         handler.removeCallbacks(tick);
         headset.close();
 
@@ -152,6 +163,7 @@ final class CallSession {
 
     private void tick(CallAudioSnapshot snapshot) {
         long now = elapsed();
+        engine.updatePolicy(settings.protectionEnabled(), settings.preventiveMode());
         CallRepairEngine.Step step = engine.onSnapshot(snapshot, now);
         applyStep(snapshot, now, step);
     }
@@ -187,6 +199,10 @@ final class CallSession {
     }
 
     private void execute(RepairCommand command) {
+        if (command != RepairCommand.RESTORE_VOICE_VOLUME && host.bluetoothTargetAmbiguous()) {
+            DiagnosticLog.log(context, "CALL route repair deferred: ambiguous Bluetooth endpoint");
+            throw new IllegalStateException("No unambiguous Bluetooth endpoint");
+        }
         switch (command) {
             case ROUTE_TO_BLUETOOTH:
                 host.requestRoute(CallAudioState.ROUTE_BLUETOOTH);

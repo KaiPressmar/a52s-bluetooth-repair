@@ -4,6 +4,16 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.20.2 - app hardening and measured regression coverage
+
+- Protection and prevention settings now take effect during an active call. Pausing protection stops pending automatic routing without resetting retry limits; explicit manual repairs remain available. Automatic rebuilds refuse ambiguous Bluetooth targets before changing the phone route.
+- Stable update selection rejects previews, malformed entries and untrusted assets. Cache expiry handles clock rollback; failed checks retain valid cached updates. Version comparison follows SemVer, including large components and numeric prerelease ordering.
+- Update downloads enforce size limits, close connections and remove partial or unverified files. Installation callbacks and update dialogs respect activity lifecycle; rejected car associations produce feedback instead of crashing.
+- Recent-call risk assessment handles nonchronological timestamps and excludes future reports.
+- Added regression tests for Android 12, 14 and 16 Telecom integration, settings changes, lifecycle, setup, update checks, downloads and installation. Test fixtures prevent unintended network requests.
+- Introduced full-production JaCoCo HTML/XML/CSV reports and enforced line/branch minimums: core 95%/85%, Android app 75%/60%. CI and release candidates run coverage checks, script tests and Android lint. See [coverage guide](docs/COVERAGE.md).
+- JVM coverage verifies behavior and integration, not audible recovery on an A52s. Bluetooth toggling is not treated as a proven repair; only a phone reboot has been demonstrated by the owner.
+
 ## 0.20.1 - wait for SCO teardown before reconnecting call audio
 
 - A Bluetooth rebuild now waits for stable phone routing and 500 ms of observed SCO disconnect before requesting the same endpoint again. Unknown SCO/LE Audio uses a 1.5-second stable phone dwell, explicitly logged as unverified teardown.

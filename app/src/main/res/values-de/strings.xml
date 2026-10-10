@@ -167,4 +167,5 @@
     <string name="outcome_manual_verified">Bluetooth nach manueller Reparatur bestätigt</string>
     <string name="manual_ambiguous_device">Mehrere Bluetooth-Anrufgeräte sind verfügbar. Wähle das gewünschte Gerät zuerst in der Anruf-App; diese App wählt keines auf Verdacht.</string>
     <string name="manual_microphone_muted">Das Mikrofon ist stummgeschaltet. Falls das unbeabsichtigt ist, hebe die Stummschaltung in der Anruf-App auf. Diese App lässt die Mikrofon-Stummschaltung unverändert.</string>
+    <string name="setup_link_rejected">Android konnte die Geräteverknüpfung nicht starten. Prüfe den Bluetooth-Zugriff oder nutze die ADB-Einrichtung.</string>
 </resources>

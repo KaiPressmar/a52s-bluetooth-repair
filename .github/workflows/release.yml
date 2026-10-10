@@ -111,8 +111,23 @@ jobs:
 
       - name: Test release candidate
         run: |
-          ./gradlew :core:test :app:testDebugUnitTest --stacktrace
+          ./gradlew coverageReport --stacktrace
+          python3 -m unittest discover -s scripts -p 'test_coverage_*.py'
+          python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --verify --markdown build/reports/jacoco/coverageReport/summary.md >> "$GITHUB_STEP_SUMMARY"
           ./gradlew :app:lintRelease --stacktrace
+
+      - name: Upload release test reports and coverage
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.RELEASE_TAG }}-test-reports
+          path: |
+            build/reports/jacoco/coverageReport/
+            core/build/test-results/test/
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/lint-results-release.html
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Require signing secrets
         env:
