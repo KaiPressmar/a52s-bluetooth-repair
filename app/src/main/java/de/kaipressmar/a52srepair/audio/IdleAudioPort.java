@@ -139,6 +139,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
         } catch (RuntimeException e) { log("START_ERROR method=" + method + " exception=" + e.getClass().getSimpleName()); return false; }
     }
     @Override @SuppressWarnings("deprecation")
+    @SuppressLint("MissingPermission") // Start checks permission; revocation is caught during cleanup.
     public boolean release() {
         if (modernOwned) {
             try { audio.clearCommunicationDevice(); modernOwned = false; }

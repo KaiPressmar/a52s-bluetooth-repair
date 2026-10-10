@@ -58,6 +58,13 @@ public class IdleAudioPortTest {
         shadowOf(audio).setIsMusicActive(false);hfp=new FakeHeadset();
         port=new IdleAudioPort(context,audio,telecom,hfp,"test");port.targetReady();
     }
+    @Test public void productionUsesAnIsolatedAudioManagerForIdleBinderOwnership() {
+        IdleAudioPort production=new IdleAudioPort(context,()->{},"isolated");
+        AudioManager isolated=ReflectionHelpers.getField(production,"audio");
+        assertNotSame(audio,isolated);
+        assertNotSame(ReflectionHelpers.getField(audio,"mICallBack"),ReflectionHelpers.getField(isolated,"mICallBack"));
+        assertTrue(production.release());production.closeObserver();
+    }
     @Test public void permissionsAreRequiredAndUnavailableSafetyObservationsFailClosed() {
         assertNull(port.blockedReason());
         shadowOf((android.app.Application)context).denyPermissions(Manifest.permission.READ_PHONE_STATE);

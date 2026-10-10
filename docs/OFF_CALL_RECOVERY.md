@@ -60,7 +60,8 @@ before confirming SCO-off. No request is a success merely because accepted.
 Silent 8-kHz mono AudioTrack is bounded by the operation; no microphone capture,
 audio focus, stream-volume or microphone-mute changes. MODE_NORMAL cancels this
 caller's mode token; it does not overwrite a saved global mode or clear another
-app. Track and own Binder selections are released on rejection, timeout, call,
+app. The idle AudioManager has its own Binder token, separate from later in-call
+experiments in this process. Track and own Binder selections are released on rejection, timeout, call,
 activity departure and completion. Binder-after-acceptance is treated as possibly
 owned. Failed cleanup has <=3 extra retries and latches the controller against
 new tests; it is exported rather than presented as successful cleanup.

@@ -23,6 +23,8 @@ public final class IdleRepairController {
     private IdleAudioPort port;
     private IdleRepairEngine engine;
     private boolean visible;
+    private boolean automaticOperation;
+    private boolean operationVoiceEnabled;
     private String observedTarget = "";
     private int cleanupRetries;
     private final Runnable tick = this::tick;
@@ -76,7 +78,9 @@ public final class IdleRepairController {
         settings.setIdleResult("RUNNING");
         port.log("TRIGGER source=" + trigger + " pendingPostCall=" + settings.idlePostCallPending());
         settings.setIdlePostCallPending(false);
-        engine = new IdleRepairEngine(port, settings.idleVoiceFallback(), now);
+        automaticOperation = automatic;
+        operationVoiceEnabled = settings.idleVoiceFallback();
+        engine = new IdleRepairEngine(port, operationVoiceEnabled, now);
         cleanupRetries = 0;
         handler.removeCallbacks(tick);
         handler.post(tick);
@@ -87,6 +91,11 @@ public final class IdleRepairController {
         handler.removeCallbacks(tick);
         if (!visible) return;
         if (running()) {
+            if ((automaticOperation && (!settings.idleAuto() || !settings.protectionEnabled()))
+                    || (operationVoiceEnabled && !settings.idleVoiceFallback())) {
+                cancel("operation disabled in settings");
+                return;
+            }
             port.observe();
             engine.tick(SystemClock.elapsedRealtime());
             if (!running()) complete();

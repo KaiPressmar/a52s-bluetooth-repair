@@ -36,7 +36,7 @@ public class IdleRepairControllerTest {
         Boolean sco=false;int closes;
         public void open(){}public void close(){closes++;}
         public List<BluetoothDevice> connectedDevices(){return devices;}
-        public Boolean scoAudioConnected(BluetoothDevice d){return devices.contains(d)?sco:null;}
+        public Boolean scoAudioConnected(BluetoothDevice d){return d != null && devices.contains(d)?sco:null;}
         public boolean supportsVoiceRecognition(BluetoothDevice d){return false;}
         public boolean startVoiceRecognition(BluetoothDevice d){throw new AssertionError("unsupported voice must not start");}
         public boolean stopVoiceRecognition(BluetoothDevice d){throw new AssertionError("unowned voice must not stop");}
@@ -48,6 +48,8 @@ public class IdleRepairControllerTest {
         shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.READ_PHONE_STATE,Manifest.permission.BLUETOOTH_CONNECT);
         telecom=context.getSystemService(TelecomManager.class);audio=context.getSystemService(AudioManager.class);
         shadowOf(telecom).setIsInCall(false);audio.setMode(AudioManager.MODE_NORMAL);hfp=new Hfp();
+        shadowOf(audio).setAvailableCommunicationDevices(List.of(IdleAudioPortTest.info(
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,"00:11:22:33:44:01",1)));
         controller=new IdleRepairController(context,()->updates++,
                 (event,id)->new IdleAudioPort(context,audio,telecom,hfp,id));
     }
@@ -89,6 +91,16 @@ public class IdleRepairControllerTest {
         PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("idle_auto",true).commit();
         controller.resume();advance(3000);assertFalse(controller.running());
         assertNull(controller.startManually());controller.pause();
+    }
+    @Test public void turningOffAutoOrVoiceFallbackCancelsAnExistingOperation() {
+        var prefs=PreferenceManager.getDefaultSharedPreferences(context);
+        prefs.edit().putBoolean("idle_auto",true).commit();controller.resume();advance(250);
+        assertTrue(controller.running());settings.setProtectionEnabled(false);advance(250);
+        assertFalse(controller.running());assertEquals("CANCELLED",settings.idleResult());
+        advance(30001);prefs.edit().putBoolean("idle_voice",true).commit();
+        assertNull(controller.startManually());advance(250);
+        prefs.edit().putBoolean("idle_voice",false).commit();advance(250);
+        assertFalse(controller.running());controller.pause();
     }
     @Test public void unknownTargetAndRepeatedAutoEventsNeverLoopRepairs() {
         PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("idle_auto",true).commit();
