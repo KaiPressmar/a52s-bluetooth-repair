@@ -19,6 +19,31 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class HeadsetMonitorTest {
+    @Test public void refreshedProxyIgnoresOldBinderCallbacksAndDisconnectedProxyCanBeReacquired() {
+        Application app = ApplicationProvider.getApplicationContext();
+        shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        HeadsetMonitor monitor = new HeadsetMonitor(app);
+        monitor.open();
+        long generation = org.robolectric.util.ReflectionHelpers.getField(monitor, "profileGeneration");
+        android.bluetooth.BluetoothProfile.ServiceListener old = org.robolectric.util.ReflectionHelpers.callInstanceMethod(
+                monitor, "listener", org.robolectric.util.ReflectionHelpers.ClassParameter.from(long.class, generation));
+        monitor.refresh();
+        BluetoothHeadset proxy = org.robolectric.shadow.api.Shadow.newInstanceOf(BluetoothHeadset.class);
+        android.bluetooth.BluetoothDevice car = android.bluetooth.BluetoothAdapter.getDefaultAdapter().getRemoteDevice("00:11:22:33:44:01");
+        shadowOf(proxy).addConnectedDevice(car);
+        old.onServiceConnected(android.bluetooth.BluetoothProfile.HEADSET, proxy);
+        assertTrue(monitor.connectedDevices().isEmpty());
+        long freshGeneration = org.robolectric.util.ReflectionHelpers.getField(monitor, "profileGeneration");
+        android.bluetooth.BluetoothProfile.ServiceListener fresh = org.robolectric.util.ReflectionHelpers.callInstanceMethod(
+                monitor, "listener", org.robolectric.util.ReflectionHelpers.ClassParameter.from(long.class, freshGeneration));
+        fresh.onServiceConnected(android.bluetooth.BluetoothProfile.HEADSET, proxy);
+        old.onServiceDisconnected(android.bluetooth.BluetoothProfile.HEADSET);
+        assertEquals(java.util.List.of(car), monitor.connectedDevices());
+        fresh.onServiceDisconnected(android.bluetooth.BluetoothProfile.HEADSET);
+        assertTrue(monitor.connectedDevices().isEmpty());
+        assertEquals(false, org.robolectric.util.ReflectionHelpers.getField(monitor, "profileRequested"));
+        monitor.close();
+    }
     @Test public void anotherHeadsetsScoDoesNotVerifyTheSelectedCarsAudio() {
         Application app = ApplicationProvider.getApplicationContext();
         shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);

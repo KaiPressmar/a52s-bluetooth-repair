@@ -72,6 +72,40 @@ public class CallSessionTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms));
     }
 
+    @Test public void ownAudioPolicyRequestCannotVerifyItsPredictedRouteAndIsClearedWhenPaused() {
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+                .putString("preventive_mode", "OFF").putBoolean("protection_enabled", true).commit();
+        AudioManager audio = context.getSystemService(AudioManager.class);
+        android.media.AudioDeviceInfo device = org.robolectric.shadows.AudioDeviceInfoBuilder.newBuilder()
+                .setType(android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO).build();
+        Object port = org.robolectric.util.ReflectionHelpers.getField(device, "mPort");
+        org.robolectric.util.ReflectionHelpers.setField(port, "mRole", 2);
+        org.robolectric.util.ReflectionHelpers.setField(port, "mAddress", "00:11:22:33:44:01");
+        org.robolectric.util.ReflectionHelpers.setField(org.robolectric.util.ReflectionHelpers.getField(port, "mHandle"), "mId", 1);
+        shadowOf(audio).setAvailableCommunicationDevices(List.of(device));
+        shadowOf(audio).setAudioDevicesForAttributes(new android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION).build(),
+                com.google.common.collect.ImmutableList.of(device));
+        FakeTelecom telecom = new FakeTelecom() {
+            @Override public android.bluetooth.BluetoothDevice bluetoothDevice() { return LegacyBluetoothTargetTest.device(1); }
+        };
+        telecom.session = new CallSession(context, telecom);
+        de.kaipressmar.a52srepair.audio.CommunicationDeviceRecovery recovery =
+                org.robolectric.util.ReflectionHelpers.getField(telecom.session, "communication");
+        assertTrue(recovery.request(telecom.bluetoothDevice(), 0L));
+        assertEquals(null, telecom.session.inspect().voiceOnBluetooth);
+        telecom.session.start();
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", false).commit();
+        advance(200L);
+        assertFalse(recovery.hasRequest());
+        assertEquals(null, audio.getCommunicationDevice());
+        assertEquals(Boolean.TRUE, telecom.session.inspect().voiceOnBluetooth);
+        assertTrue(recovery.request(telecom.bluetoothDevice(), 200L));
+        telecom.session.finish();
+        assertFalse(recovery.hasRequest());
+        assertEquals(null, audio.getCommunicationDevice());
+    }
+
     @Test public void changingProtectionDuringCallStopsPendingAutomaticReturnAndAllowsManualRepair() {
         FakeTelecom telecom = new FakeTelecom();
         telecom.session = new CallSession(context, telecom);

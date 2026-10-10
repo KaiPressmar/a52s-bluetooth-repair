@@ -170,30 +170,89 @@ public final class CallAudioService extends InCallService implements CallSession
         return "endpointApi=" + (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability())
                 + " legacyBtDevices=" + legacyTarget.size()
                 + " hfpDevices=" + legacyTarget.headsetCount()
-                + " explicitBtTarget=" + (legacyTarget.target() != null);
+                + " explicitBtTarget=" + (legacyTarget.target() != null)
+                + " targetAmbiguous=" + bluetoothTargetAmbiguous();
     }
 
     @Override public void observeHeadsets(List<android.bluetooth.BluetoothDevice> devices) {
         legacyTarget.observeHeadsets(devices);
     }
 
+    @Override @SuppressWarnings("deprecation")
+    public void refreshRoutingState() {
+        CallAudioState fresh = getCallAudioState();
+        if (fresh != null) {
+            legacyAudio = fresh;
+            legacyTarget.observe(fresh);
+        }
+        if (endpoints != null) endpoints.invalidateRequests();
+        DiagnosticLog.log(this, "CALL reread Telecom observations " + routingDetails());
+    }
+
     @Override
     public void requestRoute(int telecomRoute) {
         DiagnosticLog.log(this, "CALL request Telecom route=" + CallAudioState.audioRouteToString(telecomRoute));
         if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) {
-            CallSession targetSession = session;
-            DiagnosticLog.log(this, "CALL routing path=endpoint " + routingDetails());
-            endpoints().request(telecomRoute,
-                    (endpoint, callback) -> requestCallEndpointChange(endpoint, getMainExecutor(), callback),
+            requestEndpointRoute(telecomRoute,
+                    (endpoint, callback) -> requestCallEndpointChange(endpoint, getMainExecutor(), callback));
+            return;
+        }
+        requestLegacyRoute(telecomRoute);
+    }
+
+    @RequiresApi(34)
+    void requestEndpointRoute(int telecomRoute, EndpointAudioState.Requester requester) {
+        CallSession targetSession = session;
+        DiagnosticLog.log(this, "CALL routing path=endpoint " + routingDetails());
+        endpoints().request(telecomRoute, requester,
                     () -> {
                         if (session == targetSession && session != null) session.onEvent();
                     }, code -> {
                         if (session != targetSession || session == null) return;
                         DiagnosticLog.log(this, "CALL endpoint request failed code=" + code);
                         if (code == android.telecom.CallEndpointException.ERROR_ANOTHER_REQUEST) session.onEvent();
-                        else session.onRouteRequestFailed();
+                        else if (code == android.telecom.CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST
+                                || !tryLegacyFallback(telecomRoute)) session.onRouteRequestFailed();
                     });
-            return;
+    }
+
+    /** One fallback for a failed modern request, restricted to a single unambiguous call/device. */
+    boolean tryLegacyFallback(int route) {
+        if (session == null || !session.allowsRouteFallback()) return false;
+        List<Integer> states = callStates();
+        if (states.size() != 1 || (states.get(0) != Call.STATE_ACTIVE && states.get(0) != Call.STATE_DIALING)) return false;
+        CallAudioState audio = audioState();
+        if (audio == null || (audio.getRoute() != CallAudioState.ROUTE_EARPIECE
+                && audio.getRoute() != CallAudioState.ROUTE_BLUETOOTH)) return false;
+        try {
+            requestLegacyRoute(route);
+            DiagnosticLog.log(this, "CALL endpoint failed; bounded legacy fallback requested");
+            return true;
+        } catch (RuntimeException failure) {
+            DiagnosticLog.log(this, "CALL legacy fallback refused: " + failure.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    @Override @SuppressWarnings("deprecation")
+    public void requestLegacyRoute(int telecomRoute) {
+        audioState();
+        if (endpoints != null) endpoints.invalidateRequests();
+        if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) {
+            // Endpoint UUIDs expose no Bluetooth address: never guess their device mapping.
+            if (endpoints().bluetoothTargetAmbiguous() || endpoints().bluetoothCount() != 1
+                    || legacyTarget.candidateCount() != 1 || legacyTarget.ambiguous()) {
+                throw new IllegalStateException("No safe cross-API Bluetooth target");
+            }
+        }
+        if (telecomRoute == CallAudioState.ROUTE_BLUETOOTH
+                || telecomRoute == CallAudioState.ROUTE_WIRED_OR_EARPIECE) {
+            int required = telecomRoute == CallAudioState.ROUTE_BLUETOOTH
+                    ? CallAudioState.ROUTE_BLUETOOTH : CallAudioState.ROUTE_EARPIECE;
+            CallAudioState available = legacyAudio == null ? getCallAudioState() : legacyAudio;
+            if (available == null || (available.getSupportedRouteMask() & required) == 0) {
+                throw new IllegalStateException("Legacy route is not advertised");
+            }
         }
         if (telecomRoute == CallAudioState.ROUTE_BLUETOOTH) {
             android.bluetooth.BluetoothDevice target = bluetoothDevice();

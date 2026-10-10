@@ -25,6 +25,7 @@ public final class HeadsetMonitor {
     private boolean receiverRegistered;
     private boolean profileRequested;
     private long nextProfileRequestAt;
+    private long profileGeneration;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
@@ -33,11 +34,11 @@ public final class HeadsetMonitor {
         }
     };
 
-    private final BluetoothProfile.ServiceListener listener =
-            new BluetoothProfile.ServiceListener() {
+    private BluetoothProfile.ServiceListener listener(long generation) {
+        return new BluetoothProfile.ServiceListener() {
                 @Override
                 public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                    if (!opened) {
+                    if (!opened || generation != profileGeneration) {
                         closeProxy(proxy);
                         return;
                     }
@@ -47,10 +48,13 @@ public final class HeadsetMonitor {
 
                 @Override
                 public void onServiceDisconnected(int profile) {
+                    if (!opened || generation != profileGeneration) return;
                     headset = null;
+                    profileRequested = false;
                     if (opened) onChanged.run();
                 }
             };
+    }
 
     public HeadsetMonitor(Context context) {
         this(context, () -> {});
@@ -83,7 +87,7 @@ public final class HeadsetMonitor {
         if (!profileRequested && now >= nextProfileRequestAt) {
             nextProfileRequestAt = now + 5_000L;
             try {
-                profileRequested = adapter.getProfileProxy(context, listener, BluetoothProfile.HEADSET);
+                profileRequested = adapter.getProfileProxy(context, listener(++profileGeneration), BluetoothProfile.HEADSET);
             } catch (RuntimeException ignored) {
                 // Without the proxy the SCO state is reported as unknown.
             }
@@ -91,6 +95,7 @@ public final class HeadsetMonitor {
     }
 
     public void close() {
+        profileGeneration++;
         opened = false;
         profileRequested = false;
         nextProfileRequestAt = 0L;
@@ -101,6 +106,12 @@ public final class HeadsetMonitor {
         BluetoothHeadset proxy = headset;
         headset = null;
         closeProxy(proxy);
+    }
+
+    /** Refresh our Binder observations, not the system's HFP connection or Bluetooth stack. */
+    public void refresh() {
+        close();
+        open();
     }
 
     private void closeProxy(BluetoothProfile proxy) {

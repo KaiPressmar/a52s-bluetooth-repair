@@ -72,3 +72,23 @@ physical A52s/car validation; only the phone restart has been confirmed by the o
 A passing CI build proves the code-level invariants only. Whether the Telecom-level rebuild clears the vendor fault must be confirmed with real calls on the affected phone.
 
 For v0.20.3, run the [report-derived device scenarios](docs/REPORT_0202_ANALYSIS.md#physical-validation-still-required). Verify explicit legacy targets when modern endpoints are absent, retained car selection with a second peripheral, no routing after target disappearance and no premature repeated request. Updates open only the official release in the browser; verify that package-installation permission is absent and diagnostic sharing still works. A Play Protect classification requires separate investigation as described in [installation warnings](docs/INSTALLATION_WARNINGS.md).
+
+## Real-device protocol for v0.21.0
+
+Only physical speech establishes success. While parked, answer through the same car
+without touching the phone. If routing fails, export during the call and after it.
+Confirm that the last bounded attempt logs observation refresh, an alternate
+Telecom request, a 2-second settled phone dwell and, only if an exact AudioManager
+device mapping exists, the communication-device request. False/rejected requests
+must remain unresolved. Check that `communicationRequest` becomes false no later
+than the scheduled 15-second cleanup (Binder failures are retried with backoff).
+A temporary predicted Bluetooth route created by our own request is excluded
+from positive recovery evidence. Observe the call after cleanup too.
+
+Repeat with speaker selection, hold/resume, a second call, disabled protection and
+car disappearance while another headset stays connected. No return may override
+these guards. With two devices and no safe UUID/address mapping, alternate API
+routing is refused rather than guessed. Check the second manual attempt and its
+separate limits; closing the call/service must cancel this app's AudioManager
+request. Compare a failing call against one after the owner's proven phone reboot.
+These scenarios remain physically unverified until exercised on the A52s.

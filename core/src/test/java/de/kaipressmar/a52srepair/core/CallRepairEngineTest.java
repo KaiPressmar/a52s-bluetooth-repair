@@ -21,6 +21,60 @@ import org.junit.Test;
 public class CallRepairEngineTest {
     private static final long T0 = 1_000_000L;
 
+    private static CallRepairEngine secondManualRebuild() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot phone = droppedToPhone();
+        e.requestManualRepair(phone, T0);
+        e.onSnapshot(phone, T0 + 250L);
+        e.onSnapshot(phone, T0 + 750L);
+        e.onSnapshot(phone, T0 + 12_750L);
+        assertEquals(List.of(RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS),
+                e.requestManualRepair(phone, T0 + 20_000L).step.commands);
+        return e;
+    }
+
+    @Test public void extendedManualRebuildRefreshesThenUsesAlternateApiAndOneAudioPolicyExperiment() {
+        CallRepairEngine e = secondManualRebuild();
+        CallAudioSnapshot phone = droppedToPhone();
+        assertTrue(e.onSnapshot(phone, T0 + 21_499L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE_LEGACY),
+                e.onSnapshot(phone, T0 + 21_500L).commands);
+        e.onSnapshot(phone, T0 + 21_750L);
+        assertTrue(e.onSnapshot(phone, T0 + 23_749L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH_LEGACY, RepairCommand.TRY_COMMUNICATION_DEVICE),
+                e.onSnapshot(phone, T0 + 23_750L).commands);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH_LEGACY),
+                e.onSnapshot(phone, T0 + 29_750L).commands);
+        e.onSnapshot(phone, T0 + 35_750L);
+        assertEquals(ManualRepairStatus.BUDGET_EXHAUSTED, e.requestManualRepair(phone, T0 + 40_000L).status);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 40_000L).outcome);
+    }
+
+    @Test public void extendedRebuildAllowsSlowTeardownButNeverReturnsOverConnectedSco() {
+        CallRepairEngine e = secondManualRebuild();
+        CallAudioSnapshot stillConnected = droppedToPhone().toBuilder().scoAudioConnected(true).build();
+        e.onSnapshot(stillConnected, T0 + 21_500L);
+        assertTrue(e.onSnapshot(stillConnected, T0 + 26_000L).commands.isEmpty());
+        assertTrue(e.onSnapshot(stillConnected, T0 + 29_500L).commands.isEmpty());
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 30_000L).outcome);
+    }
+
+    @Test public void speakerChoiceWhileRefreshingCancelsAllPendingExtendedCommands() {
+        CallRepairEngine e = secondManualRebuild();
+        CallAudioSnapshot speaker = droppedToPhone().toBuilder().route(AudioRoute.SPEAKER).build();
+        assertTrue(e.onSnapshot(speaker, T0 + 21_000L).commands.isEmpty());
+        assertTrue(e.onSnapshot(speaker, T0 + 22_000L).commands.isEmpty());
+        assertFalse(e.routingOperationActive());
+    }
+
+    @Test public void missingEndpointObservationRefreshRemainsReadOnlyWhenProtectionPaused() {
+        CallRepairEngine e = new CallRepairEngine(false, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot missing = droppedToPhone().toBuilder().bluetoothRouteAvailable(false).build();
+        e.onSnapshot(missing, T0);
+        assertTrue(e.onSnapshot(missing, T0 + 10_000L).commands.isEmpty());
+        assertEquals(0, e.report(T0 + 10_000L).routeAttempts);
+    }
+
     @Test public void reportFallbackWaitsBeyondTelecomPendingWindowBeforeRebuilding() {
         CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
         CallAudioSnapshot phone = droppedToPhone();
@@ -138,14 +192,16 @@ public class CallRepairEngineTest {
         Harness h = new Harness(PreventiveRebuildMode.OFF,
                 FaultClassifierTest.carCall().voiceOnBluetooth(false).build()) {
             @Override void react(RepairCommand c) {
-                if (c == RepairCommand.ROUTE_TO_EARPIECE) {
+                if (c == RepairCommand.ROUTE_TO_EARPIECE || c == RepairCommand.ROUTE_TO_EARPIECE_LEGACY) {
                     state = state.toBuilder().route(AudioRoute.EARPIECE).build();
                 }
             }
         };
         h.runFor(60_000L);
-        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.size());
-        assertTrue(h.executed.stream().allMatch(c -> c == RepairCommand.ROUTE_TO_EARPIECE));
+        assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, h.executed.stream()
+                .filter(c -> c == RepairCommand.ROUTE_TO_EARPIECE || c == RepairCommand.ROUTE_TO_EARPIECE_LEGACY).count());
+        assertFalse(h.executed.contains(RepairCommand.ROUTE_TO_BLUETOOTH));
+        assertFalse(h.executed.contains(RepairCommand.ROUTE_TO_BLUETOOTH_LEGACY));
         assertEquals(CallOutcome.UNRESOLVED, h.end().outcome);
     }
 
@@ -291,9 +347,9 @@ public class CallRepairEngineTest {
 
         /** Default system reaction: Telecom follows route requests and the fault clears. */
         void react(RepairCommand command) {
-            if (command == RepairCommand.ROUTE_TO_EARPIECE) {
+            if (command == RepairCommand.ROUTE_TO_EARPIECE || command == RepairCommand.ROUTE_TO_EARPIECE_LEGACY) {
                 state = state.toBuilder().route(AudioRoute.EARPIECE).scoAudioConnected(false).build();
-            } else if (command == RepairCommand.ROUTE_TO_BLUETOOTH) {
+            } else if (command == RepairCommand.ROUTE_TO_BLUETOOTH || command == RepairCommand.ROUTE_TO_BLUETOOTH_LEGACY) {
                 state = FaultClassifierTest.carCall().build();
             } else if (command == RepairCommand.RESTORE_VOICE_VOLUME) {
                 state = state.toBuilder().voiceMuted(false).voiceVolume(4, 7).build();
@@ -666,13 +722,16 @@ public class CallRepairEngineTest {
                 FaultClassifierTest.carCall().scoAudioConnected(false).build()) {
             @Override void react(RepairCommand command) {
                 // Broken vendor stack: Telecom follows, but SCO never comes back up.
-                AudioRoute route = command == RepairCommand.ROUTE_TO_EARPIECE
+                if (command == RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS
+                        || command == RepairCommand.TRY_COMMUNICATION_DEVICE) return;
+                AudioRoute route = command == RepairCommand.ROUTE_TO_EARPIECE || command == RepairCommand.ROUTE_TO_EARPIECE_LEGACY
                         ? AudioRoute.EARPIECE : AudioRoute.BLUETOOTH;
                 state = state.toBuilder().route(route).scoAudioConnected(false).build();
             }
         };
         h.runFor(120_000L);
-        long rebuilds = h.executed.stream().filter(c -> c == RepairCommand.ROUTE_TO_EARPIECE).count();
+        long rebuilds = h.executed.stream().filter(c -> c == RepairCommand.ROUTE_TO_EARPIECE
+                || c == RepairCommand.ROUTE_TO_EARPIECE_LEGACY).count();
         assertEquals(CallRepairEngine.MAX_ROUTE_ATTEMPTS, rebuilds);
         CallReport report = h.end();
         assertEquals(CallOutcome.UNRESOLVED, report.outcome);
@@ -781,12 +840,12 @@ public class CallRepairEngineTest {
         assertTrue(h.executed.isEmpty());
     }
 
-    @Test public void missingBluetoothRouteIsReportedButNotTouched() {
+    @Test public void missingBluetoothRouteRefreshesObservationOnceButNeverForcesUnsupportedRouting() {
         Harness h = new Harness(
                 PreventiveRebuildMode.ALWAYS,
                 FaultClassifierTest.carCall().bluetoothRouteAvailable(false).route(AudioRoute.EARPIECE).build());
         h.runFor(30_000L);
-        assertTrue(h.executed.isEmpty());
+        assertEquals(List.of(RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS), h.executed);
         assertEquals(CallOutcome.BLUETOOTH_UNAVAILABLE, h.end().outcome);
     }
 
