@@ -179,7 +179,7 @@
     <string name="idle_permission_body">This optional test needs phone status access to avoid interfering with an active or incoming call. It does not read phone numbers or record audio. Call protection continues to work without this additional permission.</string>
     <string name="idle_allow">Allow phone status access</string>
     <string name="idle_ready">Ready for an optional channel test.</string>
-    <string name="idle_running">Testing the channel; keep the app visible. This can take up to 70 seconds.</string>
+    <string name="idle_running">Testing the channel; keep the app visible. This can take up to 70 seconds, or 90 with the optional duplex attempt.</string>
     <string name="idle_tested">Speech audio connected and disconnected successfully. Please check the next Bluetooth call: this test does not prove that call audio is repaired.</string>
     <string name="idle_unresolved">The audio channel could not be established. Export the diagnostic report. A phone restart may still be necessary.</string>
     <string name="idle_cleanup_failed">Release or disconnection could not be confirmed. No further test starts in this session. Export the report; restart the phone if audio stays occupied.</string>
@@ -196,4 +196,7 @@
     <string name="recovery_developer">Developer settings</string>
     <string name="recovery_settings_unavailable">The requested settings screen is unavailable on this device.</string>
     <string name="recovery_help_body">If the channel test fails, export a report before restarting.\n\nOutside calls: in Bluetooth settings, disable and re-enable call audio for this device; disconnect and reconnect the headset or car. Restart the headset or car audio system while parked. Re-pairing removes the saved pairing and requires setup again.\n\nInstall available phone and headset/car firmware updates. A phone restart remains the only confirmed recovery on the affected owner device. Bluetooth off/on alone did not help.\n\nSome A52s owners report temporary improvements with Bluetooth SAP enabled or A2DP hardware offload disabled in developer settings. These reports conflict, may require a restart, and do not establish a fix for speech audio. Change only one setting at a time, record its original value and compare the next call. The app cannot change these settings or restart Android audio/Bluetooth system services.</string>
+    <string name="duplex_title">Manual duplex recovery attempt</string>
+    <string name="duplex_summary">Optional, off by default. A manual test can open fresh Bluetooth output and microphone streams after simpler attempts fail. Microphone permission is required. No audio is saved or transmitted. Never runs automatically. Up to 90 seconds; a repaired phone call is not guaranteed.</string>
+    <string name="duplex_permission_body">This optional attempt briefly opens a microphone stream outside phone calls to exercise both sides of the Bluetooth speech path. Android shows microphone use. The app discards the samples without saving or transmitting them; if Android temporarily chooses another microphone, it does not read from it. Pause media and other voice apps. If you decline, leave this option off and use the other repair attempts.</string>
 </resources>

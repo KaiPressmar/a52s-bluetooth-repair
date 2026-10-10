@@ -122,4 +122,16 @@ public class IdleRepairControllerTest {
         advance(30001);assertEquals("BUSY",controller.startManually());controller.pause();
         controller.resume();assertEquals("BUSY",controller.startManually());controller.pause();
     }
+    @Test public void duplexIsManualOnlyEvenWhenSettingAndMicrophonePermissionAreGranted() {
+        shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.RECORD_AUDIO);
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("idle_auto",true).putBoolean("idle_duplex",true).commit();
+        controller.resume();advance(1000);assertTrue(controller.running());
+        de.kaipressmar.a52srepair.core.repair.IdleRepairEngine engine=org.robolectric.util.ReflectionHelpers.getField(controller,"engine");
+        assertFalse(org.robolectric.util.ReflectionHelpers.<Boolean>getField(engine,"duplexEnabled"));
+        controller.cancel("manual next");advance(30001);assertNull(controller.startManually());
+        engine=org.robolectric.util.ReflectionHelpers.getField(controller,"engine");
+        assertTrue(org.robolectric.util.ReflectionHelpers.<Boolean>getField(engine,"duplexEnabled"));
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("idle_duplex",false).commit();
+        advance(250);assertEquals("CANCELLED",settings.idleResult());controller.pause();
+    }
 }

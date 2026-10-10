@@ -15,3 +15,11 @@ fccf4a9080dd19b934b8bb157c31a0b5f123c108d9049512bd62feeb1e68c6af
 ```
 
 Review Google's [developer guidance for Play Protect warnings](https://developers.google.com/android/play-protect/warning-dev-guidance). If the classification is incorrect after reviewing the relevant guidance, the owner/developer can use Google's [Play Protect appeal form](https://support.google.com/googleplay/android-developer/contact/protectappeals) with the canonical download URL, package name, certificate and warning evidence. No appeal has been submitted by this work. Google's review, not app code, determines its classification. Keep Play Protect enabled; the app offers no bypass or security-setting automation.
+
+## v0.23 optional microphone access
+
+The standard RECORD_AUDIO permission is declared for the default-off, manual
+foreground duplex attempt. It is requested only after enabling that option and
+starting a manual test. Automatic and in-call repair do not record. No samples
+are stored/transmitted; the manifest has no Shizuku provider/permission, root or
+shell helper. This expansion does not resolve or predict Play Protect's verdict.

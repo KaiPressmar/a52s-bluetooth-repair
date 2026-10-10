@@ -44,6 +44,8 @@
             app:title="@string/idle_auto_title" app:summary="@string/idle_auto_body" />
         <SwitchPreferenceCompat app:singleLineTitle="false" app:key="idle_voice" app:defaultValue="false" app:iconSpaceReserved="false"
             app:title="@string/idle_voice_title" app:summary="@string/idle_voice_body" />
+        <SwitchPreferenceCompat app:singleLineTitle="false" app:key="idle_duplex" app:defaultValue="false" app:iconSpaceReserved="false"
+            app:title="@string/duplex_title" app:summary="@string/duplex_summary" />
         <Preference app:key="recovery_help" app:iconSpaceReserved="false"
             app:title="@string/recovery_help_title" app:summary="@string/recovery_help_summary" />
         <Preference

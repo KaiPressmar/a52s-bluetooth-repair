@@ -1,6 +1,7 @@
 package de.kaipressmar.a52srepair.ui;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -19,6 +20,22 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class MainActivityTest {
+    @Test public void microphoneExplanationIsOptionalAndCancellationDoesNotStartCapture() {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity->{
+                org.robolectric.Shadows.shadowOf((android.app.Application)activity.getApplicationContext())
+                        .grantPermissions(android.Manifest.permission.BLUETOOTH_CONNECT,android.Manifest.permission.READ_PHONE_STATE);
+                org.robolectric.Shadows.shadowOf((android.app.Application)activity.getApplicationContext())
+                        .denyPermissions(android.Manifest.permission.RECORD_AUDIO);
+                androidx.preference.PreferenceManager.getDefaultSharedPreferences(activity).edit().putBoolean("idle_duplex",true).commit();
+                activity.startIdleRepair();
+                androidx.appcompat.app.AlertDialog dialog=(androidx.appcompat.app.AlertDialog)org.robolectric.shadows.ShadowDialog.getLatestDialog();
+                assertEquals(activity.getString(R.string.duplex_permission_body),((TextView)dialog.findViewById(android.R.id.message)).getText().toString());
+                dialog.getButton(android.content.DialogInterface.BUTTON_NEGATIVE).performClick();
+                assertFalse("RUNNING".equals(new de.kaipressmar.a52srepair.data.AppSettings(activity).idleResult()));
+            });
+        }
+    }
     @Test public void updateDialogOffersCanonicalBrowserReleaseAndExplainsAndroidWarnings() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {

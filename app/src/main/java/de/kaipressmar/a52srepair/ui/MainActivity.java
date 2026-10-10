@@ -38,6 +38,8 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
     private UpdateRelease availableUpdate;
     private de.kaipressmar.a52srepair.audio.IdleRepairController idleRepair;
     private boolean pendingIdlePermissionStart;
+    private final ActivityResultLauncher<String> microphonePermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), this::onPhoneStatusResult);
     private final ActivityResultLauncher<String> phoneStatusPermission = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), this::onPhoneStatusResult);
 
@@ -109,6 +111,13 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
                     .setMessage(R.string.idle_permission_body)
                     .setPositiveButton(R.string.idle_allow, (d, w) -> phoneStatusPermission.launch(Manifest.permission.READ_PHONE_STATE))
                     .setNegativeButton(R.string.action_cancel, null).show();
+            return;
+        }
+        if (new AppSettings(this).idleDuplex()
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            new MaterialAlertDialogBuilder(this).setTitle(R.string.duplex_title).setMessage(R.string.duplex_permission_body)
+                    .setNegativeButton(R.string.action_cancel, null)
+                    .setPositiveButton(R.string.idle_allow, (d,w) -> microphonePermission.launch(Manifest.permission.RECORD_AUDIO)).show();
             return;
         }
         String reason = idleRepair.startManually();
