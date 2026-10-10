@@ -91,6 +91,15 @@ public class IdleAudioPortTest {
         shadowOf(audio).setAvailableCommunicationDevices(List.of(output));shadowOf(audio).setInputDevices(List.of(input));
         shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.RECORD_AUDIO);
         assertTrue(port.start(Method.DUPLEX));assertNotNull(ReflectionHelpers.getField(port,"duplex"));
+        DuplexChannel channel=ReflectionHelpers.getField(port,"duplex");
+        int ownSession=channel.session();
+        var own=shadowOf(audio).createActiveRecordingConfiguration(ownSession,7,context.getPackageName());
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own),false);
+        assertNull(port.blockedReason()); // Our own recorder must not block itself.
+        var other=shadowOf(audio).createActiveRecordingConfiguration(ownSession+1,1,"other.private");
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own,other),false);
+        assertTrue(port.blockedReason().contains("other microphone"));
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own),false);
         assertFalse(port.transportReady()); // Native route/config missing in simulator is not success.
         shadowOf((android.app.Application)context).denyPermissions(Manifest.permission.RECORD_AUDIO);
         assertTrue(port.blockedReason().contains("microphone"));
