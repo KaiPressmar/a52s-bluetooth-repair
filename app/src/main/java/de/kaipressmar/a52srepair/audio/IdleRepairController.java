@@ -25,6 +25,7 @@ public final class IdleRepairController {
     private boolean visible;
     private boolean automaticOperation;
     private boolean operationVoiceEnabled;
+    private boolean operationDuplexEnabled;
     private String observedTarget = "";
     private int cleanupRetries;
     private final Runnable tick = this::tick;
@@ -80,7 +81,9 @@ public final class IdleRepairController {
         settings.setIdlePostCallPending(false);
         automaticOperation = automatic;
         operationVoiceEnabled = settings.idleVoiceFallback();
-        engine = new IdleRepairEngine(port, operationVoiceEnabled, now);
+        // Microphone test is never automatic, even with a previously granted permission.
+        operationDuplexEnabled = !automatic && settings.idleDuplex();
+        engine = new IdleRepairEngine(port, operationVoiceEnabled, operationDuplexEnabled, now);
         cleanupRetries = 0;
         handler.removeCallbacks(tick);
         handler.post(tick);
@@ -92,7 +95,8 @@ public final class IdleRepairController {
         if (!visible) return;
         if (running()) {
             if ((automaticOperation && (!settings.idleAuto() || !settings.protectionEnabled()))
-                    || (operationVoiceEnabled && !settings.idleVoiceFallback())) {
+                    || (operationVoiceEnabled && !settings.idleVoiceFallback())
+                    || (operationDuplexEnabled && !settings.idleDuplex())) {
                 cancel("operation disabled in settings");
                 return;
             }

@@ -19,6 +19,9 @@ public final class AudioDiagnostics {
             List<AudioDeviceInfo> ports = audio.getAvailableCommunicationDevices();
             out.append(" ports=[");
             for (AudioDeviceInfo port : ports) out.append(device(port, target)).append(';');
+            out.append("] inputs=[");
+            for (AudioDeviceInfo input : audio.getDevices(AudioManager.GET_DEVICES_INPUTS))
+                out.append(device(input, target)).append(';');
             return out.append(']').toString();
         } catch (RuntimeException e) { return "audioObservationError=" + e.getClass().getSimpleName(); }
     }

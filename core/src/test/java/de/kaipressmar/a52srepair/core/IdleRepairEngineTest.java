@@ -17,6 +17,8 @@ public class IdleRepairEngineTest {
         List<String> events = new ArrayList<>();
         int releases;
         boolean blockOnSupport;
+        boolean transport = true;
+        String transportError;
         public String blockedReason() { return block; }
         public boolean targetReady() { return ready; }
         public Boolean scoConnected() { return sco; }
@@ -24,6 +26,8 @@ public class IdleRepairEngineTest {
         public boolean start(Method m) { requests.add(m); return accepted; }
         public boolean release() { releases++; return clear; }
         public void log(String e) { events.add(e); }
+        public boolean transportReady() { return transport; }
+        public String transportFailure() { return transportError; }
     }
     @Test public void acceptedRequestDoesNotProveConnectedAudio() {
         Port p = new Port(); IdleRepairEngine e = new IdleRepairEngine(p, false, 0);
@@ -71,6 +75,36 @@ public class IdleRepairEngineTest {
         Port p = new Port(); p.supported.remove(Method.MODERN);
         IdleRepairEngine e = new IdleRepairEngine(p, false, 0); e.tick(0);
         assertEquals(List.of(Method.LEGACY_SCO), p.requests);
+    }
+    @Test public void duplexRequiresOptInAndRunsBeforeOrdinaryScoCanMaskAnInputFault() {
+        Port p=new Port();p.accepted=false;
+        IdleRepairEngine e=new IdleRepairEngine(p,true,true,0);e.tick(0);
+        for(int n=1;n<=5;n++){e.tick(n*1000);e.tick(n*1000+750);}
+        assertEquals(List.of(Method.DUPLEX,Method.MODERN,Method.MODERN,Method.LEGACY_SCO,Method.VOICE_RECOGNITION),p.requests);
+        assertEquals(Result.UNRESOLVED,e.result());
+    }
+    @Test public void duplexCannotPassOnScoAloneOrUnstableStreamEvidence() {
+        Port p=new Port();p.supported=EnumSet.of(Method.DUPLEX);
+        IdleRepairEngine e=new IdleRepairEngine(p,false,true,0);e.tick(0);
+        p.sco=true;p.transport=false;e.tick(100);e.tick(900);assertEquals(0,p.releases);
+        p.transport=true;e.tick(1000);p.transport=false;e.tick(1500);
+        p.transport=true;e.tick(1600);e.tick(2349);assertEquals(0,p.releases);
+        e.tick(2350);assertEquals(1,p.releases);p.sco=false;e.tick(2500);e.tick(3250);
+        assertEquals(Result.CHANNEL_TESTED,e.result());
+    }
+    @Test public void deadCaptureReleasesImmediatelyAndNeverBypassesScoTeardown() {
+        Port p=new Port();p.supported=EnumSet.of(Method.DUPLEX,Method.LEGACY_SCO);
+        IdleRepairEngine e=new IdleRepairEngine(p,false,true,0);e.tick(0);
+        p.transportError="DEAD_OBJECT";p.sco=true;e.tick(1);assertEquals(1,p.releases);
+        e.tick(500);assertEquals(List.of(Method.DUPLEX),p.requests);
+        p.transportError=null;p.sco=false;e.tick(1000);e.tick(1750);
+        assertEquals(List.of(Method.DUPLEX,Method.LEGACY_SCO),p.requests);
+    }
+    @Test public void duplexBudgetDoesNotChangeOrdinaryBudgetAndRemainsBounded() {
+        Port p=new Port();IdleRepairEngine e=new IdleRepairEngine(p,false,true,0);e.tick(0);e.tick(90000);
+        assertEquals(Result.UNRESOLVED,e.result());
+        Port q=new Port();IdleRepairEngine f=new IdleRepairEngine(q,false,0);f.tick(70000);
+        assertEquals(Result.UNRESOLVED,f.result());
     }
     @Test public void discoveryWaitsForProxyAndKnownScoOff() {
         Port p = new Port(); p.ready=false; p.sco=null;

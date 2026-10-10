@@ -133,3 +133,21 @@ On the affected A52s and the parked car/headset:
 
 Do not count an idle test as a repaired call in call-history statistics. Reboot
 remains the only proven owner workaround until the above confirms otherwise.
+
+## v0.23 manual duplex validation
+
+Run the extended core/Robolectric tests and combined coverage gates. Verify the
+capture source is standard VOICE_COMMUNICATION, reads are nonblocking, unknown or
+silenced capture and mismatched real routes cannot pass, samples are erased and
+partial native failures retain cleanup ownership. With both options enabled,
+automatic idle tests must still never create capture. The normal permission dialog
+must appear only for an explicitly enabled manual test, and cancelling must not
+start capture. No root/Shizuku/shell/hidden API dependency is installed.
+
+On the actual A52s, export before/after the optional manual attempt and during the
+next phone call. Compare audible speech in both directions with the same device.
+Test incoming call, mic permission revocation/privacy mute, headset disappearance,
+app pause and screen lock during capture. Android should show the mic indicator
+only during the bounded attempt and it must disappear after cleanup. Native init
+inventory can be unavailable; it must never imply a daemon actually restarted.
+A successful off-call duplex check does not establish repaired cellular speech.

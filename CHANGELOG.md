@@ -4,6 +4,16 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.23.0 - Optional duplex stream recovery without extra system privileges
+
+- Keep APK installation and all existing repairs independent of computers, root and Shizuku. Audit Android 14 and A52s/SM7325 audio/Bluetooth layers; document precisely which native restart APIs ordinary app permissions cannot reach. Do not add ineffective `setBluetoothScoOn` flag requests as physical repairs.
+- Add an optional, default-off **manual** duplex attempt before simpler SCO checks can mask a capture-path fault: create fresh, exact-target SCO output and VOICE_COMMUNICATION capture streams, then close both. This exercises an additional HAL input/output session path; it does not restart protected system services or establish a Samsung firmware fix.
+- Ask for optional microphone permission only when the user starts a manual test with this feature enabled. Never run capture automatically. Discard/clear samples without storing, transmitting or analysing them; disclose Android's microphone indicator and temporary system routing fallback.
+- Require actual exact-target input and output routes, known unsilenced capture and nonblocking frame delivery in addition to stable SCO. Stop on native stream errors, revoked permission, new call, activity departure or disabled option; preserve owned-resource cleanup and teardown gates. The optional attempt uses a 90-second state-machine budget; ordinary tests retain 70 seconds.
+- Export input ports, duplex support/start/route/error/release observations, SoC identity and a bounded read-only inventory of relevant native init service declarations when the device permits access. Declarations are not reported as live process state or restart success.
+- Extend tests for missing/ambiguous inputs, mic mute/grant/revocation, actual capture builder, incorrect routes, Android-silenced capture, dead native streams, nonblocking reads, erased samples, partial-start/cleanup failures, manual-only execution, native inventory bounds and runtime permission explanation.
+- A phone restart remains the only owner-proven recovery. Physical A52s/car validation and Google Play Protect classification remain unverified; an added microphone permission is not a claim that installation warnings are resolved.
+
 ## 0.22.0 - Off-call speech channel recovery and deeper diagnostics
 
 - Add a manual **Test and reinitialize audio channel** before/after calls. It requires optional phone-status access, a single connected classic HFP target, known SCO-off, idle audio and a visible app. Existing in-call protection works without the extra permission.

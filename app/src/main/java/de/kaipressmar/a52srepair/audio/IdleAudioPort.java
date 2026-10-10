@@ -26,6 +26,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     private final String operation;
     private BluetoothDevice target;
     private AudioTrack track;
+    private DuplexChannel duplex;
     private boolean modeOwned, modernOwned, legacyOwned, voiceOwned;
     private String lastState = "";
 
@@ -49,7 +50,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     public void open() { headset.open(); }
     public void closeObserver() { headset.close(); }
     void resetIdleObservationTarget() {
-        if (!modernOwned && !legacyOwned && !voiceOwned && !modeOwned && track == null) target = null;
+        if (!modernOwned && !legacyOwned && !voiceOwned && !modeOwned && track == null && duplex == null) target = null;
     }
     @Override public String blockedReason() {
         if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
@@ -57,12 +58,15 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
         if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED)
             return "phone status permission missing";
         if (audio == null || telecom == null) return "audio/phone status unavailable";
+        if (duplex != null && context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
+            return "microphone permission revoked";
         try {
             if (CallAudioService.activeReport() != null || telecom.isInCall()) return "call present";
             int mode = audio.getMode();
             if (mode != AudioManager.MODE_NORMAL && !(modeOwned && mode == AudioManager.MODE_IN_COMMUNICATION))
                 return "audio mode occupied=" + mode;
             if (audio.isMusicActive()) return "media playback active";
+            if (duplex != null && otherCapturePresent(duplex.session())) return "other microphone session present";
             for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
                 int type = device.getType();
                 if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET || type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
@@ -97,6 +101,13 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
         try {
             switch (method) {
                 case MODERN: return matchingPort() != null;
+                case DUPLEX:
+                    boolean mic = microphoneAllowed(), muted = audio.isMicrophoneMute();
+                    boolean output = matchingPort() != null, input = matchingInput() != null;
+                    boolean captureBusy = otherCapturePresent(-1);
+                    log("DUPLEX_SUPPORT microphonePermission=" + mic + " muted=" + muted
+                            + " exactOutput=" + output + " exactInput=" + input + " otherCapture=" + captureBusy);
+                    return mic && !muted && !captureBusy && output && input;
                 case LEGACY_SCO: return targetReady() && audio != null && audio.isBluetoothScoAvailableOffCall();
                 case VOICE_RECOGNITION: return headset.supportsVoiceRecognition(target);
                 default: return false;
@@ -106,6 +117,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     @Override @SuppressWarnings("deprecation")
     public boolean start(IdleRepairEngine.Method method) {
         if (blockedReason() != null || !targetReady() || !Boolean.FALSE.equals(scoConnected())) return false;
+        if (method == IdleRepairEngine.Method.DUPLEX && !supports(method)) return false;
         try {
             if (method == IdleRepairEngine.Method.VOICE_RECOGNITION) {
                 // Keep mode NORMAL here: HFP voice-recognition is a different native state path.
@@ -129,12 +141,20 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
             if (track.write(new byte[16_000], 0, 16_000) != 16_000 || track.getState() != AudioTrack.STATE_INITIALIZED)
                 return false;
             if (track.setLoopPoints(0, 8_000, -1) != AudioTrack.SUCCESS) return false;
+            if (method == IdleRepairEngine.Method.DUPLEX && !track.setPreferredDevice(matchingPort())) return false;
             track.play();
-            if (method == IdleRepairEngine.Method.MODERN) {
+            if (method == IdleRepairEngine.Method.MODERN || method == IdleRepairEngine.Method.DUPLEX) {
                 AudioDeviceInfo port = matchingPort();
                 if (port == null) return false;
                 modernOwned = true;
-                return audio.setCommunicationDevice(port);
+                if (!audio.setCommunicationDevice(port)) return false;
+                if (method == IdleRepairEngine.Method.DUPLEX) {
+                    AudioDeviceInfo input = matchingInput();
+                    if (input == null || !microphoneAllowed() || otherCapturePresent(-1)) return false;
+                    duplex = DuplexChannel.create(track, input, port, this::log);
+                    return duplex.start();
+                }
+                return true;
             }
             legacyOwned = true;
             audio.startBluetoothSco();
@@ -144,6 +164,7 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
     @Override @SuppressWarnings("deprecation")
     @SuppressLint("MissingPermission") // Start checks permission; revocation is caught during cleanup.
     public boolean release() {
+        if (duplex != null && duplex.close()) duplex = null;
         if (modernOwned) {
             try { audio.clearCommunicationDevice(); modernOwned = false; }
             catch (RuntimeException e) { log("CLEAR_ERROR " + e.getClass().getSimpleName()); }
@@ -180,8 +201,33 @@ public final class IdleAudioPort implements IdleRepairEngine.Port {
                 modeOwned = false;
             } catch (RuntimeException e) { log("MODE_RELEASE_ERROR " + e.getClass().getSimpleName()); }
         }
-        return !modernOwned && !legacyOwned && !voiceOwned && track == null && !modeOwned;
+        return !modernOwned && !legacyOwned && !voiceOwned && track == null && !modeOwned && duplex == null;
     }
+    private boolean microphoneAllowed() {
+        return context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+    private boolean otherCapturePresent(int ownSession) {
+        java.util.List<android.media.AudioRecordingConfiguration> configurations = audio.getActiveRecordingConfigurations();
+        if (configurations == null) return true; // Unknown ownership must not seize microphone access.
+        for (android.media.AudioRecordingConfiguration configuration : configurations)
+            if (ownSession < 0 || configuration.getClientAudioSessionId() != ownSession) return true;
+        return false;
+    }
+    @SuppressLint("MissingPermission")
+    private AudioDeviceInfo matchingInput() {
+        if (target == null || audio == null) return null;
+        AudioDeviceInfo found = null;
+        for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_INPUTS)) {
+            if (device.isSource() && device.getId() != 0 && device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                    && !device.getAddress().isEmpty() && device.getAddress().equalsIgnoreCase(target.getAddress())) {
+                if (found != null) return null;
+                found = device;
+            }
+        }
+        return found;
+    }
+    @Override public boolean transportReady() { return duplex == null || duplex.ready(); }
+    @Override public String transportFailure() { return duplex == null ? null : duplex.failure(); }
     public void observe() {
         String state = "hfpCount=" + headset.connectedDevices().size() + " targetReady=" + targetReady()
                 + " sco=" + scoConnected() + " voiceSupported=" + headset.supportsVoiceRecognition(target)

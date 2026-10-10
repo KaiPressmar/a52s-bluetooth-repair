@@ -65,6 +65,51 @@ public class IdleAudioPortTest {
         assertNotSame(ReflectionHelpers.getField(audio,"mICallBack"),ReflectionHelpers.getField(isolated,"mICallBack"));
         assertTrue(production.release());production.closeObserver();
     }
+    @Test public void duplexNeedsExplicitMicrophoneGrantExactInputOutputAndUnmutedMic() {
+        AudioDeviceInfo output=info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,1);
+        AudioDeviceInfo input=info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,2);
+        ReflectionHelpers.setField(ReflectionHelpers.getField(input,"mPort"),"mRole",1);
+        shadowOf(audio).setAvailableCommunicationDevices(List.of(output));shadowOf(audio).setInputDevices(List.of(input));
+        shadowOf((android.app.Application)context).denyPermissions(Manifest.permission.RECORD_AUDIO);
+        assertFalse(port.supports(Method.DUPLEX));assertFalse(port.start(Method.DUPLEX));assertEquals(AudioManager.MODE_NORMAL,audio.getMode());
+        shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.RECORD_AUDIO);
+        assertTrue(port.supports(Method.DUPLEX));audio.setMicrophoneMute(true);assertFalse(port.supports(Method.DUPLEX));
+        audio.setMicrophoneMute(false);
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(shadowOf(audio).createActiveRecordingConfiguration(42,1,"other.private")),false);
+        assertFalse(port.supports(Method.DUPLEX));assertFalse(port.start(Method.DUPLEX));
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(),false);
+        audio.setMicrophoneMute(false);shadowOf(audio).setInputDevices(List.of());assertFalse(port.supports(Method.DUPLEX));
+        shadowOf(audio).setInputDevices(List.of(input,input));assertFalse(port.supports(Method.DUPLEX));
+        ReflectionHelpers.setField(ReflectionHelpers.getField(input,"mPort"),"mAddress","");
+        shadowOf(audio).setInputDevices(List.of(input));assertFalse(port.supports(Method.DUPLEX));
+        assertTrue(port.release());
+    }
+    @Test @Config(shadows={PreferredTrack.class}) public void actualDuplexBuilderOwnsCaptureAndPermissionRevocationStopsIt() {
+        AudioDeviceInfo output=info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,1);
+        AudioDeviceInfo input=info(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,ADDRESS,2);
+        ReflectionHelpers.setField(ReflectionHelpers.getField(input,"mPort"),"mRole",1);
+        shadowOf(audio).setAvailableCommunicationDevices(List.of(output));shadowOf(audio).setInputDevices(List.of(input));
+        shadowOf((android.app.Application)context).grantPermissions(Manifest.permission.RECORD_AUDIO);
+        assertTrue(port.start(Method.DUPLEX));assertNotNull(ReflectionHelpers.getField(port,"duplex"));
+        DuplexChannel channel=ReflectionHelpers.getField(port,"duplex");
+        int ownSession=channel.session();
+        var own=shadowOf(audio).createActiveRecordingConfiguration(ownSession,7,context.getPackageName());
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own),false);
+        assertNull(port.blockedReason()); // Our own recorder must not block itself.
+        var other=shadowOf(audio).createActiveRecordingConfiguration(ownSession+1,1,"other.private");
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own,other),false);
+        assertTrue(port.blockedReason().contains("other microphone"));
+        shadowOf(audio).setActiveRecordingConfigurations(List.of(own),false);
+        assertFalse(port.transportReady()); // Native route/config missing in simulator is not success.
+        shadowOf((android.app.Application)context).denyPermissions(Manifest.permission.RECORD_AUDIO);
+        assertTrue(port.blockedReason().contains("microphone"));
+        assertTrue(port.release());assertNull(ReflectionHelpers.getField(port,"duplex"));
+        assertEquals(AudioManager.MODE_NORMAL,audio.getMode());
+    }
+    @Implements(android.media.AudioTrack.class)
+    public static class PreferredTrack extends org.robolectric.shadows.ShadowAudioTrack {
+        @Implementation protected boolean native_setOutputDevice(int deviceId) { return true; }
+    }
     @Test public void permissionsAreRequiredAndUnavailableSafetyObservationsFailClosed() {
         assertNull(port.blockedReason());
         shadowOf((android.app.Application)context).denyPermissions(Manifest.permission.READ_PHONE_STATE);

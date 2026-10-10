@@ -41,10 +41,14 @@ public final class DiagnosticReport {
                 .append("idleResult=").append(settings.idleResult())
                 .append(" idleAuto=").append(settings.idleAuto())
                 .append(" voiceFallback=").append(settings.idleVoiceFallback())
+                .append(" manualDuplex=").append(settings.idleDuplex())
+                .append(" micPermission=").append(context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                        == android.content.pm.PackageManager.PERMISSION_GRANTED)
                 .append(" pendingPostCall=").append(settings.idlePostCallPending()).append('\n')
                 .append("device=").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
                 .append(" codename=").append(Build.DEVICE)
                 .append(" sdk=").append(Build.VERSION.SDK_INT)
+                .append(" soc=").append(Build.SOC_MANUFACTURER).append('/').append(Build.SOC_MODEL)
                 .append(" build=").append(Build.DISPLAY).append('\n')
                 .append("bootElapsedMs=").append(SystemClock.elapsedRealtime())
                 .append(" audioMode=").append(new VoiceStream(context.getSystemService(AudioManager.class)).mode())
@@ -66,6 +70,7 @@ public final class DiagnosticReport {
         } else {
             out.append(DiagnosticLog.timestamp(active.startedAt)).append(' ').append(active).append('\n');
         }
+        out.append("\n== Native service declarations (not live state) ==\n").append(NativeServiceInventory.capture()).append('\n');
         out.append("\n== Calls (newest first) ==\n");
 
         List<CallReport> calls = new CallReportRepository(context).history().all();

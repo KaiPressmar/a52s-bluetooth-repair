@@ -68,6 +68,12 @@ The app follows your phone's language (English or German) and can be switched un
 
 ## FAQ
 
+The optional manual duplex recovery in Settings first opens and closes fresh Bluetooth
+speech input/output streams outside calls. It requires a normal microphone grant,
+never runs automatically, and saves or transmits no audio. See the
+[A52s system/API audit](docs/A52S_SYSTEM_API_AUDIT.md) for the repair hypothesis,
+service boundaries and remaining hardware validation.
+
 <details><summary><b>Does it need root?</b></summary>
 
 No. It only uses public Android APIs and a one-time system confirmation.

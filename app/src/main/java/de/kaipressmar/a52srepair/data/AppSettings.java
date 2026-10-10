@@ -44,6 +44,7 @@ public final class AppSettings {
 
     public boolean idleAuto() { return settings.getBoolean("idle_auto", false); }
     public boolean idleVoiceFallback() { return settings.getBoolean("idle_voice", false); }
+    public boolean idleDuplex() { return settings.getBoolean("idle_duplex", false); }
     public boolean idlePostCallPending() { return state.getBoolean("idle_pending", false); }
     public void setIdlePostCallPending(boolean pending) { state.edit().putBoolean("idle_pending", pending).apply(); }
     public String idleResult() { return state.getString("idle_result", "NOT_RUN"); }
