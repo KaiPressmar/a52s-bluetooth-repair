@@ -21,6 +21,18 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class CallAudioServiceTest {
+    @Test public void missingTelecomDeviceListUsesSoleConnectedHfpDeviceAndPinsIt() {
+        ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service = controller.get();
+        android.bluetooth.BluetoothDevice car = LegacyBluetoothTargetTest.device(1);
+        service.onCallAudioStateChanged(LegacyBluetoothTargetTest.audio(CallAudioState.ROUTE_EARPIECE, null));
+        service.observeHeadsets(List.of(car));
+        service.requestRoute(CallAudioState.ROUTE_BLUETOOTH);
+        assertEquals(car, shadowOf(service).getBluetoothAudio());
+        service.observeHeadsets(List.of(LegacyBluetoothTargetTest.device(2)));
+        assertTrue(service.bluetoothTargetAmbiguous());
+        controller.destroy();
+    }
     @Test public void missingModernEndpointsUsesExplicitBluetoothDeviceRatherThanGenericMask() {
         ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
         CallAudioService service = controller.get();

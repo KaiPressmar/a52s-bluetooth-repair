@@ -32,6 +32,7 @@ public class MainActivityTest {
                 assertEquals(activity.getString(R.string.update_security_help),
                         ((TextView) alert.findViewById(android.R.id.message)).getText().toString());
                 alert.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick();
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
                 assertEquals("https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/tag/v9.0.0",
                         org.robolectric.Shadows.shadowOf(activity).getNextStartedActivity().getDataString());
             });

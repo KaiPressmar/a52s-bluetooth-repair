@@ -18,6 +18,8 @@ The old fallback calls `setAudioRoute(BLUETOOTH)` with no device. When modern av
 
 Diagnostics expose endpoint-vs-legacy path, advertised Bluetooth-device count and target availability. No device name/address is exported. Existing teardown confirmation, manual limits, mute preservation and speaker/wired/multiple-call protections remain in place.
 
+If legacy Telecom omits its device list, a sole currently connected HFP device is an additional explicit candidate. Multiple HFP candidates are not guessed between, and a requested target remains pinned if another device appears. Telecom-provided candidates take precedence. If neither interface supplies a target, the remaining generic path is explicitly logged; it cannot be called a device-specific reconnect.
+
 ## Physical validation still required
 
 Answer via the car without touching the phone, with one call-capable Bluetooth device connected. Export during failure and after completion. Look for `routing path=explicit-device` or `routing path=endpoint`, then sustained SCO/voice evidence and actual audible speech. Check two-device ambiguity, disappearance of the chosen car and user-selected speaker routing separately while parked.

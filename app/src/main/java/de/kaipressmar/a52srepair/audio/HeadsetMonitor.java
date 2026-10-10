@@ -152,4 +152,12 @@ public final class HeadsetMonitor {
         return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
                 == PackageManager.PERMISSION_GRANTED;
     }
+
+    /** Connected HFP candidates for firmware that omits legacy Telecom device lists. */
+    @SuppressLint("MissingPermission")
+    public List<BluetoothDevice> connectedDevices() {
+        if (headset == null || !permitted()) return java.util.Collections.emptyList();
+        try { return new java.util.ArrayList<>(headset.getConnectedDevices()); }
+        catch (RuntimeException e) { return java.util.Collections.emptyList(); }
+    }
 }

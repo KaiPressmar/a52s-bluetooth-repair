@@ -6,7 +6,7 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## 0.20.3 - device-specific call audio and browser-based updates
 
-- When modern endpoint availability is absent, Bluetooth routing now uses Telecom's selected or sole advertised Bluetooth device via `requestBluetoothAudio`, rather than only a route mask. The selected device survives the phone hop; ambiguous devices and a missing previously selected target are protected. Modern advertised endpoints remain preferred.
+- When modern endpoint availability is absent, Bluetooth routing now uses Telecom's selected or sole advertised Bluetooth device via `requestBluetoothAudio`, rather than only a route mask. A sole connected HFP device can fill an omitted legacy list. The selected device survives the phone hop; ambiguous devices and a missing previously selected target are protected. Modern advertised endpoints remain preferred.
 - SCO verification observes the target device, so another headset cannot prove that the car recovered. Diagnostics show the routing API, device count and whether an explicit target is available, without names or addresses.
 - Direct requests wait 6 seconds; rebuild returns wait 12 seconds, repeat at most once after 6 seconds and back off 5 seconds after failure. This avoids repeating requests inside AOSP Telecom's default 5-second pending window. Existing per-call budgets and hands-off protections remain.
 - Removed package-installation permission, APK downloading/installation code and the update FileProvider path. Update discovery remains automatic; downloads and installation now start from the official project release in the browser. Old cached APKs are removed without affecting diagnostic exports.

@@ -16,6 +16,26 @@ import org.robolectric.util.ReflectionHelpers.ClassParameter;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {31, 34, 36})
 public class LegacyBluetoothTargetTest {
+    @Test public void soleConnectedHfpFallbackIsPinnedAndNeverOverridesTelecomCandidates() {
+        BluetoothDevice car = device(1), watch = device(2);
+        LegacyBluetoothTarget t = new LegacyBluetoothTarget();
+        t.observeHeadsets(null);
+        assertNull(t.target());
+        t.observeHeadsets(List.of(car, watch));
+        assertTrue(t.ambiguous());
+        t.observeHeadsets(List.of(car));
+        assertEquals(car, t.target());
+        t.requested(car);
+        t.observeHeadsets(List.of(watch));
+        assertNull(t.target());
+        assertTrue(t.ambiguous());
+        t.observeHeadsets(List.of());
+        assertTrue(t.ambiguous());
+        t.clear();
+        t.observeHeadsets(List.of(watch));
+        t.observe(audio(CallAudioState.ROUTE_EARPIECE, null, car));
+        assertEquals(car, t.target());
+    }
     static BluetoothDevice device(int number) {
         return BluetoothAdapter.getDefaultAdapter().getRemoteDevice("00:11:22:33:44:0" + number);
     }

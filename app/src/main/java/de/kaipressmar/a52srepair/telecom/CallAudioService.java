@@ -169,7 +169,12 @@ public final class CallAudioService extends InCallService implements CallSession
     @Override public String routingDetails() {
         return "endpointApi=" + (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability())
                 + " legacyBtDevices=" + legacyTarget.size()
+                + " hfpDevices=" + legacyTarget.headsetCount()
                 + " explicitBtTarget=" + (legacyTarget.target() != null);
+    }
+
+    @Override public void observeHeadsets(List<android.bluetooth.BluetoothDevice> devices) {
+        legacyTarget.observeHeadsets(devices);
     }
 
     @Override
@@ -196,6 +201,7 @@ public final class CallAudioService extends InCallService implements CallSession
             if (target != null) {
                 DiagnosticLog.log(this, "CALL routing path=explicit-device " + routingDetails());
                 requestBluetoothAudio(target);
+                legacyTarget.requested(target);
                 return;
             }
         }

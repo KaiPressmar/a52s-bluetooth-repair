@@ -31,6 +31,7 @@ public class HeadsetMonitorTest {
         assertTrue(proxy.startVoiceRecognition(watch));
         HeadsetMonitor monitor = new HeadsetMonitor(app);
         org.robolectric.util.ReflectionHelpers.setField(monitor, "headset", proxy);
+        assertEquals(2, monitor.connectedDevices().size());
         assertEquals(Boolean.TRUE, monitor.scoAudioConnected());
         assertEquals(Boolean.FALSE, monitor.scoAudioConnected(car));
         assertEquals(Boolean.TRUE, monitor.scoAudioConnected(watch));
@@ -64,6 +65,7 @@ public class HeadsetMonitorTest {
         monitor.open();
         assertEquals(null, monitor.scoAudioConnected());
         assertEquals(false, monitor.hfpConnected());
+        assertTrue(monitor.connectedDevices().isEmpty());
         monitor.close();
     }
 

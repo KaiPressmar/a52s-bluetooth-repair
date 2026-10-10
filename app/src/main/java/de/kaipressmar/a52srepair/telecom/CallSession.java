@@ -37,6 +37,7 @@ final class CallSession {
         default boolean bluetoothTargetAmbiguous() { return false; }
         default android.bluetooth.BluetoothDevice bluetoothDevice() { return null; }
         default String routingDetails() { return "routingDetails=unavailable"; }
+        default void observeHeadsets(List<android.bluetooth.BluetoothDevice> devices) {}
     }
 
     private static final long EVENT_DEBOUNCE_MS = 150L;
@@ -229,6 +230,7 @@ final class CallSession {
     private CallAudioSnapshot snapshot(CallAudioState audio) {
         // Retry failed profile acquisition and recover a mid-call permission grant automatically.
         if (!finished) headset.open();
+        host.observeHeadsets(headset.connectedDevices());
         List<Integer> states = host.callStates();
         VoiceStream.Evidence evidence = voice.evidence();
         CallAudioSnapshot.Builder builder =
