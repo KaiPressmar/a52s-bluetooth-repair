@@ -17,6 +17,7 @@ import de.kaipressmar.a52srepair.data.DeviceInfo;
 import de.kaipressmar.a52srepair.setup.CarLinkManager;
 import de.kaipressmar.a52srepair.setup.ProtectionStatus;
 import de.kaipressmar.a52srepair.telecom.CallAudioService;
+import de.kaipressmar.a52srepair.update.UpdateLinks;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -33,6 +34,9 @@ public final class DiagnosticReport {
         out.append("== A52s Bluetooth Repair diagnostic report ==\n")
                 .append("app=").append(BuildConfig.VERSION_NAME)
                 .append(" (").append(BuildConfig.VERSION_CODE).append(")\n")
+                .append("signerSha256=").append(UpdateLinks.installedSignerSha256(context))
+                .append(" installer=").append(installerSource(context)).append('\n')
+                .append("routing=").append(CallAudioService.activeRoutingDetails()).append('\n')
                 .append("device=").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
                 .append(" codename=").append(Build.DEVICE)
                 .append(" sdk=").append(Build.VERSION.SDK_INT)
@@ -66,6 +70,13 @@ public final class DiagnosticReport {
         }
         out.append("\n== Log ==\n").append(DiagnosticLog.readAll(context));
         return out.toString();
+    }
+
+    private static String installerSource(Context context) {
+        try {
+            String source = context.getPackageManager().getInstallSourceInfo(context.getPackageName()).getInstallingPackageName();
+            return source == null ? "unknown" : source;
+        } catch (Exception e) { return "unknown"; }
     }
 
     /** Writes the report to the cache and returns a share intent, or null on I/O failure. */

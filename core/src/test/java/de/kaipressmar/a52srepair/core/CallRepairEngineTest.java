@@ -21,6 +21,37 @@ import org.junit.Test;
 public class CallRepairEngineTest {
     private static final long T0 = 1_000_000L;
 
+    @Test public void reportFallbackWaitsBeyondTelecomPendingWindowBeforeRebuilding() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot phone = droppedToPhone();
+        e.onSnapshot(phone, T0);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(phone, T0 + 3_000L).commands);
+        CallAudioSnapshot pulse = phone.toBuilder().route(AudioRoute.BLUETOOTH).build();
+        e.onSnapshot(pulse, T0 + 3_100L);
+        e.onSnapshot(phone, T0 + 3_400L);
+        assertTrue(e.onSnapshot(phone, T0 + 7_000L).commands.isEmpty());
+        assertEquals(1, e.report(T0 + 7_000L).routeAttempts);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_EARPIECE), e.onSnapshot(phone, T0 + 9_000L).commands);
+        assertFalse(e.report(T0 + 9_000L).userLeftBluetooth);
+        assertEquals(CallOutcome.UNRESOLVED, e.report(T0 + 9_000L).outcome);
+    }
+
+    @Test public void failedRebuildWaitsBeforeRepeatedRequestAndBacksOffBeforeNextAttempt() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).voiceOnBluetooth(false).build();
+        CallAudioSnapshot phone = droppedToPhone();
+        e.onSnapshot(broken, T0);
+        e.onSnapshot(broken, T0 + 2_000L);
+        e.onSnapshot(phone, T0 + 2_250L);
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(phone, T0 + 2_750L).commands);
+        assertTrue(e.onSnapshot(phone, T0 + 5_750L).commands.isEmpty());
+        assertEquals(List.of(RepairCommand.ROUTE_TO_BLUETOOTH), e.onSnapshot(phone, T0 + 8_750L).commands);
+        assertTrue(e.onSnapshot(phone, T0 + 14_750L).commands.isEmpty());
+        assertTrue(e.onSnapshot(phone, T0 + 19_749L).commands.isEmpty());
+        assertEquals(1, e.report(T0 + 19_749L).routeAttempts);
+        assertFalse(e.onSnapshot(phone, T0 + 19_750L).commands.isEmpty());
+    }
+
     @Test public void pausingLiveProtectionCancelsAutomaticReturnWithoutResettingBudget() {
         CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.OFF, false, T0);
         CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();

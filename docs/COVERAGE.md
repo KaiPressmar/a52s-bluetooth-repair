@@ -26,4 +26,6 @@ Use red/yellow HTML lines to identify a realistic failure scenario first. Add re
 
 Remaining gaps include UI interaction branches, diagnostic formatting and OS installer integration. The test application disables automatic startup update checks; update tests inject deterministic fake fetchers and connections. Production automatic update behavior is unchanged. Telecom/setup tests cover Android 12, 14 and 16 where relevant; existing UI screenshots remain checked.
 
+From v0.20.3, OS installation runs through the browser: direct APK-download/install code and its tests were removed with the package-installation permission. Tests cover canonical browser URLs, invalid metadata, missing browsers, absent permission and old-cache cleanup instead. Coverage measures the remaining production code, so changes in percentages also reflect this reduced scope.
+
 Coverage does not establish that the car receives audible speech. Validate car-answered calls without phone input, SCO teardown/rebounds, persistent downlink silence and manual repair on the physical A52s. Preserve permissions, selected devices and retry budgets. The owner's only demonstrated recovery is a phone restart; public Android routing APIs cannot guarantee a vendor audio/HAL reset.

@@ -19,6 +19,25 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {34, 36})
 public class MainActivityTest {
+    @Test public void updateDialogOffersCanonicalBrowserReleaseAndExplainsAndroidWarnings() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                var release = new de.kaipressmar.a52srepair.update.UpdateRelease(
+                        "9.0.0", "v9.0.0", "app.apk", "", "", "https://evil.example", false);
+                activity.onCheckedUpdateResult(release, "");
+                activity.installUpdate();
+                android.app.Dialog dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog();
+                assertNotNull(dialog);
+                androidx.appcompat.app.AlertDialog alert = (androidx.appcompat.app.AlertDialog) dialog;
+                assertEquals(activity.getString(R.string.update_security_help),
+                        ((TextView) alert.findViewById(android.R.id.message)).getText().toString());
+                alert.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick();
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+                assertEquals("https://github.com/KaiPressmar/a52s-bluetooth-repair/releases/tag/v9.0.0",
+                        org.robolectric.Shadows.shadowOf(activity).getNextStartedActivity().getDataString());
+            });
+        }
+    }
     @Test public void navigationSurvivesActivityRecreation() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> ((com.google.android.material.bottomnavigation.BottomNavigationView)
