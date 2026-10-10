@@ -53,7 +53,9 @@ public final class CallHistory {
     /** True when a call in the last 7 days had a problem or needed a repair (AFTER_PROBLEMS mode). */
     public boolean riskElevated(long now) {
         for (CallReport report : reports) {
-            if (now - report.startedAt > RISK_WINDOW_MS) break;
+            long age = now - report.startedAt;
+            // Insertion order need not remain chronological after a wall-clock correction.
+            if (age < 0 || age > RISK_WINDOW_MS) continue;
             if (report.outcome.problem || report.outcome == CallOutcome.REPAIRED) return true;
         }
         return false;

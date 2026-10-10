@@ -72,6 +72,7 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
         availableUpdate = updates.cachedNewerRelease();
         if (new AppSettings(this).autoUpdateCheck()) {
             updates.check(false, (release, error) -> {
+                if (!canUpdateUi()) return;
                 availableUpdate = release;
                 refreshStatus();
             });
@@ -158,11 +159,13 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
         carLink.link(device, new CarLinkManager.Callback() {
             @Override
             public void onConfirmationRequired(IntentSender sender) {
+                if (!canUpdateUi()) return;
                 linkConfirmation.launch(new IntentSenderRequest.Builder(sender).build());
             }
 
             @Override
             public void onLinked(String deviceName) {
+                if (!canUpdateUi()) return;
                 Toast.makeText(MainActivity.this,
                         getString(R.string.setup_linked, deviceName), Toast.LENGTH_SHORT).show();
                 // The companion role (and with it call access) is granted asynchronously.
@@ -172,6 +175,7 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
 
             @Override
             public void onFailed(CharSequence reason) {
+                if (!canUpdateUi()) return;
                 Toast.makeText(MainActivity.this,
                         getString(R.string.setup_link_failed, reason), Toast.LENGTH_LONG).show();
             }
@@ -209,24 +213,38 @@ public final class MainActivity extends AppCompatActivity implements SetupAction
     @Override
     public void checkForUpdates() {
         Toast.makeText(this, R.string.update_checking, Toast.LENGTH_SHORT).show();
-        new UpdateRepository(this).check(true, (release, error) -> {
-            availableUpdate = release;
-            int message = release != null ? R.string.update_title : R.string.update_none;
-            if (release == null && error != null && !error.isEmpty()) {
-                Toast.makeText(this, getString(R.string.update_failed, error), Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-            }
-            if (release != null) binding.bottomNav.setSelectedItemId(R.id.nav_status);
-            refreshStatus();
-        });
+        new UpdateRepository(this).check(true, this::onCheckedUpdateResult);
+    }
+
+    void onCheckedUpdateResult(UpdateRelease release, String error) {
+        if (!canUpdateUi()) return;
+        availableUpdate = release;
+        int message = release != null ? R.string.update_title : R.string.update_none;
+        if (release == null && error != null && !error.isEmpty()) {
+            Toast.makeText(this, getString(R.string.update_failed, error), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        }
+        if (release != null) binding.bottomNav.setSelectedItemId(R.id.nav_status);
+        refreshStatus();
     }
 
     @Override
     public void refreshStatus() {
+        if (!canUpdateUi()) return;
         for (Fragment fragment : getSupportFragmentManager().getFragments()) {
             if (fragment instanceof Refreshable && fragment.isAdded()) ((Refreshable) fragment).refresh();
         }
+    }
+
+    private boolean canUpdateUi() {
+        return binding != null && !isFinishing() && !isDestroyed()
+                && !getSupportFragmentManager().isStateSaved();
+    }
+
+    @Override protected void onDestroy() {
+        binding = null;
+        super.onDestroy();
     }
 
     /** Implemented by screens that render app state. */

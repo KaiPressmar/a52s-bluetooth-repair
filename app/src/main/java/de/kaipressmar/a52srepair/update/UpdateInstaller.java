@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.net.URI;
 
 /** Downloads, verifies (source, SHA-256, package, version) and hands the APK to Android. */
 public final class UpdateInstaller {
@@ -85,33 +86,60 @@ public final class UpdateInstaller {
     }
 
     private static File downloadAndVerify(Context app, UpdateRelease release) throws Exception {
+        return downloadAndVerify(app, release, new DownloadSource() {
+            @Override public String checksum(String url) throws IOException { return HttpClient.fetchText(url); }
+            @Override public void apk(String url, File target) throws IOException { HttpClient.downloadTo(url, target); }
+        });
+    }
+
+    interface DownloadSource {
+        String checksum(String url) throws IOException;
+        void apk(String url, File target) throws IOException;
+    }
+
+    static File downloadAndVerify(Context app, UpdateRelease release, DownloadSource source) throws Exception {
+        if (release == null || !isTrustedDownloadUrl(release.apkUrl)
+                || !isTrustedDownloadUrl(release.checksumUrl)
+                || !UpdateRelease.expectedApkName(release.version).equals(release.apkName)
+                || SemanticVersion.normalize(release.version) == null) {
+            throw new UpdateException(R.string.update_untrusted);
+        }
         File dir = new File(app.getCacheDir(), "updates");
         if (!dir.exists() && !dir.mkdirs()) throw new IOException("update directory unavailable");
         deleteOthers(dir, release.apkName);
 
         String expected;
         try {
-            expected = parseSha256(HttpClient.fetchText(release.checksumUrl));
+            expected = parseSha256(source.checksum(release.checksumUrl));
         } catch (IllegalArgumentException e) {
             throw new UpdateException(R.string.update_error_checksum);
         }
         File apk = new File(dir, release.apkName);
-        HttpClient.downloadTo(release.apkUrl, apk);
-        if (!sha256(apk).equalsIgnoreCase(expected)) {
-            //noinspection ResultOfMethodCallIgnored
-            apk.delete();
-            throw new UpdateException(R.string.update_error_checksum);
+        boolean verified = false;
+        try {
+            source.apk(release.apkUrl, apk);
+            if (!sha256(apk).equalsIgnoreCase(expected)) throw new UpdateException(R.string.update_error_checksum);
+            if (!packageMatches(app, apk, release.version)) throw new UpdateException(R.string.update_error_package);
+            verified = true;
+            return apk;
+        } finally {
+            // Partial downloads and failed APK parsing must not leave an installable cache file.
+            if (!verified) apk.delete();
         }
-        if (!packageMatches(app, apk, release.version)) {
-            //noinspection ResultOfMethodCallIgnored
-            apk.delete();
-            throw new UpdateException(R.string.update_error_package);
-        }
-        return apk;
     }
 
     static boolean isTrustedDownloadUrl(String url) {
-        return url != null && url.startsWith(TRUSTED_PREFIX);
+        if (url == null || !url.startsWith(TRUSTED_PREFIX)) return false;
+        try {
+            URI uri = URI.create(url);
+            String asset = url.substring(TRUSTED_PREFIX.length());
+            return uri.getQuery() == null && uri.getFragment() == null
+                    && asset.matches("[0-9A-Za-z._+-]+/[0-9A-Za-z._+-]+")
+                    && !asset.startsWith("../") && !asset.startsWith("./")
+                    && !asset.endsWith("/..") && !asset.endsWith("/.");
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /** First token of a {@code sha256sum} sidecar; throws for anything but 64 hex digits. */
@@ -123,6 +151,7 @@ public final class UpdateInstaller {
     }
 
     private static void launchInstaller(Activity activity, File apk, Listener listener) {
+        if (activity.isFinishing() || activity.isDestroyed()) return;
         try {
             Uri uri = FileProvider.getUriForFile(
                     activity, activity.getPackageName() + ".fileprovider", apk);

@@ -39,12 +39,14 @@ public final class UpdateRelease {
         UpdateRelease best = null;
 
         for (int i = 0; i < releases.length(); i++) {
-            JSONObject release = releases.getJSONObject(i);
-            if (release.optBoolean("draft", false)) continue;
+            JSONObject release = releases.optJSONObject(i);
+            if (release == null || release.optBoolean("draft", false)
+                    || release.optBoolean("prerelease", false)) continue;
 
             String tag = release.optString("tag_name", "");
             String version = SemanticVersion.normalize(tag);
-            if (version == null || SemanticVersion.compare(version, currentVersion) <= 0) continue;
+            if (version == null || !version.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
+                    || SemanticVersion.compare(version, currentVersion) <= 0) continue;
 
             String expectedApk = expectedApkName(version);
             JSONArray assets = release.optJSONArray("assets");
@@ -53,13 +55,15 @@ public final class UpdateRelease {
             String apkUrl = null;
             String checksumUrl = null;
             for (int a = 0; a < assets.length(); a++) {
-                JSONObject asset = assets.getJSONObject(a);
+                JSONObject asset = assets.optJSONObject(a);
+                if (asset == null) continue;
                 String name = asset.optString("name", "");
                 String url = asset.optString("browser_download_url", "");
                 if (expectedApk.equals(name)) apkUrl = url;
                 else if ((expectedApk + ".sha256").equals(name)) checksumUrl = url;
             }
-            if (apkUrl == null || checksumUrl == null) continue;
+            if (!UpdateInstaller.isTrustedDownloadUrl(apkUrl)
+                    || !UpdateInstaller.isTrustedDownloadUrl(checksumUrl)) continue;
 
             UpdateRelease candidate =
                     new UpdateRelease(

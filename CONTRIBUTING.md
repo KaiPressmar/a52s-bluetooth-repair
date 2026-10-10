@@ -30,6 +30,8 @@ Create a focused branch and pull request. Add or update a failing test first for
 
 ## Pull requests
 
+Run `./gradlew coverageReport` and `python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --verify` before submitting changes. See [coverage and test guidance](docs/COVERAGE.md) for HTML reports, enforced module thresholds and meaningful regression scenarios.
+
 A PR should explain the observed problem, hypothesis, behavioral change, safety implications, tests added, and manual A52s validation if applicable. Avoid combining unrelated repair experiments in one PR.
 
 ## Commit and release discipline
