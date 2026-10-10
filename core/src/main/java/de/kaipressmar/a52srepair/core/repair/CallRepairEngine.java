@@ -39,6 +39,9 @@ public final class CallRepairEngine {
     /** Give asynchronous SCO teardown time to settle before requesting the same device again. */
     public static final long TEARDOWN_SETTLE_MS = 500L;
     public static final long UNKNOWN_TEARDOWN_SETTLE_MS = 1_500L;
+    public static final long EXTENDED_LEAVE_TIMEOUT_MS = 8_000L;
+    public static final long EXTENDED_TEARDOWN_SETTLE_MS = 2_000L;
+    public static final long OBSERVATION_REFRESH_WAIT_MS = 1_500L;
     // AOSP Telecom keeps a Bluetooth request pending for 5 s and may retry internally.
     public static final long RETURN_TIMEOUT_MS = 12_000L;
     public static final long ROUTE_REQUEST_TIMEOUT_MS = 6_000L;
@@ -83,6 +86,7 @@ public final class CallRepairEngine {
     }
 
     private enum Operation {
+        REFRESHING_REBUILD,
         NONE,
         REBUILD_LEAVING,
         REBUILD_RETURNING,
@@ -102,6 +106,9 @@ public final class CallRepairEngine {
     private boolean operationManual;
     private boolean returnRequestRepeated;
     private boolean directRouteFailed;
+    private boolean extendedRebuild;
+    private boolean missingRouteRefreshed;
+    private boolean communicationAttempted;
     private long teardownSince = -1L;
     private boolean teardownKnown;
     private long healthySince = -1L;
@@ -280,7 +287,12 @@ public final class CallRepairEngine {
 
         if (s.callCount > 1) return step(FAST_TICK_MS, fault + " observed; repair deferred for multiple calls");
 
-        if (!fault.repairable) return step(SLOW_TICK_MS, fault + " not repairable");
+        if (fault == Fault.BLUETOOTH_ROUTE_MISSING && repairEnabled && !missingRouteRefreshed) {
+            missingRouteRefreshed = true;
+            return step(FAST_TICK_MS, "HFP connected but call endpoint missing; refresh observations once",
+                    RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS);
+        }
+        if (!fault.repairable) return step(SLOW_TICK_MS, fault + " not repairable through public routing");
         if (!repairEnabled) return step(SLOW_TICK_MS, fault + " observed (repair disabled)");
         if (now < retryAfter) return step(retryAfter - now, "waiting after failed route command");
 
@@ -323,6 +335,8 @@ public final class CallRepairEngine {
     public boolean isEnded() {
         return ended;
     }
+
+    public boolean routingOperationActive() { return routeOperationActive(); }
 
     CallOutcome outcome() {
         if (!bluetoothEverAvailable && !everOnBluetooth) {
@@ -411,6 +425,11 @@ public final class CallRepairEngine {
     private Step advanceOperation(CallAudioSnapshot s, long now) {
         long age = now - operationSince;
         switch (operation) {
+            case REFRESHING_REBUILD:
+                if (age < OBSERVATION_REFRESH_WAIT_MS) {
+                    return step(OBSERVATION_REFRESH_WAIT_MS - age, "waiting for refreshed Bluetooth observations");
+                }
+                return beginRebuildRoutes(s, now, operationPreventive, "extended Bluetooth rebuild after observation refresh");
             case REBUILD_LEAVING:
                 if (s.route == AudioRoute.EARPIECE && !Boolean.TRUE.equals(s.scoAudioConnected)) {
                     boolean known = Boolean.FALSE.equals(s.scoAudioConnected);
@@ -418,18 +437,19 @@ public final class CallRepairEngine {
                         teardownSince = now;
                         teardownKnown = known;
                     }
-                    long settleMs = known ? TEARDOWN_SETTLE_MS : UNKNOWN_TEARDOWN_SETTLE_MS;
+                    long settleMs = extendedRebuild ? EXTENDED_TEARDOWN_SETTLE_MS
+                            : known ? TEARDOWN_SETTLE_MS : UNKNOWN_TEARDOWN_SETTLE_MS;
                     if (now - teardownSince >= settleMs) {
                         begin(Operation.REBUILD_RETURNING, now, operationPreventive);
                         return step(500L, known ? "SCO off and phone route settled; return to Bluetooth"
                                 : "phone route settled; SCO teardown unknown; attempt Bluetooth return",
-                                RepairCommand.ROUTE_TO_BLUETOOTH);
+                                bluetoothReturnCommands());
                     }
                 } else {
                     // A route callback can precede the real link teardown. A rebound resets the dwell.
                     teardownSince = -1L;
                 }
-                if (age >= LEAVE_TIMEOUT_MS) {
+                if (age >= (extendedRebuild ? EXTENDED_LEAVE_TIMEOUT_MS : LEAVE_TIMEOUT_MS)) {
                     // A later phone-route diagnosis must not bypass this failed teardown
                     // by issuing a fresh direct request over the still-connected old SCO link.
                     directRouteFailed = true;
@@ -459,7 +479,7 @@ public final class CallRepairEngine {
                     lastCommandAt = now;
                     lastRouteChangeAt = now;
                     returnRequestRepeated = true;
-                    return step(500L, "repeat Bluetooth request", RepairCommand.ROUTE_TO_BLUETOOTH);
+                    return step(500L, "repeat Bluetooth request", bluetoothCommand());
                 }
                 return step(500L, "waiting for Bluetooth audio");
             case ROUTE_REQUEST:
@@ -536,13 +556,38 @@ public final class CallRepairEngine {
     }
 
     private Step startRebuild(CallAudioSnapshot s, long now, boolean preventive, String note) {
+        extendedRebuild = !preventive && (routeAttempts >= MAX_ROUTE_ATTEMPTS
+                || manualRepairs >= MAX_MANUAL_REPAIRS);
+        if (extendedRebuild) note += "; extended settle and alternate Telecom API";
+        if (extendedRebuild) {
+            begin(Operation.REFRESHING_REBUILD, now, false);
+            return step(OBSERVATION_REFRESH_WAIT_MS, note, RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS);
+        }
+        return beginRebuildRoutes(s, now, preventive, note);
+    }
+
+    private Step beginRebuildRoutes(CallAudioSnapshot s, long now, boolean preventive, String note) {
         if (!s.earpieceAvailable) {
             // Without an earpiece there is no safe intermediate route; just re-request Bluetooth.
             begin(Operation.REBUILD_RETURNING, now, preventive);
-            return step(500L, note + " (no earpiece)", RepairCommand.ROUTE_TO_BLUETOOTH);
+            return step(500L, note + " (no earpiece; no forced teardown)", bluetoothReturnCommands());
         }
         begin(Operation.REBUILD_LEAVING, now, preventive);
-        return step(250L, note, RepairCommand.ROUTE_TO_EARPIECE);
+        return extendedRebuild
+                ? step(250L, note, RepairCommand.ROUTE_TO_EARPIECE_LEGACY)
+                : step(250L, note, RepairCommand.ROUTE_TO_EARPIECE);
+    }
+
+    private RepairCommand bluetoothCommand() {
+        return extendedRebuild ? RepairCommand.ROUTE_TO_BLUETOOTH_LEGACY : RepairCommand.ROUTE_TO_BLUETOOTH;
+    }
+
+    private RepairCommand[] bluetoothReturnCommands() {
+        if (extendedRebuild && !communicationAttempted) {
+            communicationAttempted = true;
+            return new RepairCommand[] { bluetoothCommand(), RepairCommand.TRY_COMMUNICATION_DEVICE };
+        }
+        return new RepairCommand[] { bluetoothCommand() };
     }
 
     private boolean takeRouteAttempt() {

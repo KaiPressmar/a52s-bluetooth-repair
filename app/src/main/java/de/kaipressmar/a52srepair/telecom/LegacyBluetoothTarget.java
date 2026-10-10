@@ -35,5 +35,6 @@ final class LegacyBluetoothTarget {
     boolean ambiguous() { return (preferred != null || !candidates().isEmpty()) && target() == null; }
     int size() { return available.size(); }
     int headsetCount() { return headsets.size(); }
+    int candidateCount() { return candidates().size(); }
     void clear() { preferred = null; available.clear(); headsets.clear(); }
 }

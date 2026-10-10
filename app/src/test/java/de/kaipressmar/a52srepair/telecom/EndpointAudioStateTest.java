@@ -21,6 +21,31 @@ import org.robolectric.annotation.Config;
 @Config(sdk = {34, 36})
 @SuppressWarnings("deprecation")
 public class EndpointAudioStateTest {
+    @Test public void disappearedSelectedCarNeverSilentlySwitchesToSoleOtherHeadset() {
+        EndpointAudioState s = new EndpointAudioState();
+        CallEndpoint car = endpoint(CallEndpoint.TYPE_BLUETOOTH);
+        CallEndpoint watch = endpoint(CallEndpoint.TYPE_BLUETOOTH);
+        s.available(List.of(car, watch));
+        s.selected(car);
+        s.available(List.of(watch));
+        assertNull(s.target(CallAudioState.ROUTE_BLUETOOTH));
+        org.junit.Assert.assertTrue(s.bluetoothTargetAmbiguous());
+        s.selected(watch); // An explicit platform selection may establish the new target.
+        assertSame(watch, s.target(CallAudioState.ROUTE_BLUETOOTH));
+    }
+
+    @Test public void legacyFallbackInvalidatesLateModernOutcomeWithoutInventingSuccess() {
+        EndpointAudioState s = new EndpointAudioState();
+        s.available(List.of(endpoint(CallEndpoint.TYPE_BLUETOOTH)));
+        List<OutcomeReceiver<Void, CallEndpointException>> callbacks = new ArrayList<>();
+        AtomicInteger events = new AtomicInteger();
+        s.request(CallAudioState.ROUTE_BLUETOOTH, (e, c) -> callbacks.add(c),
+                events::incrementAndGet, code -> events.incrementAndGet());
+        s.invalidateRequests();
+        callbacks.get(0).onResult(null);
+        callbacks.get(0).onError(new CallEndpointException(null, CallEndpointException.ERROR_REQUEST_TIME_OUT));
+        assertEquals(0, events.get());
+    }
     private static CallEndpoint endpoint(int type) {
         return new CallEndpoint("Test", type, new ParcelUuid(UUID.randomUUID()));
     }

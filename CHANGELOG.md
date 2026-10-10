@@ -4,6 +4,16 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.21.0 - bounded recovery escalation for persistent call-audio failures
+
+- The last automatic rebuild or second manual rebuild refreshes Telecom observations and reacquires the app's HFP observer, then waits before routing. It uses the older Telecom API with an unambiguous device and a 2-second phone/SCO-off dwell, allowing up to 8 seconds for teardown. Existing automatic/manual budgets remain unchanged.
+- A failed modern endpoint request can fall back once to advertised legacy Telecom routing while the same repair and single active call are still valid. Removed endpoints, multiple/unmapped devices, speaker choices and paused automatic protection block the fallback. Neither API resets Android system services.
+- As a last-resort experiment, request AudioManager communication routing once per call to an exactly address-matched, advertised SCO/LE conversation device. Do not change audio-mode ownership or microphone mute. Clear this app's request after 15 seconds, on alternate routes, held/multiple calls, paused automatic protection and session shutdown. API acceptance is not successful speech; our own predicted route cannot establish recovery.
+- A missing call-audio endpoint despite connected HFP triggers one observation refresh, never a forced unsupported route. Observation proxy reconnection now handles service disconnects and ignores callbacks from obsolete bindings.
+- Disappearance of a previously selected modern Bluetooth endpoint never selects a different sole headset automatically. Ambiguous targets cannot provide positive audio-recovery evidence.
+- Regression tests cover escalation, slow/stuck teardown, bounded requests and cleanup, API fallback, obsolete callbacks and target disappearance on Android 12/14/16. Coverage gates and signed release validation remain enforced.
+- Public APIs still cannot restart Telecom, audioserver, the vendor HAL or Samsung services. Bluetooth toggling is not a repair step: the owner reports it never helps. A phone reboot remains the only demonstrated hardware recovery. See [recovery matrix](docs/RECOVERY_ESCALATION.md) and the expanded physical test procedure.
+
 ## 0.20.3 - device-specific call audio and browser-based updates
 
 - When modern endpoint availability is absent, Bluetooth routing now uses Telecom's selected or sole advertised Bluetooth device via `requestBluetoothAudio`, rather than only a route mask. A sole connected HFP device can fill an omitted legacy list. The selected device survives the phone hop; ambiguous devices and a missing previously selected target are protected. Modern advertised endpoints remain preferred.

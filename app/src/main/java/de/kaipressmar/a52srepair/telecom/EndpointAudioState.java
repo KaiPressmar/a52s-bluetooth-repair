@@ -36,8 +36,17 @@ final class EndpointAudioState {
 
     boolean hasAvailability() { return availableMask != null; }
 
+    int bluetoothCount() {
+        int count = 0;
+        for (CallEndpoint endpoint : available) {
+            if (endpoint.getEndpointType() == CallEndpoint.TYPE_BLUETOOTH) count++;
+        }
+        return count;
+    }
+
     boolean bluetoothTargetAmbiguous() {
-        return availableMask != null && (availableMask & CallAudioState.ROUTE_BLUETOOTH) != 0
+        return availableMask != null && (lastBluetoothId != null
+                || (availableMask & CallAudioState.ROUTE_BLUETOOTH) != 0)
                 && target(CallAudioState.ROUTE_BLUETOOTH) == null;
     }
 
@@ -54,8 +63,12 @@ final class EndpointAudioState {
             only = endpoint;
             count++;
         }
+        if (wanted == CallAudioState.ROUTE_BLUETOOTH && lastBluetoothId != null) return null;
         return count == 1 ? only : null;
     }
+
+    /** A legacy request supersedes the outstanding modern operation too. */
+    void invalidateRequests() { requestGeneration++; }
 
     interface Requester {
         void request(CallEndpoint endpoint, OutcomeReceiver<Void, CallEndpointException> callback);
