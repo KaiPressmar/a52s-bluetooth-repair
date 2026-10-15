@@ -31,36 +31,18 @@ public class CallAudioServiceTest {
         controller.destroy();
     }
     @Test @Config(sdk = {34, 36})
-    public void endpointTimeoutFallsBackOnceToSameLegacyDeviceAndLateCallbacksCannotRepeatIt() {
-        ServiceController<CallAudioService> controller = Robolectric.buildService(CallAudioService.class).create();
-        CallAudioService service = controller.get();
-        android.bluetooth.BluetoothDevice car = LegacyBluetoothTargetTest.device(1);
-        CallAudioState audio = LegacyBluetoothTargetTest.audio(CallAudioState.ROUTE_BLUETOOTH, car, car);
-        service.onCallAudioStateChanged(audio);
-        CallEndpoint endpoint = new CallEndpoint("Car", CallEndpoint.TYPE_BLUETOOTH, android.os.ParcelUuid.fromString("00000000-0000-0000-0000-000000000001"));
+    public void endpointTimeoutNeverBypassesSessionBudgetWithLegacyFallback() {
+        ServiceController<CallAudioService> controller=Robolectric.buildService(CallAudioService.class).create();
+        CallAudioService service=controller.get();
+        CallEndpoint endpoint=new CallEndpoint("Car",CallEndpoint.TYPE_BLUETOOTH,
+                new android.os.ParcelUuid(java.util.UUID.randomUUID()));
         service.onAvailableCallEndpointsChanged(List.of(endpoint));
-        service.onCallEndpointChanged(endpoint);
-        Call call = newCall();
-        Call.Details details = Shadow.newInstanceOf(Call.Details.class);
-        org.robolectric.util.ReflectionHelpers.setField(details, "mState", Call.STATE_ACTIVE);
-        org.robolectric.util.ReflectionHelpers.setField(call, "mDetails", details);
-        addCall(service, call);
-        CallSession pending = new CallSession(service, new CallSession.Host() {
-            @Override public CallAudioState audioState() { return audio; }
-            @Override public List<Integer> callStates() { return List.of(Call.STATE_ACTIVE); }
-            @Override public void requestRoute(int route) {}
-        });
-        assertEquals(ManualRepairStatus.STARTED, pending.repairManually());
-        org.robolectric.util.ReflectionHelpers.setField(service, "session", pending);
-        java.util.List<android.os.OutcomeReceiver<Void, android.telecom.CallEndpointException>> callbacks = new java.util.ArrayList<>();
-        service.requestEndpointRoute(CallAudioState.ROUTE_BLUETOOTH, (e, c) -> callbacks.add(c));
-        callbacks.get(0).onError(new android.telecom.CallEndpointException(null, android.telecom.CallEndpointException.ERROR_REQUEST_TIME_OUT));
-        assertEquals(car, shadowOf(service).getBluetoothAudio());
-        android.bluetooth.BluetoothDevice other = LegacyBluetoothTargetTest.device(2);
-        service.requestBluetoothAudio(other); // Stand-in to detect an illicit repeated request.
-        callbacks.get(0).onError(new android.telecom.CallEndpointException(null, android.telecom.CallEndpointException.ERROR_REQUEST_TIME_OUT));
-        assertEquals(other, shadowOf(service).getBluetoothAudio());
-        service.onCallEndpointChanged(new CallEndpoint("Speaker", CallEndpoint.TYPE_SPEAKER, android.os.ParcelUuid.fromString("00000000-0000-0000-0000-000000000002")));
+        java.util.List<android.os.OutcomeReceiver<Void,android.telecom.CallEndpointException>> callbacks=new java.util.ArrayList<>();
+        service.requestEndpointRoute(CallAudioState.ROUTE_BLUETOOTH,(e,c)->callbacks.add(c));
+        callbacks.get(0).onError(new android.telecom.CallEndpointException(null,
+                android.telecom.CallEndpointException.ERROR_REQUEST_TIME_OUT));
+        callbacks.get(0).onResult(null);
+        assertNull(shadowOf(service).getBluetoothAudio());
         assertFalse(service.tryLegacyFallback(CallAudioState.ROUTE_BLUETOOTH));
         controller.destroy();
     }
@@ -135,7 +117,7 @@ public class CallAudioServiceTest {
         service.onCallAdded(first);
         assertNotNull(CallAudioService.activeReport());
         assertEquals(1, CallAudioService.checkNow().callCount);
-        assertEquals(ManualRepairStatus.NO_ACTIVE_CALL, CallAudioService.repairNow());
+        assertEquals(ManualRepairStatus.ALTERNATIVE_ROUTE, CallAudioService.repairNow());
         addCall(service, second);
         service.onCallAdded(second);
         assertEquals(2, CallAudioService.checkNow().callCount);

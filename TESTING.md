@@ -151,3 +151,9 @@ app pause and screen lock during capture. Android should show the mic indicator
 only during the bounded attempt and it must disappear after cleanup. Native init
 inventory can be unavailable; it must never imply a daemon actually restarted.
 A successful off-call duplex check does not establish repaired cellular speech.
+
+## Version 0.24.0 dispatch and hardware gates
+
+`RecoveryDispatchTest` exercises Android 12, 14 and 16 with virtual time and delayed storage acknowledgment. It verifies that permission/call eligibility changes, user speaker choices, target changes, process interruption and stale callbacks cannot issue an unguarded request. `RecoveryBudgetTest` covers exact accounting, one-rebuild limits, reserved return capacity and the absolute deadline. Journal, policy, legacy-history and diagnostic-export tests cover durable failure and privacy boundaries.
+
+Run `python3 scripts/validate-repository.py` alongside the existing Gradle/coverage checks. The physical protocol is [ACCESS_PROTOCOL.md](docs/validation/ACCESS_PROTOCOL.md). Hardware results for v0.24.0 are pending; the release is experimental and must not be counted as audible recovery evidence.

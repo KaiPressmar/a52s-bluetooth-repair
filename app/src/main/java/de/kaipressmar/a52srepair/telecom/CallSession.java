@@ -21,6 +21,12 @@ import de.kaipressmar.a52srepair.data.AppSettings;
 import de.kaipressmar.a52srepair.data.CallReportRepository;
 import de.kaipressmar.a52srepair.diagnostics.DiagnosticLog;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import de.kaipressmar.a52srepair.core.repair.RecoveryBudget;
+import de.kaipressmar.a52srepair.core.model.AudioRoute;
+import de.kaipressmar.a52srepair.data.RecoveryJournalRepository;
 
 /**
  * Android driver for one {@link CallRepairEngine}: collects snapshots, runs the engine on the
@@ -35,6 +41,10 @@ final class CallSession {
 
         void requestRoute(int telecomRoute);
 
+        default boolean safeToRepair() { return false; }
+        default String targetToken() { return null; }
+        default String stableAccessoryId() { return null; }
+        default String selectedTargetToken() { return null; }
         default void requestLegacyRoute(int telecomRoute) { requestRoute(telecomRoute); }
         default void refreshRoutingState() {}
 
@@ -43,6 +53,23 @@ final class CallSession {
         default String routingDetails() { return "routingDetails=unavailable"; }
         default void observeHeadsets(List<android.bluetooth.BluetoothDevice> devices) {}
     }
+
+    private static final Executor JOURNAL_WRITER = Executors.newSingleThreadExecutor();
+    private final Executor writer;
+    private final RecoveryJournalRepository journal;
+    private final de.kaipressmar.a52srepair.data.RecoveryPolicyRepository policies;
+    private String riskScope;
+    private final RecoveryBudget budget = new RecoveryBudget();
+    private final String generation = UUID.randomUUID().toString();
+    private boolean pendingDispatch;
+    private boolean expectedPhoneHop;
+    private boolean bluetoothIntent;
+    private boolean yielded;
+    private boolean interrupted;
+    private boolean executing;
+    private AudioRoute previousRoute = AudioRoute.UNKNOWN;
+    private String targetToken;
+    private String controlResult = "NOT_REQUESTED";
 
     private static final long EVENT_DEBOUNCE_MS = 150L;
     private static final long LOG_HEARTBEAT_MS = 30_000L;
@@ -69,9 +96,18 @@ final class CallSession {
 
     private final Runnable tick = this::tick;
 
-    CallSession(Context context, Host host) {
+    CallSession(Context context, Host host) { this(context, host, JOURNAL_WRITER); }
+
+    CallSession(Context context, Host host, Executor writer) {
         this.context = context.getApplicationContext();
         this.host = host;
+        this.writer = writer;
+        policies = new de.kaipressmar.a52srepair.data.RecoveryPolicyRepository(this.context);
+        journal = new RecoveryJournalRepository(this.context);
+        interrupted = journal.interrupted();
+        if (interrupted) budget.stop("INTERRUPTED");
+        de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.record(this.context,
+                de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.Event.START, 0, 0);
         headset = new HeadsetMonitor(this.context, this::onEvent);
         voice = new VoiceStream(this.context.getSystemService(AudioManager.class));
         communication = new CommunicationDeviceRecovery(this.context.getSystemService(AudioManager.class));
@@ -81,7 +117,7 @@ final class CallSession {
         preferences = PreferenceManager.getDefaultSharedPreferences(this.context);
         startedAtWall = System.currentTimeMillis();
         startedAtElapsed = SystemClock.elapsedRealtime();
-        boolean riskElevated = reports.history().riskElevated(startedAtWall);
+        boolean riskElevated = false; // Resolve the current accessory before applying AFTER_PROBLEMS.
         engine = new CallRepairEngine(
                 settings.protectionEnabled(), settings.preventiveMode(), riskElevated, 0L);
         DiagnosticLog.log(
@@ -105,7 +141,12 @@ final class CallSession {
 
     /** Keep short Bluetooth selections: debouncing can otherwise hide a failed SCO attempt. */
     void onAudioStateChanged(CallAudioState audio) {
-        if (!finished) tick(snapshot(audio));
+        if (!finished) {
+            // Inspect every short route pulse, but do not reenter execution from a synchronous callback.
+            observeChoice(snapshot(audio));
+            if (executing || pendingDispatch) onEvent();
+            else tick(snapshot(audio));
+        }
     }
 
     /** Current call is exportable before it is added to the completed-call history. */
@@ -124,6 +165,8 @@ final class CallSession {
 
     ManualRepairStatus repairManually() {
         if (finished) return ManualRepairStatus.NO_ACTIVE_CALL;
+        if (!host.safeToRepair() || !settings.protectionEnabled()) return ManualRepairStatus.ALTERNATIVE_ROUTE;
+        if (!"NONE".equals(budget.refusal(elapsed(), true))) return ManualRepairStatus.BUDGET_EXHAUSTED;
         engine.updatePolicy(settings.protectionEnabled(), settings.preventiveMode());
         headset.open();
         CallAudioSnapshot state = snapshot();
@@ -131,6 +174,8 @@ final class CallSession {
         // Platform target selection is checked before any intermediate route is requested.
         if (state.phase.carriesAudio() && state.callCount == 1 && state.bluetoothRouteAvailable
                 && host.bluetoothTargetAmbiguous()) return ManualRepairStatus.AMBIGUOUS_DEVICE;
+        targetToken = host.targetToken();
+        bluetoothIntent = true; // Explicit action can establish intent, never reset the shared budget.
         CallRepairEngine.ManualRepair result = engine.requestManualRepair(state, now);
         DiagnosticLog.log(context, "CALL manual repair result=" + result.status);
         if (result.status == ManualRepairStatus.STARTED && !applyStep(state, now, result.step)) {
@@ -141,22 +186,41 @@ final class CallSession {
 
     void onRouteRequestFailed() {
         if (finished) return;
+        if ("REQUESTED".equals(controlResult) || "ACKNOWLEDGED".equals(controlResult)) controlResult = "REJECTED";
         engine.onRouteRequestFailed(elapsed());
+        onEvent();
+    }
+
+    void onRequestAcknowledged() {
+        if (finished) return;
+        controlResult = "ACKNOWLEDGED";
         onEvent();
     }
 
     boolean allowsRouteFallback() {
         engine.updatePolicy(settings.protectionEnabled(), settings.preventiveMode());
-        return !finished && engine.routingOperationActive();
+        return false; // Cross-API mutations must never bypass durable request accounting.
     }
 
     private CallReport report(long now) {
         CallReport r = engine.report(now);
-        return new CallReport(startedAtWall, r.durationMs, r.outcome, r.faults,
-                r.routeAttempts, r.volumeRestores, r.preventiveRebuild, r.userLeftBluetooth, r.manualRepairs);
+        de.kaipressmar.a52srepair.core.report.CallOutcome outcome = r.outcome;
+        if (r.usedBluetooth() && (interrupted || "REJECTED".equals(controlResult)
+                || (!"NONE".equals(budget.stoppedReason()) && !yielded))) {
+            outcome = de.kaipressmar.a52srepair.core.report.CallOutcome.UNRESOLVED;
+        }
+        if (yielded) outcome = de.kaipressmar.a52srepair.core.report.CallOutcome.LEFT_BLUETOOTH;
+        return new CallReport(startedAtWall, r.durationMs, outcome, r.faults,
+                r.routeAttempts, 0, r.preventiveRebuild && budget.dispatchedCount() > 0, r.userLeftBluetooth || yielded, r.manualRepairs,
+                budget.reserved(), budget.dispatchedCount(), controlResult,
+                interrupted ? "INTERRUPTED" : budget.stoppedReason(), false);
     }
 
-    void finish() {
+    void interrupt() { interrupted = true; budget.stop("INTERRUPTED"); finish(false); }
+
+    void finish() { finish(true); }
+
+    private void finish(boolean observedEnd) {
         if (finished) return;
         long now = elapsed();
         engine.onSnapshot(snapshot().toBuilder().phase(CallPhase.ENDED).build(), now);
@@ -167,8 +231,15 @@ final class CallSession {
         communication.close();
 
         CallReport report = report(now);
-        reports.add(report);
-        if (report.outcome.problem) {
+        de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.record(context,
+                observedEnd ? de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.Event.END
+                        : de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.Event.INTERRUPTED,
+                budget.dispatchedCount(), now);
+        writer.execute(() -> reports.add(report));
+        // Only observing the actual end closes a lease. Service destruction is not call completion.
+        if (observedEnd) writer.execute(() -> journal.close(generation));
+        if (report.outcome.problem && !yielded) {
+            policies.recordProblem(riskScope, System.currentTimeMillis());
             settings.setIdlePostCallPending(true);
             DiagnosticLog.log(context, "IDLE post-call candidate recorded; execution requires visible app and idle phone");
         }
@@ -182,7 +253,15 @@ final class CallSession {
 
     private void tick(CallAudioSnapshot snapshot) {
         long now = elapsed();
-        engine.updatePolicy(settings.protectionEnabled(), settings.preventiveMode());
+        observeChoice(snapshot);
+        if (riskScope == null) riskScope = policies.scope(host.stableAccessoryId());
+        engine.updateRisk(policies.elevated(riskScope, System.currentTimeMillis()));
+        boolean allowed = settings.protectionEnabled() && host.safeToRepair() && !yielded
+                && !interrupted && "NONE".equals(budget.stoppedReason());
+        engine.updatePolicy(allowed, settings.preventiveMode());
+        if (budget.firstAt() >= 0 && budget.remainingMs(now) == 0
+                && (engine.routingOperationActive() || pendingDispatch)) budget.stop("DEADLINE");
+        if (pendingDispatch) { schedule(250L); return; }
         CallRepairEngine.Step step = engine.onSnapshot(snapshot, now);
         communication.maintain(snapshot, now, settings.protectionEnabled() || engine.routingOperationActive());
         applyStep(snapshot, now, step);
@@ -198,6 +277,8 @@ final class CallSession {
                 context.getSystemService(AudioManager.class), host.bluetoothDevice());
         if (!step.commands.isEmpty() || !state.equals(lastLoggedSnapshot)
                 || !step.note.equals(lastLoggedNote) || now - lastLoggedAt >= LOG_HEARTBEAT_MS) {
+            de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.observation(context, snapshot,
+                    budget.dispatchedCount(), now);
             lastLoggedSnapshot = state;
             lastLoggedNote = step.note;
             lastLoggedAt = now;
@@ -209,7 +290,11 @@ final class CallSession {
 
         for (RepairCommand command : step.commands) {
             try {
-                execute(command);
+                if (command == RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS) execute(command);
+                else if (command == RepairCommand.RESTORE_VOICE_VOLUME || command == RepairCommand.TRY_COMMUNICATION_DEVICE) {
+                    // No implicit volume changes or AudioPolicy ownership experiments during cellular calls.
+                    DiagnosticLog.log(context, "CALL optional mutation suppressed command=" + command);
+                } else accepted &= dispatch(command);
             } catch (RuntimeException e) {
                 accepted = false;
                 // Binder/permission failures must not kill call observation or reset budgets.
@@ -224,6 +309,88 @@ final class CallSession {
         return accepted;
     }
 
+    private void observeChoice(CallAudioSnapshot state) {
+        String selected = host.selectedTargetToken();
+        if (state.route == AudioRoute.BLUETOOTH) {
+            bluetoothIntent = true;
+            if (targetToken == null) targetToken = selected == null ? host.targetToken() : selected;
+            else if (selected != null && !targetToken.equals(selected)) yielded = true;
+            expectedPhoneHop = false;
+        } else if (state.route == AudioRoute.SPEAKER || state.route == AudioRoute.WIRED_HEADSET
+                || state.route == AudioRoute.STREAMING
+                || (previousRoute == AudioRoute.BLUETOOTH && state.route == AudioRoute.EARPIECE && !expectedPhoneHop)) {
+            yielded = true;
+        }
+        previousRoute = state.route;
+        if (yielded) budget.stop("USER_CHOICE");
+        if (budget.reserved() > 0 && (!state.repairAllowed || state.callCount != 1
+                || state.phase != CallPhase.ACTIVE)) budget.stop("INELIGIBLE");
+    }
+
+    private boolean eligible(CallAudioSnapshot state, long now) {
+        observeChoice(state);
+        String offered = host.targetToken();
+        return !finished && settings.protectionEnabled() && host.safeToRepair() && state.repairAllowed
+                && state.phase == CallPhase.ACTIVE && state.callCount == 1 && state.bluetoothRouteAvailable
+                && !host.bluetoothTargetAmbiguous() && bluetoothIntent && !yielded && !interrupted
+                && targetToken != null && targetToken.equals(offered)
+                && (state.route == AudioRoute.BLUETOOTH || state.route == AudioRoute.EARPIECE)
+                && "NONE".equals(budget.stoppedReason()) && budget.remainingMs(now) > 0;
+    }
+
+    private boolean dispatch(RepairCommand command) {
+        long now = elapsed();
+        CallAudioSnapshot fresh = snapshot();
+        boolean leaving = command == RepairCommand.ROUTE_TO_EARPIECE
+                || command == RepairCommand.ROUTE_TO_EARPIECE_LEGACY;
+        if (!eligible(fresh, now) || (leaving && !fresh.earpieceAvailable)) {
+            controlResult = "BLOCKED";
+            DiagnosticLog.log(context, "CALL mutation blocked: eligibility, intent or ambiguous Bluetooth endpoint");
+            onRouteRequestFailed();
+            return false;
+        }
+        if (!budget.reserve(now, leaving)) {
+            controlResult = "BLOCKED";
+            onRouteRequestFailed();
+            return false;
+        }
+        pendingDispatch = true;
+        int reservation = budget.reserved();
+        long firstAt = budget.firstAt();
+        writer.execute(() -> {
+            boolean saved = journal.reserve(generation, reservation, firstAt);
+            handler.post(() -> {
+                pendingDispatch = false;
+                if (finished) return;
+                if (!saved) {
+                    budget.stop("STORAGE_FAILED"); controlResult = "STORAGE_FAILED";
+                    onRouteRequestFailed(); return;
+                }
+                if (budget.remainingMs(elapsed()) == 0) budget.stop("DEADLINE");
+                if (!eligible(snapshot(), elapsed())) {
+                    controlResult = "CANCELLED";
+                    onRouteRequestFailed(); return;
+                }
+                executing = true;
+                try {
+                    if (leaving) expectedPhoneHop = true;
+                    budget.dispatched();
+                    controlResult = "REQUESTED";
+                    DiagnosticLog.log(context, "RECOVERY dispatch sequence=" + reservation + " command=" + command
+                            + " remainingMs=" + budget.remainingMs(elapsed()));
+                    de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.record(context,
+                            de.kaipressmar.a52srepair.diagnostics.RecoveryEventLog.Event.DISPATCH,
+                            reservation, elapsed());
+                    execute(command);
+                } catch (RuntimeException failure) {
+                    controlResult = "REJECTED";
+                    onRouteRequestFailed();
+                } finally { executing = false; onEvent(); }
+            });
+        });
+        return true;
+    }
+
     private void execute(RepairCommand command) {
         if (command != RepairCommand.RESTORE_VOICE_VOLUME
                 && command != RepairCommand.REFRESH_BLUETOOTH_OBSERVATIONS && host.bluetoothTargetAmbiguous()) {
@@ -235,13 +402,13 @@ final class CallSession {
                 host.requestRoute(CallAudioState.ROUTE_BLUETOOTH);
                 break;
             case ROUTE_TO_EARPIECE:
-                host.requestRoute(CallAudioState.ROUTE_WIRED_OR_EARPIECE);
+                host.requestRoute(CallAudioState.ROUTE_EARPIECE);
                 break;
             case ROUTE_TO_BLUETOOTH_LEGACY:
                 host.requestLegacyRoute(CallAudioState.ROUTE_BLUETOOTH);
                 break;
             case ROUTE_TO_EARPIECE_LEGACY:
-                host.requestLegacyRoute(CallAudioState.ROUTE_WIRED_OR_EARPIECE);
+                host.requestLegacyRoute(CallAudioState.ROUTE_EARPIECE);
                 break;
             case REFRESH_BLUETOOTH_OBSERVATIONS:
                 host.refreshRoutingState();
@@ -249,13 +416,9 @@ final class CallSession {
                 DiagnosticLog.log(context, "CALL observation proxy refreshed; system services not reset");
                 break;
             case TRY_COMMUNICATION_DEVICE:
-                boolean accepted = communication.request(host.bluetoothDevice(), elapsed());
-                DiagnosticLog.log(context, "CALL AudioManager target-matched request accepted=" + accepted
-                        + "; telephony keeps mode ownership; audible recovery not established");
-                break;
             case RESTORE_VOICE_VOLUME:
-                int volume = voice.restoreAudibleVolume();
-                DiagnosticLog.log(context, "CALL voice volume restored to " + volume);
+                // Kept in the core command vocabulary for legacy decoding and off-call experiments.
+                // Cellular call execution never changes AudioPolicy ownership or user volume here.
                 break;
         }
     }
@@ -275,14 +438,14 @@ final class CallSession {
         boolean ambiguous = host.bluetoothTargetAmbiguous();
         // Our temporary AudioPolicy selection can affect predicted attribute routing. It must
         // not manufacture positive recovery evidence for a still-broken cellular call.
-        Boolean voiceEvidence = ambiguous || (communication.hasRequest() && Boolean.TRUE.equals(evidence.onBluetooth))
-                ? null : evidence.onBluetooth;
+        Boolean voiceEvidence = null; // Attribute predictions are logged separately, not health proof.
         CallAudioSnapshot.Builder builder =
                 CallAudioSnapshot.builder()
                         .phase(TelecomMapping.dominantPhase(states))
                         .callCount(states.size())
+                        .repairAllowed(host.safeToRepair())
                         .hfpConnected(headset.hfpConnected())
-                        .scoAudioConnected(!ambiguous && evidence.requiresSco
+                        .scoAudioConnected(!ambiguous && evidence.requiresSco && host.bluetoothDevice() != null
                                 ? headset.scoAudioConnected(host.bluetoothDevice()) : null)
                         .voiceOnBluetooth(voiceEvidence)
                         .voiceVolume(voice.volume(), voice.maxVolume())

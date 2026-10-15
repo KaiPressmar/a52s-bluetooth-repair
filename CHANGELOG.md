@@ -4,6 +4,22 @@ Notable project changes are recorded here. Published GitHub Releases also use au
 
 ## Unreleased
 
+## 0.24.0 - Durable bounded automatic recovery
+
+Experimental prerelease: physical A52s access and audible recovery validation are pending. The stable updater continues to offer v0.23.0.
+
+- Add a shared four-request recovery limit, a 15-second dispatch deadline and one rebuild limit across automatic, preventive and manual requests.
+- Reserve every route request in a durable journal before dispatch; suppress another preventive bounce after an interrupted process until an actual call end is observed.
+- Recheck call authority, active-call metadata, emergency classification, target identity and user route choices after asynchronous storage acknowledgment. Handset calls with an unused Bluetooth device are left alone.
+- Remove automatic cross-API fallback outside budget accounting and implicit in-call volume/AudioPolicy mutations.
+- Scope preventive risk history by accessory, firmware and policy revision. Separate configured setup from an actually bound service.
+- Migrate history non-destructively to version 2, preserve legacy evidence, and show route observations without claiming audible success.
+- Share bounded typed diagnostic events instead of free-form private logs. Improve community forms, compatibility records and repository validation.
+- Keep existing visible off-call experiments separate; no vendor stack restart, root requirement or permanent background service is introduced.
+
+Validation: JVM/Robolectric regressions, coverage thresholds, debug/release lint and APK build are required. Hardware protocol and remaining evidence gates are documented in docs/validation/ACCESS_PROTOCOL.md.
+
+
 ## 0.23.0 - Optional duplex stream recovery without extra system privileges
 
 - Keep APK installation and all existing repairs independent of computers, root and Shizuku. Audit Android 14 and A52s/SM7325 audio/Bluetooth layers; document precisely which native restart APIs ordinary app permissions cannot reach. Do not add ineffective `setBluetoothScoOn` flag requests as physical repairs.

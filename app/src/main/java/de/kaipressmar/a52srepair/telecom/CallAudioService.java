@@ -137,7 +137,7 @@ public final class CallAudioService extends InCallService implements CallSession
     public void onDestroy() {
         if (activeService.get() == this) activeService.clear();
         if (session != null) {
-            session.finish();
+            session.interrupt();
             session = null;
         }
         legacyAudio = null;
@@ -162,6 +162,31 @@ public final class CallAudioService extends InCallService implements CallSession
             states.add(details == null ? Call.STATE_NEW : details.getState());
         }
         return states;
+    }
+
+    @Override public boolean safeToRepair() {
+        return de.kaipressmar.a52srepair.setup.ProtectionStatus.hasCallAccess(this)
+                && de.kaipressmar.a52srepair.setup.ProtectionStatus.hasBluetoothPermission(this)
+                && CallEligibility.allows(this, getCalls());
+    }
+
+    @Override public String targetToken() {
+        if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) return endpoints().targetToken();
+        android.bluetooth.BluetoothDevice device = bluetoothDevice();
+        return device == null ? null : device.getAddress(); // Memory only, never exported.
+    }
+
+    @Override public String stableAccessoryId() {
+        try {
+            android.bluetooth.BluetoothDevice device = bluetoothDevice();
+            return device == null ? null : device.getAddress();
+        } catch (RuntimeException unavailable) { return null; }
+    }
+
+    @Override public String selectedTargetToken() {
+        if (Build.VERSION.SDK_INT >= 34 && endpoints().hasAvailability()) return endpoints().selectedToken();
+        CallAudioState audio = audioState();
+        return audio != null && audio.getRoute() == CallAudioState.ROUTE_BLUETOOTH ? targetToken() : null;
     }
 
     @Override public boolean bluetoothTargetAmbiguous() {
@@ -216,33 +241,17 @@ public final class CallAudioService extends InCallService implements CallSession
         endpoints().request(telecomRoute, requester,
                     () -> {
                         DiagnosticLog.log(this, "CALL endpoint request acknowledged; audio connection still requires observation");
-                        if (session == targetSession && session != null) session.onEvent();
+                        if (session == targetSession && session != null) session.onRequestAcknowledged();
                     }, code -> {
                         if (session != targetSession || session == null) return;
                         DiagnosticLog.log(this, "CALL endpoint request failed code=" + code);
-                        if (code == android.telecom.CallEndpointException.ERROR_ANOTHER_REQUEST) session.onEvent();
-                        else if (code == android.telecom.CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST
-                                || !tryLegacyFallback(telecomRoute)) session.onRouteRequestFailed();
+                        // Every retry must pass the session budget and durable dispatch path.
+                        session.onRouteRequestFailed();
                     });
     }
 
     /** One fallback for a failed modern request, restricted to a single unambiguous call/device. */
-    boolean tryLegacyFallback(int route) {
-        if (session == null || !session.allowsRouteFallback()) return false;
-        List<Integer> states = callStates();
-        if (states.size() != 1 || (states.get(0) != Call.STATE_ACTIVE && states.get(0) != Call.STATE_DIALING)) return false;
-        CallAudioState audio = audioState();
-        if (audio == null || (audio.getRoute() != CallAudioState.ROUTE_EARPIECE
-                && audio.getRoute() != CallAudioState.ROUTE_BLUETOOTH)) return false;
-        try {
-            requestLegacyRoute(route);
-            DiagnosticLog.log(this, "CALL endpoint failed; bounded legacy fallback requested");
-            return true;
-        } catch (RuntimeException failure) {
-            DiagnosticLog.log(this, "CALL legacy fallback refused: " + failure.getClass().getSimpleName());
-            return false;
-        }
-    }
+    boolean tryLegacyFallback(int route) { return false; }
 
     @Override @SuppressWarnings("deprecation")
     public void requestLegacyRoute(int telecomRoute) {
@@ -256,7 +265,8 @@ public final class CallAudioService extends InCallService implements CallSession
             }
         }
         if (telecomRoute == CallAudioState.ROUTE_BLUETOOTH
-                || telecomRoute == CallAudioState.ROUTE_WIRED_OR_EARPIECE) {
+                || telecomRoute == CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                || telecomRoute == CallAudioState.ROUTE_EARPIECE) {
             int required = telecomRoute == CallAudioState.ROUTE_BLUETOOTH
                     ? CallAudioState.ROUTE_BLUETOOTH : CallAudioState.ROUTE_EARPIECE;
             CallAudioState available = legacyAudio == null ? getCallAudioState() : legacyAudio;
@@ -275,6 +285,7 @@ public final class CallAudioService extends InCallService implements CallSession
             }
         }
         DiagnosticLog.log(this, "CALL routing path=legacy-mask " + routingDetails());
-        setAudioRoute(telecomRoute);
+        setAudioRoute(telecomRoute == CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                ? CallAudioState.ROUTE_EARPIECE : telecomRoute);
     }
 }

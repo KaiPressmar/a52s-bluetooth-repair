@@ -2,6 +2,7 @@ package de.kaipressmar.a52srepair.data;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
@@ -35,6 +36,21 @@ public class CallReportRepositoryTest {
         assertEquals(2L, history.all().get(0).startedAt);
         repo.clear();
         assertTrue(repo.history().all().isEmpty());
+    }
+
+    @Test public void importsLegacyWithoutOverwritingItAndMarksAudioUnknown() throws Exception {
+        CallReportRepository repo=new CallReportRepository(context); repo.clear();
+        java.io.File old=new java.io.File(context.getFilesDir(),"call-reports.txt");
+        String original="1;1;100;REPAIRED;;1;0;1;0;0\n";
+        java.nio.file.Files.writeString(old.toPath(),original);
+        assertTrue(repo.history().all().get(0).legacyEvidence);
+        assertFalse(repo.history().all().get(0).audibleConfirmed);
+        repo.add(report(2));
+        assertEquals(2,new CallReportRepository(context).history().all().size());
+        assertEquals(original,java.nio.file.Files.readString(old.toPath()));
+        repo.add(report(3));
+        assertEquals(3,repo.history().all().size());
+        repo.clear(); assertFalse(old.exists());
     }
 
     @Test public void protectionIsOnByDefault() {

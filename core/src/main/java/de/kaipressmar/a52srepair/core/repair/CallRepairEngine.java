@@ -97,7 +97,7 @@ public final class CallRepairEngine {
 
     private boolean repairEnabled;
     private PreventiveRebuildMode preventiveMode;
-    private final boolean riskElevated;
+    private boolean riskElevated;
     private final long startedAt;
 
     private Operation operation = Operation.NONE;
@@ -157,6 +157,7 @@ public final class CallRepairEngine {
     public ManualRepair requestManualRepair(CallAudioSnapshot s, long now) {
         ManualRepairStatus denied = null;
         if (ended || !s.phase.carriesAudio() || s.callCount == 0) denied = ManualRepairStatus.NO_ACTIVE_CALL;
+        else if (!s.repairAllowed) denied = ManualRepairStatus.ALTERNATIVE_ROUTE;
         else if (s.callCount > 1) denied = ManualRepairStatus.MULTIPLE_CALLS;
         else if (!s.bluetoothRouteAvailable) denied = ManualRepairStatus.BLUETOOTH_UNAVAILABLE;
         else if (s.route == AudioRoute.UNKNOWN) denied = ManualRepairStatus.ROUTE_UNKNOWN;
@@ -193,6 +194,8 @@ public final class CallRepairEngine {
 
     /** Called for synchronous exceptions or a current Telecom endpoint error callback. */
     /** Apply changed settings to this call without resetting observations or repair budgets. */
+    public void updateRisk(boolean elevated) { riskElevated = elevated; }
+
     public void updatePolicy(boolean enabled, PreventiveRebuildMode mode) {
         repairEnabled = enabled;
         preventiveMode = mode == null ? PreventiveRebuildMode.OFF : mode;
@@ -217,6 +220,13 @@ public final class CallRepairEngine {
         if (s.phase == CallPhase.ENDED) {
             finish(now);
             return step(IDLE_TICK_MS, "call ended");
+        }
+
+        if (!s.repairAllowed) {
+            endOperation();
+            currentFault = Fault.NONE;
+            faultSince = now;
+            return step(FAST_TICK_MS, "ineligible call or authority unavailable; observe only");
         }
 
         bluetoothEverAvailable |= s.bluetoothRouteAvailable;
@@ -541,7 +551,7 @@ public final class CallRepairEngine {
                 || preventiveSuppressed
                 || s.callCount > 1
                 || s.route != AudioRoute.BLUETOOTH
-                || !s.phase.carriesAudio()
+                || s.phase != CallPhase.ACTIVE
                 || sinceStart > PREVENTIVE_WINDOW_MS) {
             return step(tick, "healthy");
         }

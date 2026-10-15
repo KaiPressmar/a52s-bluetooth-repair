@@ -18,7 +18,7 @@ release/0.20                   ●─────────────   v0.2
 - **Upstream first:** every fix is merged into `main` through a reviewed PR with a regression test, then cherry-picked (`git cherry-pick -x`) onto the release branch. Release branches receive no commits that are not on `main`, except the `Release vX.Y.Z` commit (version and changelog).
 - **Single version source:** `RELEASE_VERSION` in the repository root. Gradle reads it for `versionName`; CI sets `versionCode` from the workflow run number, so it grows with every release.
 - **Changelog first:** `CHANGELOG.md` on `main` is the source of truth. New changes go under `## Unreleased`; a release needs a `## X.Y.Z - title` section, which becomes the GitHub release notes.
-- **Stable versions only:** the in-app updater offers every non-draft release to all users, so the workflow refuses pre-release versions such as `1.0.0-rc.1`.
+- **Version and channel:** `RELEASE_VERSION` remains numeric `X.Y.Z`. Optional `RELEASE_CHANNEL` is `stable` or `experimental` (missing means stable). Experimental releases are marked GitHub prereleases, never Latest, and excluded by the in-app updater. Publish device-unvalidated recovery changes on the experimental channel. Never reuse a published tag when later promoting behavior; use a new version.
 - **Latest:** a release is marked *Latest* (and serves `releases/latest/download/bluetooth-repair.apk`) only if it is the highest version. A patch on an older line is published without taking over *Latest*.
 
 | Change | Version |

@@ -169,10 +169,7 @@ public final class HeadsetMonitor implements HeadsetAccess {
             List<BluetoothDevice> devices = proxy.getConnectedDevices();
             if (devices.isEmpty()) return null;
             if (target != null) return devices.contains(target) ? proxy.isAudioConnected(target) : null;
-            for (BluetoothDevice device : devices) {
-                if (proxy.isAudioConnected(device)) return Boolean.TRUE;
-            }
-            return Boolean.FALSE;
+            return devices.size() == 1 ? proxy.isAudioConnected(devices.get(0)) : null;
         } catch (RuntimeException e) {
             observationError("sco-state", e);
             return null;

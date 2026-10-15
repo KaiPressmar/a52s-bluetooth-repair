@@ -58,6 +58,7 @@ public final class DiagnosticReport {
                 .append('\n')
                 .append("status=").append(ProtectionStatus.evaluate(context))
                 .append(" callAccess=").append(ProtectionStatus.hasCallAccess(context))
+                .append(" accessEvidence=").append(ProtectionStatus.callAccessEvidence(context).status)
                 .append(" linked=").append(new CarLinkManager(context).linkedDevices().size())
                 .append(" protection=").append(settings.protectionEnabled())
                 .append(" preventive=").append(settings.preventiveMode())
@@ -78,7 +79,7 @@ public final class DiagnosticReport {
             CallReport call = calls.get(i);
             out.append(DiagnosticLog.timestamp(call.startedAt)).append(' ').append(call).append('\n');
         }
-        out.append("\n== Log ==\n").append(DiagnosticLog.readAll(context));
+        out.append("\n== Recovery events ==\n").append(RecoveryEventLog.read(context));
         return out.toString();
     }
 

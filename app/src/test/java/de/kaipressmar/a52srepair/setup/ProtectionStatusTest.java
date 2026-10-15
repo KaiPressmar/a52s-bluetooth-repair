@@ -32,7 +32,7 @@ public class ProtectionStatusTest {
         shadowOf(app.getSystemService(BluetoothManager.class).getAdapter()).setEnabled(false);
         assertEquals(ProtectionStatus.BLUETOOTH_OFF, ProtectionStatus.evaluate(app));
         shadowOf(app.getSystemService(BluetoothManager.class).getAdapter()).setEnabled(true);
-        assertEquals(ProtectionStatus.ACTIVE, ProtectionStatus.evaluate(app));
+        assertEquals(ProtectionStatus.CONFIGURED, ProtectionStatus.evaluate(app));
         assertTrue(ProtectionStatus.ACTIVE.setupComplete());
         assertFalse(ProtectionStatus.NEEDS_CALL_ACCESS.setupComplete());
     }

@@ -13,13 +13,17 @@ import java.util.List;
 
 /** Persists one line per call (newest first), bounded by {@link CallHistory#MAX_ENTRIES}. */
 public final class CallReportRepository {
-    private static final String FILE_NAME = "call-reports.txt";
+    private static final String FILE_NAME = "call-reports-v2.txt";
     private static final Object LOCK = new Object();
 
+    private final Context context;
     private final File file;
+    private final File legacy;
 
     public CallReportRepository(Context context) {
+        this.context = context.getApplicationContext();
         file = new File(context.getApplicationContext().getFilesDir(), FILE_NAME);
+        legacy = new File(context.getApplicationContext().getFilesDir(), "call-reports.txt");
     }
 
     public CallHistory history() {
@@ -36,15 +40,18 @@ public final class CallReportRepository {
         synchronized (LOCK) {
             //noinspection ResultOfMethodCallIgnored
             file.delete();
+            legacy.delete();
+            new RecoveryPolicyRepository(context).clear();
         }
     }
 
     private List<CallReport> read() {
         synchronized (LOCK) {
             List<CallReport> out = new ArrayList<>();
-            if (!file.exists()) return out;
+            File source = file.exists() ? file : legacy;
+            if (!source.exists()) return out;
             try {
-                for (String line : Files.readAllLines(file.toPath(), StandardCharsets.UTF_8)) {
+                for (String line : Files.readAllLines(source.toPath(), StandardCharsets.UTF_8)) {
                     CallReport report = CallReport.decode(line);
                     if (report != null) out.add(report);
                 }
@@ -66,6 +73,9 @@ public final class CallReportRepository {
             return;
         }
         //noinspection ResultOfMethodCallIgnored
-        tmp.renameTo(file);
+        if (!tmp.renameTo(file)) {
+            de.kaipressmar.a52srepair.diagnostics.DiagnosticLog.log(
+                    context, "REPORT atomic replacement failed");
+        }
     }
 }

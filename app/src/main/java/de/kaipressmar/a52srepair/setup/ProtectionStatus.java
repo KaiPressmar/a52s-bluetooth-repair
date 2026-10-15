@@ -15,6 +15,7 @@ public enum ProtectionStatus {
     NEEDS_CALL_ACCESS,
     PAUSED,
     BLUETOOTH_OFF,
+    CONFIGURED,
     ACTIVE;
 
     /** App-op behind {@code MANAGE_ONGOING_CALLS}; Telecom binds our InCallService only if allowed. */
@@ -25,7 +26,7 @@ public enum ProtectionStatus {
         if (!hasCallAccess(context)) return NEEDS_CALL_ACCESS;
         if (!new AppSettings(context).protectionEnabled()) return PAUSED;
         if (!bluetoothEnabled(context)) return BLUETOOTH_OFF;
-        return ACTIVE;
+        return de.kaipressmar.a52srepair.telecom.CallAudioService.activeReport() == null ? CONFIGURED : ACTIVE;
     }
 
     public boolean setupComplete() {
@@ -37,16 +38,21 @@ public enum ProtectionStatus {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    public static boolean hasCallAccess(Context context) {
+    public static de.kaipressmar.a52srepair.core.model.Evidence<Boolean> callAccessEvidence(Context context) {
+        long now = android.os.SystemClock.elapsedRealtime();
         AppOpsManager ops = context.getSystemService(AppOpsManager.class);
-        if (ops == null) return false;
+        if (ops == null) return de.kaipressmar.a52srepair.core.model.Evidence.unavailable(now);
         try {
-            return ops.unsafeCheckOpNoThrow(
-                            OP_MANAGE_ONGOING_CALLS, Process.myUid(), context.getPackageName())
-                    == AppOpsManager.MODE_ALLOWED;
-        } catch (RuntimeException e) {
-            return false;
+            return de.kaipressmar.a52srepair.core.model.Evidence.known(ops.unsafeCheckOpNoThrow(
+                    OP_MANAGE_ONGOING_CALLS, Process.myUid(), context.getPackageName()) == AppOpsManager.MODE_ALLOWED, now);
+        } catch (RuntimeException unavailable) {
+            return de.kaipressmar.a52srepair.core.model.Evidence.unknown(now);
         }
+    }
+
+    public static boolean hasCallAccess(Context context) {
+        de.kaipressmar.a52srepair.core.model.Evidence<Boolean> evidence = callAccessEvidence(context);
+        return evidence.fresh(android.os.SystemClock.elapsedRealtime(), 1_000L) && Boolean.TRUE.equals(evidence.value);
     }
 
     static boolean bluetoothEnabled(Context context) {

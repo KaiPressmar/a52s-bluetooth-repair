@@ -18,6 +18,13 @@ public final class CallReport {
     public final boolean preventiveRebuild;
     public final boolean userLeftBluetooth;
     public final int manualRepairs;
+    public final int reservedRequests;
+    public final int dispatchedRequests;
+    public final String controlResult;
+    public final String stopReason;
+    public final boolean legacyEvidence;
+    /** An ordinary app cannot establish actual audible cellular audio. */
+    public final boolean audibleConfirmed = false;
 
     public CallReport(
             long startedAt,
@@ -35,6 +42,19 @@ public final class CallReport {
     public CallReport(long startedAt, long durationMs, CallOutcome outcome, Set<Fault> faults,
             int routeAttempts, int volumeRestores, boolean preventiveRebuild,
             boolean userLeftBluetooth, int manualRepairs) {
+        this(startedAt, durationMs, outcome, faults, routeAttempts, volumeRestores, preventiveRebuild,
+                userLeftBluetooth, manualRepairs, 0, 0, "NOT_REQUESTED", "NONE", false);
+    }
+
+    public CallReport(long startedAt, long durationMs, CallOutcome outcome, Set<Fault> faults,
+            int routeAttempts, int volumeRestores, boolean preventiveRebuild, boolean userLeftBluetooth,
+            int manualRepairs, int reservedRequests, int dispatchedRequests, String controlResult,
+            String stopReason, boolean legacyEvidence) {
+        this.reservedRequests = reservedRequests;
+        this.dispatchedRequests = dispatchedRequests;
+        this.controlResult = safeToken(controlResult);
+        this.stopReason = safeToken(stopReason);
+        this.legacyEvidence = legacyEvidence;
         this.startedAt = startedAt;
         this.durationMs = durationMs;
         this.outcome = outcome;
@@ -60,7 +80,7 @@ public final class CallReport {
         }
         return String.join(
                 SEPARATOR,
-                "1",
+                "2",
                 Long.toString(startedAt),
                 Long.toString(durationMs),
                 outcome.name(),
@@ -69,14 +89,16 @@ public final class CallReport {
                 Integer.toString(volumeRestores),
                 preventiveRebuild ? "1" : "0",
                 userLeftBluetooth ? "1" : "0",
-                Integer.toString(manualRepairs));
+                Integer.toString(manualRepairs), Integer.toString(reservedRequests),
+                Integer.toString(dispatchedRequests), controlResult, stopReason, legacyEvidence ? "1" : "0");
     }
 
     /** Returns {@code null} for malformed or unknown lines instead of throwing. */
     public static CallReport decode(String line) {
         if (line == null) return null;
         String[] p = line.split(SEPARATOR, -1);
-        if (p.length < 9 || !"1".equals(p[0])) return null;
+        boolean legacy = p.length >= 9 && "1".equals(p[0]);
+        if (!legacy && (p.length < 15 || !"2".equals(p[0]))) return null;
         try {
             Set<Fault> faults = EnumSet.noneOf(Fault.class);
             if (!p[4].isEmpty()) {
@@ -93,14 +115,29 @@ public final class CallReport {
                     Long.parseLong(p[2]),
                     CallOutcome.valueOf(p[3]),
                     faults,
-                    Integer.parseInt(p[5]),
-                    Integer.parseInt(p[6]),
+                    nonNegative(p[5]),
+                    nonNegative(p[6]),
                     "1".equals(p[7]),
                     "1".equals(p[8]),
-                    p.length > 9 ? Integer.parseInt(p[9]) : 0);
+                    p.length > 9 ? nonNegative(p[9]) : 0,
+                    legacy ? 0 : nonNegative(p[10]), legacy ? 0 : nonNegative(p[11]),
+                    legacy ? "LEGACY" : safeToken(p[12]), legacy ? "UNKNOWN" : safeToken(p[13]),
+                    legacy || "1".equals(p[14]));
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    private static int nonNegative(String value) {
+        int n = Integer.parseInt(value);
+        if (n < 0) throw new IllegalArgumentException("Negative count");
+        return n;
+    }
+    private static String safeToken(String value) {
+        if (value == null || !Set.of("NONE", "UNKNOWN", "LEGACY", "NOT_REQUESTED", "ACKNOWLEDGED",
+                "REQUESTED", "CANCELLED", "BLOCKED", "REJECTED", "STORAGE_FAILED", "REQUEST_BUDGET",
+                "REBUILD_BUDGET", "DEADLINE", "INTERRUPTED", "USER_CHOICE", "INELIGIBLE").contains(value)) return "UNKNOWN";
+        return value;
     }
 
     @Override
@@ -115,6 +152,8 @@ public final class CallReport {
                 volumeRestores,
                 preventiveRebuild,
                 userLeftBluetooth,
-                manualRepairs);
+                manualRepairs) + " reserved=" + reservedRequests + " dispatched=" + dispatchedRequests
+                + " control=" + controlResult + " stopped=" + stopReason
+                + " legacyEvidence=" + legacyEvidence + " audible=UNKNOWN";
     }
 }

@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Every report helps narrow down the Samsung/Qualcomm fault.
+        Thanks for reporting! Every report helps distinguish call routing, transport and unobservable audio failures.
         **Please do not post phone numbers, contact names or Bluetooth MAC addresses.**
-        If you have the app installed: open *Settings → Share diagnostic report* (*Einstellungen → Diagnosebericht teilen*) **before rebooting** and attach the file.
+        If you have the app installed: when safely parked, open *Settings → Share diagnostic report* (*Einstellungen → Diagnosebericht teilen*) **before rebooting** and attach the file.
   - type: dropdown
     id: symptom
     attributes:
@@ -53,15 +53,12 @@ body:
       placeholder: VW Golf 8 (2021), Composition Media
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: app-version
     attributes:
-      label: App version
-      options:
-        - App not installed
-        - 0.17.x or newer
-        - 0.16.x
-        - Older than 0.16
+      label: Exact app version
+      description: Include whether this is an experimental prerelease, or write not installed.
+      placeholder: "0.24.0 experimental"
     validations:
       required: true
   - type: dropdown
@@ -70,8 +67,8 @@ body:
       label: What does the app show under "History" (Verlauf) for that call?
       options:
         - App not installed / no entry
-        - All good (Alles in Ordnung)
-        - Repaired automatically (Automatisch repariert)
+        - No observable fault (older versions show All good)
+        - Bluetooth route restored (older versions show Repaired automatically)
         - Problem persisted (Problem blieb bestehen)
         - Bluetooth calling blocked (Bluetooth-Telefonie blockiert)
         - Switched to phone (Auf Telefon umgeschaltet)
@@ -84,6 +81,35 @@ body:
         - "Yes"
         - "No"
         - Not tried
+  - type: dropdown
+    id: access
+    attributes:
+      label: Call access setup
+      options:
+        - Companion device association
+        - ADB app-op grant
+        - Unknown or not configured
+  - type: dropdown
+    id: call-type
+    attributes:
+      label: Type of call
+      options:
+        - Cellular incoming
+        - Cellular outgoing
+        - Wi-Fi Calling
+        - App or VoIP call
+        - Unknown
+  - type: dropdown
+    id: corrective-action
+    attributes:
+      label: Did this call recover without corrective action?
+      description: A restart, Bluetooth toggle, manual route change or repair button is a manual correction.
+      options:
+        - Recovered automatically and both parties could hear
+        - Routing changed but sound remained broken
+        - Manual correction was required
+        - Not recovered
+        - Unknown
   - type: textarea
     id: details
     attributes:
