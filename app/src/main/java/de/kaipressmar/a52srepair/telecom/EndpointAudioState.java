@@ -34,6 +34,15 @@ final class EndpointAudioState {
         availableMask = mask;
     }
 
+    String targetToken() {
+        CallEndpoint endpoint = target(CallAudioState.ROUTE_BLUETOOTH);
+        return endpoint == null ? null : endpoint.getIdentifier().toString();
+    }
+    String selectedToken() {
+        return current != null && current.getEndpointType() == CallEndpoint.TYPE_BLUETOOTH
+                ? current.getIdentifier().toString() : null;
+    }
+
     boolean hasAvailability() { return availableMask != null; }
 
     int bluetoothCount() {

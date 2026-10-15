@@ -26,6 +26,10 @@
   <img src="docs/assets/screenshot-settings.png" width="230" alt="Settings">
 </p>
 
+## Experimental implementation release
+
+Version **0.24.0** implements durable, bounded automatic recovery and is distributed as a GitHub **prerelease** while stock-A52s hardware validation is pending. Stable downloads remain on v0.23.0. A selected Bluetooth route does not prove audible speech. See [compatibility evidence](docs/COMPATIBILITY.md), the [implementation status](docs/IMPLEMENTATION_STATUS.md) and [privacy details](PRIVACY.md).
+
 ## Is this my problem?
 
 You probably have the known **Galaxy A52s 5G (SM-A528B / SM-A528N) Bluetooth call-audio bug** if, since One UI 6.1 / Android 14:
@@ -44,14 +48,14 @@ Many owners report it since the January 2025 update. Public reports do not estab
 2. **Install** it. Android asks once to allow installing from your browser or file manager.
 3. **Open the app** and complete the two one-time steps:
    - allow **Bluetooth access**;
-   - tap **Link car**, pick your car and confirm the Android dialog. The dialog calls the car a "watch"; that is the only device type through which Android lets apps control call audio.
+   - tap **Link car**, pick your car and confirm the Android dialog. The dialog calls the car a "watch". This enrollment path is experimental; acceptance does not prove reliable call access on every firmware.
 4. Done when the app shows **Protection active**. Automatic checks need no phone input. While stationary, the status screen also offers **Check now** and **Reconnect Bluetooth audio** during a call.
 
 *Alternative to step 3 with a computer:* `adb shell appops set de.kaipressmar.a52srepair MANAGE_ONGOING_CALLS allow`
 
 ## How it works
 
-- **Invisible:** Android starts the app only while a call is in progress. Between calls nothing runs: no background service, no notifications, no battery use.
+- **Invisible:** Android starts the app only while a call is in progress. Between calls nothing runs: no permanent background service or call-monitoring notifications. Work during a call still uses battery.
 - **Hands-free:** while driving you only accept the call through the car. The app checks the call audio and repairs it on its own:
   - moves a call stuck on the phone to the car,
   - rebuilds the Bluetooth audio link (car → phone → car, about 1 second),
@@ -114,6 +118,10 @@ This project depends on reports from real cars and firmware versions. You can he
 - **Starring the repository**, so other A52s owners find it.
 
 Code contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Research and planned improvements
+
+The [15 October 2026 research review](docs/RESEARCH_2026-10-15.md) examines community reports, Android API limits and the current implementation. The [detailed refactoring plan](docs/REFACTORING_PLAN.md) defines automatic recovery, code changes, validation gates and rollout. The [implementation backlog](docs/IMPLEMENTATION_PLAN.md) provides twelve ordered PRs with concrete tasks and acceptance criteria. The [repository and community plan](docs/COMMUNITY_PLAN.md) covers support, field evidence, contribution workflows and release quality. These are proposed improvements; reliable recovery of every vendor audio failure is not established.
 
 ## For developers
 

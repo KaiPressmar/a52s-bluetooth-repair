@@ -32,7 +32,8 @@ public final class Formatting {
         for (Fault fault : report.faults) {
             parts.add(context.getString(OutcomeStyle.faultLabel(fault)));
         }
-        int steps = report.routeAttempts + report.volumeRestores + report.manualRepairs;
+        int steps = report.legacyEvidence ? report.routeAttempts + report.volumeRestores + report.manualRepairs
+                : report.dispatchedRequests;
         if (steps > 0) {
             parts.add(context.getResources().getQuantityString(R.plurals.history_actions, steps, steps));
         }
@@ -40,6 +41,8 @@ public final class Formatting {
             parts.add(context.getString(R.string.history_preventive));
         }
         if (report.manualRepairs > 0) parts.add(context.getString(R.string.history_manual, report.manualRepairs));
+        if (report.usedBluetooth()) parts.add(context.getString(R.string.history_audio_unknown));
+        if (report.legacyEvidence) parts.add(context.getString(R.string.history_legacy));
         return String.join(" · ", parts);
     }
 }

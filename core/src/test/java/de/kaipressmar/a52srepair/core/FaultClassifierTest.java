@@ -53,7 +53,7 @@ public class FaultClassifierTest {
     }
 
     @Test public void oneWayAudioDownlinkElsewhere() {
-        assertEquals(Fault.DOWNLINK_NOT_ON_BLUETOOTH, FaultClassifier.classify(
+        assertEquals(Fault.NONE, FaultClassifier.classify(
                 carCall().voiceOnBluetooth(false).build()));
     }
 

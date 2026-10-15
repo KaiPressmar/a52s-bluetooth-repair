@@ -7,8 +7,8 @@
     <string name="nav_settings">Einstellungen</string>
 
     <!-- Status hero -->
-    <string name="status_active_title">Schutz aktiv</string>
-    <string name="status_active_body">Die App prüft deine Anrufe und versucht erkannte Audiofehler automatisch zu beheben. Du musst dafür nichts am Handy bedienen.</string>
+    <string name="status_active_title">Bereit für Wiederherstellungsversuche</string>
+    <string name="status_active_body">Automatische Wiederherstellung ist eingerichtet. Anrufzugriff und Ergebnis hängen von Telefon und verbundenem Gerät ab. Hörbarer Anrufton ist für diese Version noch nicht bestätigt.</string>
     <string name="status_bluetooth_off_body">Bluetooth ist gerade aus. Sobald du über Fahrzeug oder Headset telefonierst, ist der Schutz automatisch dabei.</string>
     <string name="status_setup_title">Einrichtung abschließen</string>
     <string name="status_setup_body">Noch ein oder zwei einmalige Schritte, dann arbeitet der Schutz vollautomatisch.</string>
@@ -46,7 +46,7 @@
     <!-- Statistics -->
     <string name="stats_title">Bluetooth-Anrufe der letzten 30 Tage</string>
     <string name="stats_calls">Anrufe</string>
-    <string name="stats_repaired">Repariert</string>
+    <string name="stats_repaired">Audioweg wiederhergestellt</string>
     <string name="stats_problems">Probleme</string>
     <string name="last_call_title">Letzter Bluetooth-Anruf</string>
     <string name="last_call_none">Noch kein Anruf über Fahrzeug oder Headset aufgezeichnet.</string>
@@ -64,15 +64,15 @@
     <!-- History -->
     <string name="history_empty">Hier erscheinen deine Anrufe, sobald die App sie begleitet hat.</string>
     <string name="history_meta">%1$s · %2$s</string>
-    <string name="history_preventive">Vorsorglich neu aufgebaut</string>
+    <string name="history_preventive">Vorsorgliche Wiederverbindung versucht</string>
     <plurals name="history_actions">
         <item quantity="one">%1$d Reparaturschritt</item>
         <item quantity="other">%1$d Reparaturschritte</item>
     </plurals>
 
     <!-- Outcomes -->
-    <string name="outcome_healthy">Alles in Ordnung</string>
-    <string name="outcome_repaired">Automatisch repariert</string>
+    <string name="outcome_healthy">Kein sichtbarer Fehler</string>
+    <string name="outcome_repaired">Bluetooth-Audioweg wiederhergestellt</string>
     <string name="outcome_unresolved">Problem blieb bestehen</string>
     <string name="outcome_bluetooth_unavailable">Bluetooth-Telefonie blockiert</string>
     <string name="outcome_left_bluetooth">Auf Telefon umgeschaltet</string>
@@ -158,7 +158,7 @@
     <string name="manual_unverified">Der manuelle Neuaufbau ist noch nicht bestätigt. Android-Signale allein können hörbare Sprache nicht bestätigen.</string>
     <string name="fault_user_reported">Audioproblem manuell gemeldet</string>
     <string name="history_manual">Manuelle Versuche: %1$d</string>
-    <string name="outcome_manual_verified">Bluetooth nach manueller Reparatur bestätigt</string>
+    <string name="outcome_manual_verified">Bluetooth-Audioweg nach Versuch erkannt</string>
     <string name="manual_ambiguous_device">Mehrere Bluetooth-Anrufgeräte sind verfügbar. Wähle das gewünschte Gerät zuerst in der Anruf-App; diese App wählt keines auf Verdacht.</string>
     <string name="manual_microphone_muted">Das Mikrofon ist stummgeschaltet. Falls das unbeabsichtigt ist, hebe die Stummschaltung in der Anruf-App auf. Diese App lässt die Mikrofon-Stummschaltung unverändert.</string>
     <string name="setup_link_rejected">Android konnte die Geräteverknüpfung nicht starten. Prüfe den Bluetooth-Zugriff oder nutze die ADB-Einrichtung.</string>
@@ -188,4 +188,6 @@
     <string name="duplex_title">Manueller Reparaturversuch für beide Sprachrichtungen</string>
     <string name="duplex_summary">Optional, zunächst aus. Der manuelle Test öffnet zuerst neue Bluetooth-Ausgabe- und Mikrofonstreams; bei Bedarf folgen einfachere Anfragen. Dafür ist Mikrofonzugriff nötig. Keine Audiodaten werden gespeichert oder übertragen. Läuft nie automatisch. Bis zu 90 Sekunden; ein repariertes Telefonat ist nicht garantiert.</string>
     <string name="duplex_permission_body">Dieser optionale Versuch öffnet kurz einen Mikrofonstream außerhalb von Telefonaten, um beide Seiten des Bluetooth-Sprachpfads anzusteuern. Android zeigt den Mikrofonzugriff an. Die App verwirft die Daten, ohne sie zu speichern oder zu übertragen. Die App prüft vor und nach dem Lesen die gemeldete Bluetooth-Route; Android kann vorübergehend ein anderes Mikrofon aktivieren. Pausiere Medien und andere Sprach-Apps. Wenn du dies nicht möchtest, lasse die Option aus und nutze die anderen Reparaturversuche.</string>
+    <string name="history_audio_unknown">Ton nicht bestätigt</string>
+    <string name="history_legacy">Älteres Berichtsformat</string>
 </resources>

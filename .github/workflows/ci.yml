@@ -45,6 +45,11 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_coverage_*.py'
           python3 scripts/coverage-summary.py build/reports/jacoco/coverageReport/coverageReport.xml --verify --markdown build/reports/jacoco/coverageReport/summary.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Validate documentation and compatibility evidence
+        run: |
+          python3 scripts/validate-repository.py
+          python3 -m unittest discover -s scripts -p 'test_repository_*.py'
+
       - name: Android lint
         run: ./gradlew :app:lintDebug --stacktrace
 

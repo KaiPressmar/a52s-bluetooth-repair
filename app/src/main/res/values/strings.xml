@@ -9,8 +9,8 @@
     <string name="nav_settings">Settings</string>
 
     <!-- Status hero -->
-    <string name="status_active_title">Protection active</string>
-    <string name="status_active_body">The app checks your calls and automatically attempts to repair detected audio faults. No phone interaction is needed for these attempts.</string>
+    <string name="status_active_title">Ready to attempt recovery</string>
+    <string name="status_active_body">Automatic recovery is configured. Actual call access and recovery depend on the phone and connected device. Audible call recovery is not yet validated for this release.</string>
     <string name="status_bluetooth_off_body">Bluetooth is currently off. As soon as you call through your car or headset, protection is active automatically.</string>
     <string name="status_setup_title">Finish setup</string>
     <string name="status_setup_body">One or two one-time steps left, then protection works fully automatically.</string>
@@ -49,7 +49,7 @@
     <!-- Statistics -->
     <string name="stats_title">Bluetooth calls in the last 30 days</string>
     <string name="stats_calls">Calls</string>
-    <string name="stats_repaired">Repaired</string>
+    <string name="stats_repaired">Route restored</string>
     <string name="stats_problems">Problems</string>
     <string name="last_call_title">Last Bluetooth call</string>
     <string name="last_call_none">No call through a car or headset recorded yet.</string>
@@ -71,15 +71,15 @@
     <!-- History -->
     <string name="history_empty">Your calls appear here once the app has accompanied them.</string>
     <string name="history_meta">%1$s · %2$s</string>
-    <string name="history_preventive">Rebuilt as a precaution</string>
+    <string name="history_preventive">Preventive reconnect attempted</string>
     <plurals name="history_actions">
         <item quantity="one">%1$d repair step</item>
         <item quantity="other">%1$d repair steps</item>
     </plurals>
 
     <!-- Outcomes -->
-    <string name="outcome_healthy">All good</string>
-    <string name="outcome_repaired">Repaired automatically</string>
+    <string name="outcome_healthy">No observable fault</string>
+    <string name="outcome_repaired">Bluetooth route restored</string>
     <string name="outcome_unresolved">Problem persisted</string>
     <string name="outcome_bluetooth_unavailable">Bluetooth calling blocked</string>
     <string name="outcome_left_bluetooth">Switched to phone</string>
@@ -169,7 +169,7 @@
     <string name="manual_unverified">The manual reconnect has not been verified. Android signals alone cannot confirm that speech is audible.</string>
     <string name="fault_user_reported">Audio problem reported manually</string>
     <string name="history_manual">Manual attempts: %1$d</string>
-    <string name="outcome_manual_verified">Bluetooth verified after manual repair</string>
+    <string name="outcome_manual_verified">Bluetooth route observed after repair</string>
     <string name="manual_ambiguous_device">Multiple Bluetooth call devices are available. Select the intended device in the call app first; this app will not guess.</string>
     <string name="manual_microphone_muted">The microphone is muted. If this was unintentional, unmute it in the call app. This app preserves microphone mute.</string>
     <string name="setup_link_rejected">Android could not start device linking. Check Bluetooth access or use the ADB setup.</string>
@@ -199,4 +199,6 @@
     <string name="duplex_title">Manual duplex recovery attempt</string>
     <string name="duplex_summary">Optional, off by default. A manual test first opens fresh Bluetooth output and microphone streams; simpler requests follow if needed. Microphone permission is required. No audio is saved or transmitted. Never runs automatically. Up to 90 seconds; a repaired phone call is not guaranteed.</string>
     <string name="duplex_permission_body">This optional attempt briefly opens a microphone stream outside phone calls to exercise both sides of the Bluetooth speech path. Android shows microphone use. The app discards the samples without saving or transmitting them; it checks the reported Bluetooth route before and after reading, but Android can briefly activate another microphone. Pause media and other voice apps. If you decline, leave this option off and use the other repair attempts.</string>
+    <string name="history_audio_unknown">Sound not verified</string>
+    <string name="history_legacy">Earlier report format</string>
 </resources>

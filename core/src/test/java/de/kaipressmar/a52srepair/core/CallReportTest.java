@@ -56,6 +56,18 @@ public class CallReportTest {
         assertEquals(manual.toString(), CallReport.decode(manual.encode()).toString());
     }
 
+    @Test public void versionTwoPreservesDispatchEvidenceAndRejectsPrivateTokens() {
+        CallReport r=new CallReport(1,2,CallOutcome.UNRESOLVED,EnumSet.noneOf(Fault.class),1,0,true,false,
+                0,2,1,"REJECTED","DEADLINE",false);
+        CallReport decoded=CallReport.decode(r.encode());
+        assertEquals(2,decoded.reservedRequests);assertEquals(1,decoded.dispatchedRequests);
+        assertEquals("REJECTED",decoded.controlResult);assertFalse(decoded.audibleConfirmed);
+        assertNull(CallReport.decode(r.encode().replace(";2;1;REJECTED", ";-1;1;REJECTED")));
+        decoded=CallReport.decode(r.encode().replace("REJECTED","ALICE"));
+        assertEquals("UNKNOWN",decoded.controlResult);assertFalse(decoded.toString().contains("ALICE"));
+        assertTrue(CallReport.decode("1;1;2;HEALTHY;;0;0;0;0").legacyEvidence);
+    }
+
     @Test public void riskElevatedOnlyForRecentProblems() {
         long now = 100L * DAY;
         CallHistory calm = new CallHistory(List.of(report(now - DAY, CallOutcome.HEALTHY)));

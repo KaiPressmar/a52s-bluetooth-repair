@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "model": "SM-A528B",
+      "firmware": "A528BXXSBGYI3",
+      "android": "14",
+      "accessory": "VW head unit",
+      "app_version": "earlier than 0.13",
+      "enrollment": "legacy watchdog",
+      "status": "KNOWN_LIMITATION",
+      "observation_days": null,
+      "eligible_calls": null,
+      "faults": null,
+      "automatic_recoveries": null,
+      "manual_corrections": null,
+      "evidence": "docs/field-reports/2026-10-07-vw-one-way-audio.md",
+      "notes": "Reported one-way failure; submitted log ends before the call. Does not validate current recovery."
+    },
+    {
+      "model": "SM-A528B",
+      "firmware": "A528BXXSBGYI3",
+      "android": "14",
+      "accessory": "not yet tested",
+      "app_version": "0.24.0",
+      "enrollment": "not yet tested",
+      "status": "UNTESTED",
+      "observation_days": null,
+      "eligible_calls": null,
+      "faults": null,
+      "automatic_recoveries": null,
+      "manual_corrections": null,
+      "evidence": "docs/validation/ACCESS_PROTOCOL.md",
+      "notes": "Automated tests passed; physical phone validation remains pending."
+    }
+  ]
+}

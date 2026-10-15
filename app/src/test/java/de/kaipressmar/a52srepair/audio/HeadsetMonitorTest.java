@@ -95,7 +95,7 @@ public class HeadsetMonitorTest {
         HeadsetMonitor monitor = new HeadsetMonitor(app);
         org.robolectric.util.ReflectionHelpers.setField(monitor, "headset", proxy);
         assertEquals(2, monitor.connectedDevices().size());
-        assertEquals(Boolean.TRUE, monitor.scoAudioConnected());
+        assertEquals(null, monitor.scoAudioConnected());
         assertEquals(Boolean.FALSE, monitor.scoAudioConnected(car));
         assertEquals(Boolean.TRUE, monitor.scoAudioConnected(watch));
         assertEquals(null, monitor.scoAudioConnected(adapter.getRemoteDevice("00:11:22:33:44:03")));

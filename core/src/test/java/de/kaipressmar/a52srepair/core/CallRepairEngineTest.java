@@ -190,10 +190,10 @@ public class CallRepairEngineTest {
 
     @Test public void automaticRebuildCannotReconnectOverPersistentOldScoLink() {
         Harness h = new Harness(PreventiveRebuildMode.OFF,
-                FaultClassifierTest.carCall().voiceOnBluetooth(false).build()) {
+                FaultClassifierTest.carCall().scoAudioConnected(false).build()) {
             @Override void react(RepairCommand c) {
                 if (c == RepairCommand.ROUTE_TO_EARPIECE || c == RepairCommand.ROUTE_TO_EARPIECE_LEGACY) {
-                    state = state.toBuilder().route(AudioRoute.EARPIECE).build();
+                    state = state.toBuilder().route(AudioRoute.EARPIECE).scoAudioConnected(true).build();
                 }
             }
         };
@@ -618,6 +618,18 @@ public class CallRepairEngineTest {
         assertTrue(h.executed.isEmpty());
     }
 
+    @Test public void eligibilityLossCancelsAnInFlightReturn() {
+        CallRepairEngine e = new CallRepairEngine(true, PreventiveRebuildMode.ALWAYS, false, T0);
+        CallAudioSnapshot s = FaultClassifierTest.carCall().build();
+        e.onSnapshot(s,T0);
+        assertFalse(e.onSnapshot(s,T0+2000).commands.isEmpty());
+        s=s.toBuilder().route(AudioRoute.EARPIECE).scoAudioConnected(false).repairAllowed(false).build();
+        assertTrue(e.onSnapshot(s,T0+3000).commands.isEmpty());
+        assertFalse(e.routingOperationActive());
+        assertEquals(de.kaipressmar.a52srepair.core.repair.ManualRepairStatus.ALTERNATIVE_ROUTE,
+                e.requestManualRepair(s,T0+4000).status);
+    }
+
     @Test public void healthyCallWithoutPreventiveModeIsLeftAlone() {
         Harness h = new Harness(PreventiveRebuildMode.OFF, FaultClassifierTest.carCall().build());
         h.runFor(60_000L);
@@ -700,7 +712,7 @@ public class CallRepairEngineTest {
     @Test public void oneWayAudioTriggersFullRebuild() {
         Harness h = new Harness(
                 PreventiveRebuildMode.OFF,
-                FaultClassifierTest.carCall().voiceOnBluetooth(false).build());
+                FaultClassifierTest.carCall().scoAudioConnected(false).build());
         h.runFor(20_000L);
         assertEquals(
                 List.of(RepairCommand.ROUTE_TO_EARPIECE, RepairCommand.ROUTE_TO_BLUETOOTH),
@@ -851,7 +863,7 @@ public class CallRepairEngineTest {
 
     @Test public void observeOnlyModeDetectsButNeverActs() {
         CallRepairEngine engine = new CallRepairEngine(false, PreventiveRebuildMode.ALWAYS, true, T0);
-        CallAudioSnapshot broken = FaultClassifierTest.carCall().voiceOnBluetooth(false).build();
+        CallAudioSnapshot broken = FaultClassifierTest.carCall().scoAudioConnected(false).build();
         for (long t = T0; t < T0 + 30_000L; t += 500L) {
             assertTrue(engine.onSnapshot(broken, t).commands.isEmpty());
         }
@@ -890,7 +902,7 @@ public class CallRepairEngineTest {
     @Test public void endedEngineIgnoresLateSnapshots() {
         Harness h = new Harness(PreventiveRebuildMode.ALWAYS, FaultClassifierTest.carCall().build());
         h.end();
-        h.state = FaultClassifierTest.carCall().voiceOnBluetooth(false).build();
+        h.state = FaultClassifierTest.carCall().scoAudioConnected(false).build();
         h.runFor(20_000L);
         assertTrue(h.executed.isEmpty());
         assertFalse(h.engine.report(h.now).preventiveRebuild);

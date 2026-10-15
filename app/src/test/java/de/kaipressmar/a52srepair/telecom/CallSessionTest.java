@@ -41,6 +41,11 @@ public class CallSessionTest {
         int callState = Call.STATE_ACTIVE;
         final List<Integer> requests = new ArrayList<>();
         CallSession session;
+        @Override public boolean safeToRepair() { return true; }
+        @Override public String targetToken() { return "test-target"; }
+        @Override public String selectedTargetToken() {
+            return audio.getRoute() == CallAudioState.ROUTE_BLUETOOTH ? "test-target" : null;
+        }
 
         @Override public CallAudioState audioState() { return audio; }
 
@@ -48,7 +53,7 @@ public class CallSessionTest {
 
         @Override public void requestRoute(int route) {
             requests.add(route);
-            int effective = route == CallAudioState.ROUTE_WIRED_OR_EARPIECE ? CallAudioState.ROUTE_EARPIECE : route;
+            int effective = route == CallAudioState.ROUTE_EARPIECE ? CallAudioState.ROUTE_EARPIECE : route;
             audio = new CallAudioState(false, effective, ALL_ROUTES);
             session.onEvent();
         }
@@ -89,7 +94,7 @@ public class CallSessionTest {
         FakeTelecom telecom = new FakeTelecom() {
             @Override public android.bluetooth.BluetoothDevice bluetoothDevice() { return LegacyBluetoothTargetTest.device(1); }
         };
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         de.kaipressmar.a52srepair.audio.CommunicationDeviceRecovery recovery =
                 org.robolectric.util.ReflectionHelpers.getField(telecom.session, "communication");
         assertTrue(recovery.request(telecom.bluetoothDevice(), 0L));
@@ -99,38 +104,30 @@ public class CallSessionTest {
         advance(200L);
         assertFalse(recovery.hasRequest());
         assertEquals(null, audio.getCommunicationDevice());
-        assertEquals(Boolean.TRUE, telecom.session.inspect().voiceOnBluetooth);
+        assertEquals(null, telecom.session.inspect().voiceOnBluetooth);
         assertTrue(recovery.request(telecom.bluetoothDevice(), 200L));
         telecom.session.finish();
         assertFalse(recovery.hasRequest());
         assertEquals(null, audio.getCommunicationDevice());
     }
 
-    @Test public void changingProtectionDuringCallStopsPendingAutomaticReturnAndAllowsManualRepair() {
-        FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
-        telecom.session.start();
-        advance(1_200L);
-        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
-        PreferenceManager.getDefaultSharedPreferences(context).edit()
-                .putBoolean("protection_enabled", false).commit();
-        advance(5_000L);
-        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
-        assertEquals(ManualRepairStatus.STARTED, telecom.session.repairManually());
-        advance(5_000L);
-        assertEquals(CallAudioState.ROUTE_BLUETOOTH, (int) telecom.requests.get(telecom.requests.size() - 1));
+    @Test public void protectionSwitchStopsBothAutomaticAndManualMutations() {
+        FakeTelecom telecom=new FakeTelecom();
+        telecom.session=new CallSession(context,telecom,Runnable::run);
+        telecom.session.start(); advance(1200);
+        assertEquals(List.of(CallAudioState.ROUTE_EARPIECE),telecom.requests);
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled",false).commit();
+        advance(5000);
+        assertEquals(ManualRepairStatus.ALTERNATIVE_ROUTE,telecom.session.repairManually());
+        assertEquals(1,telecom.requests.size());
         telecom.session.finish();
-        int count = telecom.requests.size();
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", true).commit();
-        advance(20_000L);
-        assertEquals(count, telecom.requests.size());
     }
 
     @Test public void ambiguousAutomaticTargetCannotMoveCallToPhoneBeforeFailingReturn() {
         FakeTelecom telecom = new FakeTelecom() {
             @Override public boolean bluetoothTargetAmbiguous() { return true; }
         };
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(20_000L);
         assertTrue(telecom.requests.isEmpty());
@@ -140,12 +137,12 @@ public class CallSessionTest {
 
     @Test public void a52sCarCallGetsOnePreventiveRebuildAndIsReported() {
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(20_000L);
 
         assertEquals(
-                List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE, CallAudioState.ROUTE_BLUETOOTH),
+                List.of(CallAudioState.ROUTE_EARPIECE, CallAudioState.ROUTE_BLUETOOTH),
                 telecom.requests);
 
         telecom.session.finish();
@@ -155,24 +152,20 @@ public class CallSessionTest {
         assertTrue(DiagnosticLog.readAll(context).contains("CALL END"));
     }
 
-    @Test public void callStuckOnEarpieceIsMovedToCar() {
-        FakeTelecom telecom = new FakeTelecom();
-        telecom.audio = new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, ALL_ROUTES);
-        telecom.session = new CallSession(context, telecom);
-        telecom.session.start();
-        advance(15_000L);
-
-        assertEquals(CallAudioState.ROUTE_BLUETOOTH, (int) telecom.requests.get(0));
+    @Test public void handsetCallWithUnusedBluetoothDeviceIsNeverSeized() {
+        FakeTelecom telecom=new FakeTelecom();
+        telecom.audio=new CallAudioState(false,CallAudioState.ROUTE_EARPIECE,ALL_ROUTES);
+        telecom.session=new CallSession(context,telecom,Runnable::run);
+        telecom.session.start(); advance(30_000);
+        assertTrue(telecom.requests.isEmpty());
+        assertEquals(0,telecom.session.report().dispatchedRequests);
         telecom.session.finish();
-        // Robolectric supplies neither SCO nor voice-route evidence: request != proven recovery.
-        assertEquals(CallOutcome.UNRESOLVED,
-                new CallReportRepository(context).history().latestBluetoothCall().outcome);
     }
 
     @Test public void shortBluetoothSelectionsAreLoggedWithoutDebounce() {
         FakeTelecom telecom = new FakeTelecom();
         telecom.audio = new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, ALL_ROUTES);
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(1L);
         DiagnosticLog.clear(context);
@@ -189,7 +182,7 @@ public class CallSessionTest {
 
     @Test public void activeReportDoesNotFinishOrPersistTheCall() {
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(100L);
         CallReport active = telecom.session.report();
@@ -209,12 +202,12 @@ public class CallSessionTest {
                 throw new SecurityException("unavailable call routing");
             }
         };
-        telecom.audio = new CallAudioState(false, CallAudioState.ROUTE_EARPIECE, ALL_ROUTES);
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(60_000L);
-        assertEquals(3, telecom.session.report().routeAttempts);
-        assertTrue(DiagnosticLog.readAll(context).contains("failed: SecurityException"));
+        assertTrue(telecom.requests.size() > 0);
+        assertTrue(telecom.requests.size() <= 4);
+        assertEquals(telecom.requests.size(), telecom.session.report().dispatchedRequests);
         telecom.session.finish();
         assertEquals(CallOutcome.UNRESOLVED,
                 new CallReportRepository(context).history().latestBluetoothCall().outcome);
@@ -222,7 +215,7 @@ public class CallSessionTest {
 
     @Test public void callbacksAfterFinishNeverRequestAnotherRoute() {
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         telecom.session.finish();
         telecom.session.onEvent();
@@ -233,25 +226,25 @@ public class CallSessionTest {
 
     @Test public void finishIsIdempotent() {
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         telecom.session.finish();
         telecom.session.finish();
         assertEquals(1, new CallReportRepository(context).history().all().size());
     }
 
-    @Test public void manualCheckIsReadOnlyAndExplicitRepairWorksWhilePaused() {
+    @Test public void manualCheckIsReadOnlyAndExplicitRepairUsesSharedBudget() {
         PreferenceManager.getDefaultSharedPreferences(context).edit()
-                .putBoolean("protection_enabled", false).commit();
+                .putBoolean("protection_enabled", true).putString("preventive_mode", "OFF").commit();
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
         advance(100L);
         assertTrue(telecom.session.inspect().bluetoothRouteAvailable);
         assertTrue(telecom.requests.isEmpty());
         assertEquals(ManualRepairStatus.STARTED, telecom.session.repairManually());
         advance(10_000L);
-        assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE, CallAudioState.ROUTE_BLUETOOTH), telecom.requests);
+        assertEquals(List.of(CallAudioState.ROUTE_EARPIECE, CallAudioState.ROUTE_BLUETOOTH), telecom.requests);
         assertEquals(1, telecom.session.report().manualRepairs);
         assertEquals(0, telecom.session.report().routeAttempts);
         assertEquals(CallOutcome.UNRESOLVED, telecom.session.report().outcome); // Unknown SCO/voice != proof.
@@ -265,16 +258,16 @@ public class CallSessionTest {
     }
 
     @Test public void manualCommandExceptionIsReportedAndObservationContinues() {
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", false).commit();
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", true).putString("preventive_mode","OFF").commit();
         FakeTelecom telecom = new FakeTelecom() {
             @Override public void requestRoute(int route) {
                 requests.add(route);
                 throw new SecurityException("routing denied");
             }
         };
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         telecom.session.start();
-        assertEquals(ManualRepairStatus.COMMAND_FAILED, telecom.session.repairManually());
+        assertEquals(ManualRepairStatus.STARTED, telecom.session.repairManually());
         advance(20_000L);
         assertEquals(1, telecom.requests.size());
         assertEquals(CallOutcome.UNRESOLVED, telecom.session.report().outcome);
@@ -285,7 +278,7 @@ public class CallSessionTest {
         FakeTelecom telecom = new FakeTelecom() {
             @Override public boolean bluetoothTargetAmbiguous() { return true; }
         };
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         assertEquals(ManualRepairStatus.AMBIGUOUS_DEVICE, telecom.session.repairManually());
         assertTrue(telecom.requests.isEmpty());
         assertEquals(0, telecom.session.report().manualRepairs);
@@ -295,7 +288,7 @@ public class CallSessionTest {
     @Test public void inspectionSeparatesMicrophoneMuteFromPlaybackMute() {
         FakeTelecom telecom = new FakeTelecom();
         telecom.audio = new CallAudioState(true, CallAudioState.ROUTE_BLUETOOTH, ALL_ROUTES);
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         assertTrue(telecom.session.inspect().microphoneMuted);
         assertFalse(telecom.session.inspect().voiceMuted);
         assertTrue(telecom.requests.isEmpty());
@@ -309,9 +302,9 @@ public class CallSessionTest {
         android.app.AppOpsManager ops = app.getSystemService(android.app.AppOpsManager.class);
         shadowOf(ops).setMode("android:manage_ongoing_calls", android.os.Process.myUid(), app.getPackageName(),
                 android.app.AppOpsManager.MODE_ALLOWED);
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", false).commit();
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean("protection_enabled", true).putString("preventive_mode","OFF").commit();
         FakeTelecom telecom = new FakeTelecom();
-        telecom.session = new CallSession(context, telecom);
+        telecom.session = new CallSession(context, telecom, Runnable::run);
         org.robolectric.android.controller.ServiceController<CallAudioService> controller =
                 org.robolectric.Robolectric.buildService(CallAudioService.class).create();
         CallAudioService service = controller.get();
@@ -328,7 +321,7 @@ public class CallSessionTest {
                 activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_check).performClick();
                 assertTrue(telecom.requests.isEmpty());
                 activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_repair).performClick();
-                assertEquals(List.of(CallAudioState.ROUTE_WIRED_OR_EARPIECE), telecom.requests);
+                assertTrue(telecom.requests.isEmpty());
                 android.widget.TextView message = activity.findViewById(de.kaipressmar.a52srepair.R.id.manual_result);
                 assertEquals(activity.getString(de.kaipressmar.a52srepair.R.string.manual_started), message.getText().toString());
             });

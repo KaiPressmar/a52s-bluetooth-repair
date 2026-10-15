@@ -19,6 +19,7 @@ public final class CallAudioSnapshot {
     public final boolean voiceMuted;
     public final boolean microphoneMuted;
     public final int callCount;
+    public final boolean repairAllowed;
 
     private CallAudioSnapshot(Builder b) {
         phase = b.phase;
@@ -33,6 +34,7 @@ public final class CallAudioSnapshot {
         voiceMuted = b.voiceMuted;
         microphoneMuted = b.microphoneMuted;
         callCount = b.callCount;
+        repairAllowed = b.repairAllowed;
     }
 
     public static Builder builder() {
@@ -51,7 +53,7 @@ public final class CallAudioSnapshot {
                 .voiceVolume(voiceVolume, voiceMaxVolume)
                 .voiceMuted(voiceMuted)
                 .microphoneMuted(microphoneMuted)
-                .callCount(callCount);
+                .callCount(callCount).repairAllowed(repairAllowed);
     }
 
     /** Voice stream is muted or at index 0: the caller is inaudible on every route. */
@@ -90,6 +92,7 @@ public final class CallAudioSnapshot {
         private boolean voiceMuted;
         private boolean microphoneMuted;
         private int callCount = 1;
+        private boolean repairAllowed = true;
 
         public Builder phase(CallPhase value) { phase = value; return this; }
         public Builder route(AudioRoute value) { route = value; return this; }
@@ -101,6 +104,7 @@ public final class CallAudioSnapshot {
         public Builder voiceVolume(int volume, int max) { voiceVolume = volume; voiceMaxVolume = max; return this; }
         public Builder voiceMuted(boolean value) { voiceMuted = value; return this; }
         public Builder microphoneMuted(boolean value) { microphoneMuted = value; return this; }
+        public Builder repairAllowed(boolean value) { repairAllowed = value; return this; }
         public Builder callCount(int value) { callCount = value; return this; }
 
         public CallAudioSnapshot build() {

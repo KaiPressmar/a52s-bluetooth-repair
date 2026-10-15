@@ -45,6 +45,17 @@ body:
     attributes:
       label: Observation period and number of car calls
       placeholder: 2 weeks, ~30 calls
+  - type: textarea
+    id: counts
+    attributes:
+      label: Reproduced faults and recovery counts
+      description: Give total calls, actual faulty calls, automatic recoveries, failures, and calls needing a manual correction. A period with no fault does not prove a repair.
+      placeholder: "50 calls; 10 actual failures; 8 automatic recoveries; 2 manual corrections"
+  - type: input
+    id: enrollment
+    attributes:
+      label: Call access setup and call type
+      placeholder: "Companion association; incoming cellular calls"
   - type: dropdown
     id: preventive
     attributes:

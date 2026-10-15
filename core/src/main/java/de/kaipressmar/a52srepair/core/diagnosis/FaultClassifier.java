@@ -24,7 +24,6 @@ public final class FaultClassifier {
 
         if (s.route != AudioRoute.BLUETOOTH) return Fault.CALL_NOT_ON_BLUETOOTH;
         if (Boolean.FALSE.equals(s.scoAudioConnected)) return Fault.SCO_DISCONNECTED;
-        if (Boolean.FALSE.equals(s.voiceOnBluetooth)) return Fault.DOWNLINK_NOT_ON_BLUETOOTH;
         if (s.voiceSilenced()) return Fault.VOICE_SILENCED;
         return Fault.NONE;
     }

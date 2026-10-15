@@ -29,6 +29,7 @@ jobs:
       tag: ${{ steps.check.outputs.tag }}
       previous_tag: ${{ steps.check.outputs.previous_tag }}
       latest: ${{ steps.check.outputs.latest }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -43,8 +44,13 @@ jobs:
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < RELEASE_VERSION)"
           TAG="v$VERSION"
+          CHANNEL="$(cat RELEASE_CHANNEL 2>/dev/null || echo stable)"
+          [[ "$CHANNEL" = stable || "$CHANNEL" = experimental ]] \
+            || { echo "::error::Invalid RELEASE_CHANNEL"; exit 1; }
+          PRERELEASE=false
+          [ "$CHANNEL" = experimental ] && PRERELEASE=true
 
-          # Stable versions only: the in-app updater offers every non-draft release to all users.
+          # Version strings stay numeric; the channel controls GitHub prerelease status.
           [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]] \
             || { echo "::error::RELEASE_VERSION '$VERSION' is not a stable MAJOR.MINOR.PATCH version"; exit 1; }
           LINE="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
@@ -64,7 +70,7 @@ jobs:
           STABLE_TAGS="$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
           HIGHEST="$(printf '%s\n%s\n' "$STABLE_TAGS" "$TAG" | sed '/^$/d' | sort -V | tail -n1)"
           LATEST=false
-          [ "$HIGHEST" = "$TAG" ] && LATEST=true
+          [ "$HIGHEST" = "$TAG" ] && [ "$PRERELEASE" = false ] && LATEST=true
           PREVIOUS="$(printf '%s\n%s\n' "$STABLE_TAGS" "$TAG" | sed '/^$/d' | sort -V | grep -B1 -x "$TAG" | head -n1)"
           [ "$PREVIOUS" = "$TAG" ] && PREVIOUS=""
 
@@ -74,6 +80,7 @@ jobs:
             echo "tag=$TAG"
             echo "previous_tag=$PREVIOUS"
             echo "latest=$LATEST"
+            echo "prerelease=$PRERELEASE"
           } >> "$GITHUB_OUTPUT"
           echo "::notice::Publishing $TAG from $BRANCH (latest=$LATEST, previous=${PREVIOUS:-none})"
 
@@ -222,6 +229,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LATEST: ${{ needs.prepare.outputs.latest }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -234,4 +242,5 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$RELEASE_TAG${TITLE:+ – $TITLE}" \
             --notes-file notes.md \
-            --latest="$LATEST"
+            --latest="$LATEST" \
+            --prerelease="$PRERELEASE"

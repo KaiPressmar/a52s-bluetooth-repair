@@ -47,6 +47,7 @@ public final class DiagnosticLog {
         current(context).delete();
         //noinspection ResultOfMethodCallIgnored
         previous(context).delete();
+        RecoveryEventLog.clear(context);
     }
 
     static String timestamp(long millis) {
