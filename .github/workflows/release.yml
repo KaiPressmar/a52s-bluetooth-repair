@@ -39,6 +39,7 @@ jobs:
         id: check
         env:
           BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -67,7 +68,9 @@ jobs:
             || { echo "::error::CHANGELOG.md has no '## $VERSION' section"; exit 1; }
 
           # Latest only if this is the highest stable version; a patch on an older line is not.
-          STABLE_TAGS="$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
+          RELEASED_TAGS="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.prerelease == false and .draft == false) | .tag_name')"
+          STABLE_TAGS="$(printf '%s\n' "$RELEASED_TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
           HIGHEST="$(printf '%s\n%s\n' "$STABLE_TAGS" "$TAG" | sed '/^$/d' | sort -V | tail -n1)"
           LATEST=false
           [ "$HIGHEST" = "$TAG" ] && [ "$PRERELEASE" = false ] && LATEST=true

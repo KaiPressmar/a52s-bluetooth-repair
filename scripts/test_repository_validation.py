@@ -1,5 +1,4 @@
 """Evidence and release-channel regression checks using only the Python standard library."""
-import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -35,7 +34,7 @@ class RepositoryValidationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
         start = workflow.index('          set -euo pipefail')
         end = workflow.index('\n  release:', start)
-        shell = '\n'.join(line[10:] for line in workflow[start:end].splitlines())
+        shell = 'gh() { echo v0.23.0; }\n' + '\n'.join(line[10:] for line in workflow[start:end].splitlines())
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(['git', 'init', '-q', directory], check=True)
@@ -46,12 +45,19 @@ class RepositoryValidationTest(unittest.TestCase):
                 output = root / 'outputs'
                 output.write_text('')
                 import os
-                env = dict(os.environ, BRANCH='release/0.24', GITHUB_OUTPUT=str(output))
+                env = dict(os.environ, BRANCH='release/0.24', GITHUB_OUTPUT=str(output), GITHUB_REPOSITORY='test/repo')
                 subprocess.run(['bash', '-c', shell], cwd=root, env=env, check=True,
                                stdout=subprocess.DEVNULL)
                 fields = dict(line.split('=', 1) for line in output.read_text().splitlines())
                 self.assertEqual(expected, fields['latest'])
                 self.assertEqual(str(channel == 'experimental').lower(), fields['prerelease'])
+            (root / 'RELEASE_VERSION').write_text('0.23.1\n')
+            (root / 'CHANGELOG.md').write_text('## 0.23.1 - Maintenance\n')
+            output.write_text('')
+            env['BRANCH'] = 'release/0.23'
+            subprocess.run(['bash', '-c', shell], cwd=root, env=env, check=True,
+                           stdout=subprocess.DEVNULL)
+            self.assertIn('latest=true', output.read_text())
 
 
 if __name__ == '__main__':
