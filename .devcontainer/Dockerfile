@@ -1,5 +1,5 @@
 # Android build environment matching CI: JDK 21, Android SDK platform 37, build-tools 36.
-FROM mcr.microsoft.com/devcontainers/java:1-21-bookworm
+FROM mcr.microsoft.com/devcontainers/java:3-25-bookworm
 
 ARG CMDLINE_TOOLS_VERSION=13114758
 ENV ANDROID_HOME=/opt/android-sdk \
